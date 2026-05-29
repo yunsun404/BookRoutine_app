@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "test",
-    "slug": "test",
+    "name": "BookRoutine_app",
+    "slug": "BookRoutine_app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "test",
+    "scheme": "BookRoutine_app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
