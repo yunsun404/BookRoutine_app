@@ -14,6 +14,9 @@ export default function HomeScreen() {
             <TouchableOpacity onPress={() => router.push('/(tabs)/readingroomstart')}>
                 <Text>독서방 시작 화면</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/deleteaccount')}>
+                <Text>탈퇴</Text>
+            </TouchableOpacity>
         </View>
 
     );

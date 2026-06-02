@@ -78,6 +78,13 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  // 탈퇴
+  deleteAccount: (body: {}) =>
+    request<{ success: boolean }>('/auth/delete', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    })
 };
 
 // ────────────────────────────────────────

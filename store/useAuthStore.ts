@@ -25,6 +25,9 @@ interface AuthState {
 
   // 토큰 갱신 후 access_token만 교체
   updateaccess_token: (access_token: string) => Promise<void>;
+
+  // 탈퇴
+  deleteAuth: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -55,4 +58,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     await AsyncStorage.setItem('access_token', access_token);
     set({ access_token });
   },
+
+  deleteAuth: async () => {
+    await AsyncStorage.removeItem('access_token');
+    await AsyncStorage.removeItem('refreshToken');
+    set({ user: null, access_token: null, isLoggedIn: false });
+  }
 }));
