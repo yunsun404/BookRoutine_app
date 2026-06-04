@@ -1,6 +1,6 @@
-import React from "react";
-import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import React from "react";
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -10,49 +10,54 @@ const TAB_CONFIG: {
   icon: IoniconsName;
   iconActive: IoniconsName;
 }[] = [
-    {
-      name: "stats",
-      title: "통계",
-      icon: "bar-chart-outline",
-      iconActive: "bar-chart",
-    },
-    {
-      name: "calendar",
-      title: "달력",
-      icon: "calendar-outline",
-      iconActive: "calendar",
-    },
-    { name: "index", title: "홈", icon: "home-outline", iconActive: "home" },
-    {
-      name: "group",
-      title: "그룹",
-      icon: "people-outline",
-      iconActive: "people",
-    },
-    {
-      name: "recommend",
-      title: "추천",
-      icon: "sparkles-outline",
-      iconActive: "sparkles",
-    },
-  ];
+  {
+    name: "stats",
+    title: "통계",
+    icon: "bar-chart-outline",
+    iconActive: "bar-chart",
+  },
+  {
+    name: "calendar",
+    title: "달력",
+    icon: "calendar-outline",
+    iconActive: "calendar",
+  },
+  {
+    name: "index",
+    title: "홈",
+    icon: "home-outline",
+    iconActive: "home",
+  },
+  {
+    name: "group",
+    title: "그룹",
+    icon: "people-outline",
+    iconActive: "people",
+  },
+  {
+    name: "recommend",
+    title: "추천",
+    icon: "sparkles-outline",
+    iconActive: "sparkles",
+  },
+];
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#1a1a1a",
-        tabBarInactiveTintColor: "#a0a0a0",
+        tabBarActiveTintColor: "#4A3B32",
+        tabBarInactiveTintColor: "#999",
         tabBarStyle: {
+          backgroundColor: "#fff",
           borderTopWidth: 0.5,
-          borderTopColor: "rgba(0,0,0,0.14)",
-          elevation: 0,
-          shadowOpacity: 0,
+          borderTopColor: "#E0E0E0",
+          height: 60,
+          paddingBottom: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          marginBottom: 2,
+          fontSize: 11,
         },
       }}
     >
@@ -72,6 +77,7 @@ export default function TabsLayout() {
           }}
         />
       ))}
+
       <Tabs.Screen
         name="goals"
         options={{
@@ -79,6 +85,5 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
-
   );
 }
