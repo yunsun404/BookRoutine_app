@@ -1,0 +1,283 @@
+import { Dimensions, StyleSheet } from "react-native";
+
+const { width } = Dimensions.get("window");
+const COLUMN_COUNT = 3;
+const CARD_WIDTH = (width - 56) / COLUMN_COUNT;
+
+export { CARD_WIDTH, COLUMN_COUNT };
+
+export default StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F0EFED",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#E1D9D1",
+    marginRight: 16,
+  },
+  profileInfo: {
+    justifyContent: "center",
+  },
+  nickname: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333",
+  },
+  ageGroup: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 2,
+  },
+  tabRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  tabActive: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "#333",
+  },
+  tabActiveText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#333",
+  },
+  tabInactive: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  tabInactiveText: {
+    fontSize: 14,
+    color: "#999",
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  columnWrapper: {
+    justifyContent: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+  card: {
+    width: CARD_WIDTH,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  bookCover: {
+    width: CARD_WIDTH - 24,
+    height: (CARD_WIDTH - 24) * 1.45,
+    borderRadius: 8,
+    backgroundColor: "#E1D9D1",
+  },
+  bookTitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 10,
+    textAlign: "center",
+    width: "100%",
+  },
+  dateText: {
+    fontSize: 10,
+    color: "#999",
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 5,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#C8B84A",
+    borderRadius: 3,
+  },
+  badge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#4A3B32",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    zIndex: 1,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  folderCard: {
+    width: CARD_WIDTH,
+    height: (CARD_WIDTH - 24) * 1.45 + 70,
+    backgroundColor: "#C8B8E8",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    minHeight: 100,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  folderName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#4A3B6B",
+    textAlign: "center",
+  },
+  folderCount: {
+    fontSize: 11,
+    color: "#6B5A9B",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  addFolderCard: {
+    width: CARD_WIDTH,
+    height: (CARD_WIDTH - 24) * 1.45 + 70,
+    backgroundColor: "#F0EFED",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#DDD",
+    borderStyle: "dashed",
+    minHeight: 100,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  addFolderText: {
+    fontSize: 28,
+    color: "#999",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: width * 0.8,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 16,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  modalCancel: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  modalCancelText: {
+    fontSize: 14,
+    color: "#999",
+  },
+  modalConfirm: {
+    backgroundColor: "#4A3B32",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "700",
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "flex-end",
+  },
+  menuBox: {
+    width: 200,
+    backgroundColor: "#fff",
+    borderBottomLeftRadius: 16,
+    paddingVertical: 16,
+    marginTop: 56,
+    shadowColor: "#000",
+    shadowOffset: { width: -2, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  menuProfile: {
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#E1D9D1",
+    marginBottom: 8,
+  },
+  menuNickname: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#333",
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: "#F0EFED",
+    marginVertical: 8,
+  },
+  menuItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  menuItemText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  backButton: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+});
