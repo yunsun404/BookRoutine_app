@@ -34,7 +34,7 @@ interface MyBook {
   };
 }
 
-const BASE_URL = "http://172.20.19.42:3000";
+const BASE_URL = "http://172.20.6.25:3000/api/v1";
 const { width } = Dimensions.get("window");
 const COLUMN_COUNT = 3;
 const CARD_WIDTH = (width - 56) / COLUMN_COUNT;

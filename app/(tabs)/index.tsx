@@ -1,8 +1,12 @@
 import BookCarousel, { type Book } from "@/components/home/BookCarousel";
 import FeedCard, { type FeedItem } from "@/components/home/FreedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
-import { ScrollView, StyleSheet, View } from "react-native";
-import Header from "../../components/Header";
+import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import Header from "@/components/Header";
+import { useRouter } from "expo-router";
+
+
+
 
 const today = new Date();
 const tomorrow = new Date(today);
@@ -56,6 +60,8 @@ const MOCK_FEED: FeedItem[] = [
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
+
   return (
     <>
       <Header />
@@ -64,16 +70,25 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <BookCarousel books={MOCK_BOOKS} />
+        <Pressable onPress={() => router.push("/goals")}>
+          <BookCarousel books={MOCK_BOOKS} />
+        </Pressable>
+
         <GoalSection
           goal="데미안 읽기"
           tasks={MOCK_TASKS}
           onGoalEdit={() => console.log("목표 수정")}
           onTaskEdit={(id) => console.log("할일 수정:", id)}
         />
+
         <View style={styles.feedSection}>
           {MOCK_FEED.map((item) => (
-            <FeedCard key={item.id} item={item} />
+            <Pressable
+              key={item.id}
+              onPress={() => router.push("/thread")}
+            >
+              <FeedCard item={item} />
+            </Pressable>
           ))}
         </View>
       </ScrollView>

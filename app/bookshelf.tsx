@@ -46,7 +46,7 @@ interface FolderItem {
   }[];
 }
 
-const BASE_URL = "http://172.20.19.42:3000";
+const BASE_URL = "http://172.20.6.25:3000/api/v1";
 const formatAge = (age: number) => {
   if (age >= 10 && age < 20) return "10대";
   if (age >= 20 && age < 30) return "20대";

@@ -1,5 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
+import React from "react";
 import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -9,32 +10,32 @@ const TAB_CONFIG: {
   icon: IoniconsName;
   iconActive: IoniconsName;
 }[] = [
-  {
-    name: "stats",
-    title: "통계",
-    icon: "bar-chart-outline",
-    iconActive: "bar-chart",
-  },
-  {
-    name: "calendar",
-    title: "달력",
-    icon: "calendar-outline",
-    iconActive: "calendar",
-  },
-  { name: "index", title: "홈", icon: "home-outline", iconActive: "home" },
-  {
-    name: "group",
-    title: "그룹",
-    icon: "people-outline",
-    iconActive: "people",
-  },
-  {
-    name: "recommend",
-    title: "추천",
-    icon: "sparkles-outline",
-    iconActive: "sparkles",
-  },
-];
+    {
+      name: "stats",
+      title: "통계",
+      icon: "bar-chart-outline",
+      iconActive: "bar-chart",
+    },
+    {
+      name: "calendar",
+      title: "달력",
+      icon: "calendar-outline",
+      iconActive: "calendar",
+    },
+    { name: "index", title: "홈", icon: "home-outline", iconActive: "home" },
+    {
+      name: "group",
+      title: "그룹",
+      icon: "people-outline",
+      iconActive: "people",
+    },
+    {
+      name: "recommend",
+      title: "추천",
+      icon: "sparkles-outline",
+      iconActive: "sparkles",
+    },
+  ];
 
 export default function TabsLayout() {
   return (
@@ -71,6 +72,13 @@ export default function TabsLayout() {
           }}
         />
       ))}
+      <Tabs.Screen
+        name="goals"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
+
   );
 }
