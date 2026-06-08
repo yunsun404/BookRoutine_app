@@ -1,3 +1,4 @@
+import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import Header from "../components/Header";
-import { supabase } from "../lib/supabase";
 import styles from "./styles/bookshelf.styles";
 
 interface BookshelfItem {
@@ -46,7 +46,6 @@ interface FolderItem {
   }[];
 }
 
-const BASE_URL = "http://localhost:3000/api/v1";
 const formatAge = (age: number) => {
   if (age >= 10 && age < 20) return "10대";
   if (age >= 20 && age < 30) return "20대";
@@ -57,7 +56,6 @@ const formatAge = (age: number) => {
 };
 
 export default function BookshelfScreen() {
-  // ✅ 수정: 초기값을 [] 로 설정
   const [books, setBooks] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"bookshelf" | "garden">(
@@ -74,26 +72,26 @@ export default function BookshelfScreen() {
     fetchFolders();
   }, []);
 
+  // ✅ supabase 직접 호출 제거 — user API로 교체
   const fetchProfile = async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("nickname, age, profile_image")
-      .eq("user_id", "7ff77428-bdab-4724-9a67-ed5587217978")
-      .single();
-    if (!error && data) setProfile(data);
+    try {
+      const response = await authFetch(`${BASE_URL}/users/me`);
+      const data = await response.json();
+      if (data) setProfile(data);
+    } catch (error) {
+      console.error("프로필 에러:", error);
+    }
   };
 
   const fetchBooks = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/bookshelf`);
+      // ✅ authFetch로 교체
+      const response = await authFetch(`${BASE_URL}/bookshelf`);
       const data = await response.json();
-      console.log("응답 상태:", response.status);
-      console.log("응답 데이터:", JSON.stringify(data)); // ← 추가
-      // 배열인지 확인 후 set
       setBooks(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("에러:", error);
-      setBooks([]); // 에러 시에도 빈 배열 보장
+      setBooks([]);
     } finally {
       setLoading(false);
     }
@@ -101,9 +99,10 @@ export default function BookshelfScreen() {
 
   const fetchFolders = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/bookshelf/folders`);
+      // ✅ authFetch로 교체
+      const response = await authFetch(`${BASE_URL}/bookshelf/folders`);
       const data = await response.json();
-      setFolders(Array.isArray(data) ? data : []); // 동일하게 방어
+      setFolders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("폴더 에러:", error);
       setFolders([]);
@@ -123,9 +122,9 @@ export default function BookshelfScreen() {
   const createFolder = async () => {
     if (!folderName.trim()) return;
     try {
-      await fetch(`${BASE_URL}/bookshelf/folders`, {
+      // ✅ authFetch로 교체
+      await authFetch(`${BASE_URL}/bookshelf/folders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder_name: folderName }),
       });
       setFolderName("");

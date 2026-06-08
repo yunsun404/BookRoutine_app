@@ -1,3 +1,5 @@
+import { useColorScheme } from "@/components/useColorScheme";
+import { authFetch, BASE_URL, initAuth } from "@/constants/api";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import {
   DarkTheme,
@@ -7,22 +9,15 @@ import {
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "react-native-reanimated";
 
-import { useColorScheme } from "@/components/useColorScheme";
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary
-} from "expo-router";
+export { ErrorBoundary } from "expo-router";
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: "(tabs)",
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -30,19 +25,31 @@ export default function RootLayout() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     ...FontAwesome.font,
   });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  const [authReady, setAuthReady] = useState(false); // ✅ 추가
 
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      initAuth().then(async () => {
+        setAuthReady(true);
+        try {
+          // 발자국 체크
+          await authFetch(`${BASE_URL}/checklists/check-paw`, {
+            method: "POST",
+          });
+          // ✅ 미완료 체크리스트 다음 독서일로 복사
+          await authFetch(`${BASE_URL}/checklists/rollover`, {
+            method: "POST",
+          });
+        } catch (e) {
+          console.error("앱 초기화 실패:", e);
+        }
+      });
     }
   }, [loaded]);
 
-  if (!loaded) {
+  // ✅ 폰트 로딩 + 로그인 둘 다 완료돼야 렌더링
+  if (!loaded || !authReady) {
     return null;
   }
 

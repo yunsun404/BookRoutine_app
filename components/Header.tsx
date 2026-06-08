@@ -1,15 +1,15 @@
+import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    Image,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
 
 interface UserProfile {
   nickname: string;
@@ -24,6 +24,7 @@ export default function Header() {
     fetchProfile();
   }, []);
 
+  /*
   const fetchProfile = async () => {
     const { data, error } = await supabase
       .from("users")
@@ -32,6 +33,12 @@ export default function Header() {
       .single();
 
     if (!error && data) setProfile(data);
+  };
+  */
+  const fetchProfile = async () => {
+    const res = await authFetch(`${BASE_URL}/user/me`);
+    const data = await res.json();
+    if (data) setProfile(data);
   };
 
   return (

@@ -2,6 +2,7 @@ import { Colors, FontSize, Spacing } from "@/components/constants/tokens";
 import BookCarousel, { type Book } from "@/components/home/BookCarousel";
 import FeedCard, { type FeedItem } from "@/components/home/FreedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
+import { authFetch, BASE_URL } from "@/constants/api";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,8 +15,6 @@ import {
 } from "react-native";
 import Header from "../../components/Header";
 
-const BASE_URL = "http://localhost:3000/api/v1";
-const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type ChecklistItem = {
@@ -77,9 +76,8 @@ export default function HomeScreen() {
 
   async function fetchUpcoming() {
     try {
-      const res = await fetch(
-        `${BASE_URL}/checklists/upcoming?user_id=${USER_ID}`,
-      );
+      // ✅ authFetch로 교체 — 토큰 자동 포함
+      const res = await authFetch(`${BASE_URL}/checklists/upcoming`);
       const data: BookGroup[] = await res.json();
       setBookGroups(data);
     } catch (e) {
@@ -89,7 +87,6 @@ export default function HomeScreen() {
     }
   }
 
-  // 낙관적 업데이트 — 특정 책 그룹의 특정 태스크 토글
   async function handleToggle(bookId: string, taskId: string) {
     setBookGroups((prev) =>
       prev.map((group) =>
@@ -107,11 +104,11 @@ export default function HomeScreen() {
     );
 
     try {
-      await fetch(`${BASE_URL}/checklists/${taskId}/check`, {
+      // ✅ authFetch로 교체
+      await authFetch(`${BASE_URL}/checklists/${taskId}/check`, {
         method: "PATCH",
       });
     } catch (e) {
-      // 실패 시 원상복구
       setBookGroups((prev) =>
         prev.map((group) =>
           group.book_id !== bookId
@@ -150,7 +147,6 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View>
-            {/* 책별 스와이프 */}
             <FlatList
               data={bookGroups}
               horizontal
@@ -158,6 +154,7 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.book_id}
               scrollEventThrottle={16}
+              nestedScrollEnabled={true}
               getItemLayout={(_, index) => ({
                 length: SCREEN_WIDTH,
                 offset: SCREEN_WIDTH * index,
@@ -183,7 +180,6 @@ export default function HomeScreen() {
               )}
             />
 
-            {/* 페이지 인디케이터 — 몇 번째 책인지 점으로 표시 */}
             {bookGroups.length > 1 && (
               <View style={styles.dotRow}>
                 {bookGroups.map((_, i) => (
