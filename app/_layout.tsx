@@ -67,14 +67,16 @@ function RootLayoutNav() {
         <Stack.Screen name="folder/[folder_id]" options={{ headerShown: false }} />
         <Stack.Screen name="book/[bookshelf_id]" options={{ headerShown: false }} />
         
-        {/* 인증 관련 라우트 */}
+        {/* 인증 관련 라우트 (index는 루트 폴더에 있고, signup/logout은 (auth) 폴더 안에 있으므로 경로 수정) */}
         <Stack.Screen name="index" options={{ title: 'login' }} />
-        <Stack.Screen name="signup" options={{ title: 'signup' }} />
-        <Stack.Screen name="logout" options={{ title: 'logout' }} />
+        <Stack.Screen name="(auth)/signup" options={{ title: 'signup' }} />
+        <Stack.Screen name="(auth)/logout" options={{ title: 'logout' }} />
 
-        {/* 🛠️ [수정] ranking과 goals 모두 순정 헤더바를 완벽하게 숨겨 커스텀 헤더와 일치시킵니다 */}
-        <Stack.Screen name="ranking/ranking" options={{ headerShown: false }} />
-        <Stack.Screen name="goals" options={{ headerShown: false }} />
+        {/* 🛠️ [수정] 실제 라우트 목록에 'ranking'으로 잡혀 있으므로 중복 경로 수정 */}
+        <Stack.Screen name="ranking" options={{ headerShown: false }} />
+
+        {/* 🛠️ [주의] 'goals' 화면은 (tabs)/_layout.tsx 내부에서 이미 정의 및 href: null 처리가 
+            완료되었으므로, 중복 에러를 막기 위해 최상단 Stack에서는 제거했습니다! */}
       </Stack>
     </ThemeProvider>
   );
