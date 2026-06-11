@@ -21,7 +21,7 @@ interface BookInFolder {
     book_id: string;
     title: string;
     cover_url: string;
-    bookshelves: { bookshelf_id: string; status: number }[];
+    bookshelves: { bookshelf_id: string; status: number; progress: number }[];
   };
 }
 
@@ -34,7 +34,7 @@ interface MyBook {
   };
 }
 
-const BASE_URL = "http://172.20.6.25:3000/api/v1";
+const BASE_URL = "http://localhost:3000/api/v1";
 const { width } = Dimensions.get("window");
 const COLUMN_COUNT = 3;
 const CARD_WIDTH = (width - 56) / COLUMN_COUNT;
@@ -237,6 +237,16 @@ export default function FolderDetailScreen() {
                 <Text style={styles.bookTitle} numberOfLines={1}>
                   {item.book.title}
                 </Text>
+                <View style={styles.progressBarBackground}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${item.book.bookshelves?.[0]?.progress ?? 0}%`,
+                      },
+                    ]}
+                  />
+                </View>
               </View>
             </TouchableOpacity>
           )}
@@ -463,5 +473,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "700",
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 5,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginTop: 6,
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#C8B84A",
+    borderRadius: 3,
   },
 });

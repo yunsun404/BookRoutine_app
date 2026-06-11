@@ -4,9 +4,10 @@ import { create } from 'zustand';
 interface User {
   user_id: string;
   nickname: string;
-  profile_image?: string;
-  reading_style?: JSON;
-  favorite_genre?: JSON;
+  profile_image?: string | null;
+  reading_style?: object | null;
+  reading_habit?: object | null;
+  favorite_genre?: object | null;
 }
 
 interface AuthState {

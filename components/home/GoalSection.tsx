@@ -1,9 +1,9 @@
 import {
-    Colors,
-    FontSize,
-    Radius,
-    Spacing,
-} from "@/components/constants/tokens";
+  Colors,
+  FontSize,
+  Radius,
+  Spacing,
+} from "@/constants/tokens"; // 프로젝트 경로에 맞게 수정하세요
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -19,6 +19,7 @@ type Props = {
   tasks: Task[];
   onGoalEdit?: () => void;
   onTaskEdit?: (id: string) => void;
+  onTaskToggle: (taskId: string) => void; // 타입 추가
 };
 
 function getWhenLabel(dueDate: string): string {
@@ -26,9 +27,7 @@ function getWhenLabel(dueDate: string): string {
   today.setHours(0, 0, 0, 0);
   const due = new Date(dueDate);
   due.setHours(0, 0, 0, 0);
-  const diff = Math.round(
-    (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const diff = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diff === 0) return "오늘";
   if (diff === 1) return "내일";
@@ -42,6 +41,7 @@ export default function GoalSection({
   tasks,
   onGoalEdit,
   onTaskEdit,
+  onTaskToggle, // 추가
 }: Props) {
   return (
     <View style={styles.section}>
@@ -61,6 +61,7 @@ export default function GoalSection({
             isLast={idx === tasks.length - 1}
             whenLabel={getWhenLabel(task.dueDate)}
             onEdit={() => onTaskEdit?.(task.id)}
+            onToggle={() => onTaskToggle(task.id)} // 추가
           />
         ))}
       </View>
@@ -73,20 +74,24 @@ type TaskItemProps = {
   isLast: boolean;
   whenLabel: string;
   onEdit: () => void;
+  onToggle: () => void; // 추가
 };
 
-function TaskItem({ task, isLast, whenLabel, onEdit }: TaskItemProps) {
+function TaskItem({ task, isLast, whenLabel, onEdit, onToggle }: TaskItemProps) {
   return (
     <View style={[styles.taskItem, !isLast && styles.taskBorder]}>
-      <View style={[styles.checkbox, task.done && styles.checkboxDone]}>
+      {/* 체크박스를 클릭 가능하게 변경 */}
+      <TouchableOpacity onPress={onToggle} style={[styles.checkbox, task.done && styles.checkboxDone]}>
         {task.done && <Text style={styles.checkmark}>✓</Text>}
-      </View>
+      </TouchableOpacity>
+      
       <Text
         style={[styles.taskText, task.done && styles.taskTextDone]}
         numberOfLines={1}
       >
         {task.text}
       </Text>
+      
       {whenLabel === "오늘" && (
         <TouchableOpacity onPress={onEdit}>
           <Text style={styles.editBtn}>수정</Text>
@@ -98,79 +103,18 @@ function TaskItem({ task, isLast, whenLabel, onEdit }: TaskItemProps) {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: 10,
-  },
-  goalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.bgSecondary,
-    borderRadius: Radius.md,
-  },
-  goalLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    minWidth: 36,
-  },
-  goalText: {
-    flex: 1,
-    fontSize: FontSize.md,
-    fontWeight: "500",
-    color: Colors.textPrimary,
-    textAlign: "center",
-  },
-  editBtn: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
-  tasksCard: {
-    backgroundColor: Colors.bgSecondary,
-    borderRadius: Radius.lg,
-    marginTop: 10,
-    overflow: "hidden",
-  },
-  taskItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-  },
-  taskBorder: {
-    borderBottomWidth: 0.5,
-    borderBottomColor: Colors.border,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    backgroundColor: Colors.borderStrong,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxDone: {
-    backgroundColor: Colors.check,
-  },
-  checkmark: {
-    fontSize: 11,
-    color: "#fff",
-    fontWeight: "700",
-  },
-  taskText: {
-    flex: 1,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  taskTextDone: {
-    textDecorationLine: "line-through",
-    opacity: 0.5,
-  },
-  whenLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    marginLeft: 4,
-  },
+  section: { paddingHorizontal: Spacing.lg, paddingTop: 10 },
+  goalRow: { flexDirection: "row", alignItems: "center", padding: 10, paddingHorizontal: 14, backgroundColor: Colors.bgSecondary, borderRadius: Radius.md },
+  goalLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, minWidth: 36 },
+  goalText: { flex: 1, fontSize: FontSize.md, fontWeight: "500", color: Colors.textPrimary, textAlign: "center" },
+  editBtn: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  tasksCard: { backgroundColor: Colors.bgSecondary, borderRadius: Radius.lg, marginTop: 10, overflow: "hidden" },
+  taskItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 14 },
+  taskBorder: { borderBottomWidth: 0.5, borderBottomColor: Colors.border },
+  checkbox: { width: 18, height: 18, borderRadius: 4, backgroundColor: Colors.borderStrong, alignItems: "center", justifyContent: "center" },
+  checkboxDone: { backgroundColor: Colors.check },
+  checkmark: { fontSize: 11, color: "#fff", fontWeight: "700" },
+  taskText: { flex: 1, fontSize: FontSize.base, color: Colors.textPrimary },
+  taskTextDone: { textDecorationLine: "line-through", opacity: 0.5 },
+  whenLabel: { fontSize: FontSize.xs, color: Colors.textTertiary, marginLeft: 4 },
 });

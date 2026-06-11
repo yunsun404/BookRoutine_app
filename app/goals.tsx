@@ -1,3 +1,4 @@
+import { Colors, FontSize, Radius, Spacing } from "@/constants/tokens";
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
@@ -9,6 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+
+import { useRouter } from 'expo-router';
 
 const API_URL = 'http://localhost:3000/reading-goals';
 
@@ -54,7 +57,16 @@ type Book = {
   total_pages: number;
 };
 
+type CalendarCell = {
+  date: Date;
+  day: number;
+  currentMonth: boolean;
+  dateString: string;
+};
+
 export default function GoalsScreen() {
+  const router = useRouter();
+
   const [step, setStep] = useState<'book' | 'plan'>('book');
 
   const [book, setBook] = useState<Book>(defaultBook);
@@ -77,6 +89,11 @@ export default function GoalsScreen() {
 
   const readingDates = useMemo(() => {
     const result: Date[] = [];
+
+    if (!startDate || !endDate) {
+      return result;
+    }
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -90,6 +107,7 @@ export default function GoalsScreen() {
       if (selectedDays.includes(current.getDay())) {
         result.push(new Date(current));
       }
+
       current.setDate(current.getDate() + 1);
     }
 
@@ -97,26 +115,25 @@ export default function GoalsScreen() {
   }, [startDate, endDate, selectedDays]);
 
   const dailyPages =
-    readingDates.length > 0 ? Math.ceil(book.total_pages / readingDates.length) : 0;
+    readingDates.length > 0
+      ? Math.ceil(book.total_pages / readingDates.length)
+      : 0;
 
   const calendarDays = useMemo(() => {
     const firstDate = new Date(currentYear, currentMonth, 1);
     const lastDate = new Date(currentYear, currentMonth + 1, 0);
+
     const firstDay = firstDate.getDay();
     const lastDay = lastDate.getDate();
 
     const prevLastDate = new Date(currentYear, currentMonth, 0).getDate();
 
-    const cells: {
-      date: Date;
-      day: number;
-      currentMonth: boolean;
-      dateString: string;
-    }[] = [];
+    const cells: CalendarCell[] = [];
 
     for (let i = firstDay - 1; i >= 0; i--) {
       const day = prevLastDate - i;
       const date = new Date(currentYear, currentMonth - 1, day);
+
       cells.push({
         date,
         day,
@@ -127,6 +144,7 @@ export default function GoalsScreen() {
 
     for (let day = 1; day <= lastDay; day++) {
       const date = new Date(currentYear, currentMonth, day);
+
       cells.push({
         date,
         day,
@@ -138,6 +156,7 @@ export default function GoalsScreen() {
     while (cells.length % 7 !== 0) {
       const nextDay = cells.length - firstDay - lastDay + 1;
       const date = new Date(currentYear, currentMonth + 1, nextDay);
+
       cells.push({
         date,
         day: nextDay,
@@ -186,21 +205,24 @@ export default function GoalsScreen() {
   };
 
   const isStartDate = (dateString: string) => dateString === startDate;
+
   const isEndDate = (dateString: string) => dateString === endDate;
 
   const isInRange = (dateString: string) => {
     if (!startDate || !endDate) return false;
+
     const target = new Date(dateString);
+
     return target >= new Date(startDate) && target <= new Date(endDate);
   };
 
   const toggleDay = (day: number) => {
     setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+      prev.includes(day)
+        ? prev.filter((d) => d !== day)
+        : [...prev, day],
     );
   };
-
-
 
   const searchBooks = async (text: string) => {
     setSearchTitle(text);
@@ -215,26 +237,30 @@ export default function GoalsScreen() {
       setSearchLoading(true);
 
       const res = await fetch(
-        `http://localhost:3000/books/search?query=${encodeURIComponent(text)}`,
+        `http://localhost:3000/api/v1/reading-goals/search?title=${encodeURIComponent(text)}`
       );
 
       const data = await res.json();
 
-      setSearchResults(data);
+      if (Array.isArray(data)) {
+        setSearchResults(data);
+      } else {
+        setSearchResults([]);
+      }
     } catch (error) {
       console.log(error);
+      setSearchResults([]);
     } finally {
       setSearchLoading(false);
     }
   };
-
-
 
   const openBookModal = () => {
     setTempTitle(book.title);
     setTempAuthor(book.author);
     setTempPages(String(book.total_pages));
     setSearchTitle('');
+    setSearchResults([]);
     setTitleOpen(false);
     setBookModalVisible(true);
   };
@@ -245,14 +271,42 @@ export default function GoalsScreen() {
       return;
     }
 
+    const pageNumber = Number(tempPages);
+
+    if (Number.isNaN(pageNumber) || pageNumber <= 0) {
+      Alert.alert('알림', '총 페이지 수는 숫자로 입력해주세요.');
+      return;
+    }
+
     setBook({
       ...book,
       title: tempTitle,
       author: tempAuthor,
-      total_pages: Number(tempPages),
+      total_pages: pageNumber,
     });
 
     setBookModalVisible(false);
+  };
+
+  const handleSearch = async (query) => {
+    try {
+      console.log("검색 시도 중:", query); // 1. 검색어 확인
+
+      const response = await fetch(`/api/v1/reading-goals/search?title=${query}`);
+
+      console.log("서버 응답 상태:", response.status); // 2. HTTP 상태 코드 확인 (200, 404, 500 등)
+
+      if (!response.ok) {
+        throw new Error(`서버 에러 발생: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("받아온 검색 결과 데이터:", data); // 3. 실제 데이터 구조 확인
+
+      setSearchResults(data);
+    } catch (error) {
+      console.error("검색 중 에러 발생:", error); // 4. 어디서 실패했는지 상세 로그
+    }
   };
 
   const createGoal = async () => {
@@ -297,29 +351,38 @@ export default function GoalsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.pageTitle}>목표설정</Text>
+      <Text style={styles.pageTitle}>목표 설정</Text>
 
       {step === 'book' ? (
-        <View style={styles.screen}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <Pressable style={styles.bookAddBox} onPress={openBookModal}>
             <Text style={styles.plusText}>+ 책 추가</Text>
           </Pressable>
 
-          <View style={styles.bookInfoBox}>
-            <InfoRow label="제목 :" value={book.title} />
-            <InfoRow label="저자 :" value={book.author} />
-            <InfoRow label="총 페이지 수 :" value={`${book.total_pages}`} />
+          <View style={styles.card}>
+            <InfoRow label="제목" value={book.title} />
+            <InfoRow label="저자" value={book.author} />
+            <InfoRow label="총 페이지" value={`${book.total_pages}쪽`} />
           </View>
 
           <Pressable style={styles.mainButton} onPress={() => setStep('plan')}>
             <Text style={styles.mainButtonText}>계획 생성하기</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       ) : (
-        <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
-          <View style={styles.bookTopInfo}>
-            <InfoRow label="제목 :" value={book.title} />
-            <InfoRow label="저자 :" value={book.author} />
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.card}>
+            <InfoRow label="제목" value={book.title} />
+            <InfoRow label="저자" value={book.author} />
+            <InfoRow label="총 페이지" value={`${book.total_pages}쪽`} />
           </View>
 
           <View style={styles.calendarBox}>
@@ -328,12 +391,16 @@ export default function GoalsScreen() {
                 <Text style={styles.arrowText}>‹</Text>
               </Pressable>
 
-              <View style={styles.calendarSelectBox}>
-                <Text style={styles.calendarSelectText}>{monthNames[currentMonth]}</Text>
-              </View>
+              <View style={styles.calendarTitleRow}>
+                <View style={styles.calendarSelectBox}>
+                  <Text style={styles.calendarSelectText}>
+                    {monthNames[currentMonth]}
+                  </Text>
+                </View>
 
-              <View style={styles.calendarSelectBox}>
-                <Text style={styles.calendarSelectText}>{currentYear}</Text>
+                <View style={styles.calendarSelectBox}>
+                  <Text style={styles.calendarSelectText}>{currentYear}</Text>
+                </View>
               </View>
 
               <Pressable onPress={() => moveMonth('next')}>
@@ -351,7 +418,9 @@ export default function GoalsScreen() {
 
             <View style={styles.calendarGrid}>
               {calendarDays.map((item) => {
-                const selected = isStartDate(item.dateString) || isEndDate(item.dateString);
+                const selected =
+                  isStartDate(item.dateString) || isEndDate(item.dateString);
+
                 const inRange = isInRange(item.dateString);
 
                 return (
@@ -388,6 +457,7 @@ export default function GoalsScreen() {
           <View style={styles.dayRow}>
             {days.map((day) => {
               const active = selectedDays.includes(day.value);
+
               return (
                 <Pressable
                   key={day.value}
@@ -403,29 +473,38 @@ export default function GoalsScreen() {
           </View>
 
           <View style={styles.resultInputRow}>
-            <Text style={styles.resultLabel}>하루 목표량 :</Text>
+            <Text style={styles.resultLabel}>하루 목표량</Text>
+
             <View style={styles.fakeInput}>
-              <Text>{dailyPages}</Text>
+              <Text style={styles.fakeInputText}>{dailyPages}쪽</Text>
             </View>
           </View>
 
           <View style={styles.resultBox}>
             <Text style={styles.resultNumber}>{readingDates.length}</Text>
-            <Text style={styles.resultText}>실제 독서일 / 총 일</Text>
+            <Text style={styles.resultText}>실제 독서일</Text>
           </View>
 
           <Pressable style={styles.mainButton} onPress={createGoal}>
             <Text style={styles.mainButtonText}>이대로 목표 적용하기</Text>
           </Pressable>
+
+          <Pressable style={styles.backButton} onPress={() => setStep('book')}>
+            <Text style={styles.backButtonText}>책 다시 선택하기</Text>
+          </Pressable>
         </ScrollView>
       )}
 
       <View style={styles.bottomNav}>
-        <Text>통계</Text>
-        <Text>달력</Text>
-        <Text>홈</Text>
-        <Text>그룹</Text>
-        <Text>추천</Text>
+        <Text style={styles.navItem}>통계</Text>
+        <Text style={styles.navItem}>달력</Text>
+
+        <Pressable onPress={() => router.push('/home')}>
+          <Text style={styles.navItemActive}>홈</Text>
+        </Pressable>
+
+        <Text style={styles.navItem}>그룹</Text>
+        <Text style={styles.navItem}>추천</Text>
       </View>
 
       <Modal transparent visible={bookModalVisible} animationType="fade">
@@ -437,7 +516,7 @@ export default function GoalsScreen() {
               style={styles.searchHeader}
               onPress={() => setTitleOpen((prev) => !prev)}
             >
-              <Text style={styles.searchHeaderText}>+ 제목</Text>
+              <Text style={styles.searchHeaderText}>+ 제목 검색</Text>
             </Pressable>
 
             {titleOpen && (
@@ -450,30 +529,30 @@ export default function GoalsScreen() {
                 />
 
                 {searchLoading ? (
-                  <Text style={{ marginTop: 10 }}>검색 중...</Text>
+                  <Text style={styles.loadingText}>검색 중...</Text>
+                ) : searchResults.length === 0 && searchTitle.length >= 2 ? (
+                  <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
                 ) : (
                   searchResults.map((item, index) => (
                     <Pressable
-                      key={index}
+                      key={`${item.book_id || item.title}-${index}`}
                       style={styles.searchResult}
                       onPress={() => {
                         setBook({
                           book_id: item.book_id || `temp-${index}`,
-                          title: item.title,
-                          author: item.author,
+                          title: item.title || '',
+                          author: item.author || '',
                           total_pages: item.total_pages || 0,
                         });
 
-                        setTempTitle(item.title);
-                        setTempAuthor(item.author);
+                        setTempTitle(item.title || '');
+                        setTempAuthor(item.author || '');
                         setTempPages(String(item.total_pages || 0));
 
                         setTitleOpen(false);
                       }}
                     >
-                      <Text style={styles.searchResultTitle}>
-                        {item.title}
-                      </Text>
+                      <Text style={styles.searchResultTitle}>{item.title}</Text>
 
                       <Text style={styles.searchResultAuthor}>
                         {item.author}
@@ -510,14 +589,14 @@ export default function GoalsScreen() {
 
             <View style={styles.modalButtonRow}>
               <Pressable
-                style={styles.modalSmallButton}
+                style={styles.modalCancelButton}
                 onPress={() => setBookModalVisible(false)}
               >
-                <Text>취소</Text>
+                <Text style={styles.modalCancelText}>취소</Text>
               </Pressable>
 
-              <Pressable style={styles.modalSmallButton} onPress={applyTempBook}>
-                <Text>확인</Text>
+              <Pressable style={styles.modalConfirmButton} onPress={applyTempBook}>
+                <Text style={styles.modalConfirmText}>확인</Text>
               </Pressable>
             </View>
           </View>
@@ -543,300 +622,430 @@ function formatDate(date: Date) {
 
   return `${year}-${month}-${day}`;
 }
-
 const styles = StyleSheet.create({
   container: {
-    width: 390,
-    minHeight: '100%',
-    alignSelf: 'center',
-    backgroundColor: '#fff',
-    paddingTop: 30,
+    flex: 1,
+    backgroundColor: Colors.bgPrimary,
+    paddingTop: Spacing.xl,
   },
+
   pageTitle: {
-    color: '#1e90ff',
-    fontSize: 16,
-    marginLeft: 18,
-    marginBottom: 10,
-    fontWeight: '600',
+    fontSize: FontSize.md,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
   },
+
   screen: {
     flex: 1,
-    paddingHorizontal: 28,
-    paddingBottom: 80,
+    paddingHorizontal: Spacing.lg,
   },
+
+  scrollContent: {
+    paddingBottom: Spacing.xl, //?
+  },
+
+  card: {
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    shadowColor: Colors.textPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: Radius.md,
+    elevation: 3,
+  },
+
   bookAddBox: {
-    width: 210,
-    height: 300,
-    backgroundColor: '#eee',
-    borderRadius: 10,
-    alignSelf: 'center',
+    height: 210,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 45,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
   },
+
   plusText: {
-    fontSize: 20,
+    fontSize: FontSize.md,
+    color: Colors.textTertiary,
   },
-  bookInfoBox: {
-    backgroundColor: '#e4f3e8',
-    borderRadius: 12,
-    paddingVertical: 32,
-    paddingHorizontal: 50,
-    marginTop: 85,
-  },
-  bookTopInfo: {
-    marginTop: 40,
-    marginBottom: 20,
-    paddingHorizontal: 55,
-  },
+
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 9,
+    marginVertical: Spacing.xs,
+    gap: Spacing.md,
   },
+
   infoLabel: {
-    fontSize: 16,
+    fontSize: FontSize.base,
+    color: Colors.textSecondary,
   },
+
   infoValue: {
-    fontSize: 16,
+    flex: 1,
+    fontSize: FontSize.base,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    textAlign: 'right',
+  },
+
+  mainButton: {
+    backgroundColor: Colors.textPrimary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+
+  mainButtonText: {
+    color: Colors.bgPrimary,
+    fontSize: FontSize.base,
     fontWeight: '700',
   },
-  mainButton: {
-    width: 210,
-    backgroundColor: '#6f51b5',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignSelf: 'center',
+
+  backButton: {
     alignItems: 'center',
-    marginTop: 48,
+    marginTop: Spacing.md,
   },
-  mainButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+
+  backButtonText: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.sm,
   },
+
   calendarBox: {
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginTop: Spacing.sm,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 14,
-    padding: 18,
-    marginTop: 15,
+    borderColor: Colors.border,
   },
+
   calendarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: Spacing.md,
   },
+
+  calendarTitleRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+
   arrowText: {
     fontSize: 32,
     fontWeight: '700',
+    color: Colors.textPrimary,
   },
+
   calendarSelectBox: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 18,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.bgSecondary,
   },
+
   calendarSelectText: {
-    fontSize: 14,
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
   },
+
   weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: Spacing.sm,
   },
+
   weekText: {
     width: 36,
     textAlign: 'center',
-    color: '#777',
-    fontSize: 12,
+    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
   },
+
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
+
   calendarDay: {
-    width: 46,
+    width: `${100 / 7}%`,
     height: 38,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     marginVertical: 2,
   },
+
   rangeDay: {
-    backgroundColor: '#f1f1f1',
+    backgroundColor: Colors.bgPrimary,
   },
+
   selectedDate: {
-    backgroundColor: '#333',
+    backgroundColor: Colors.textPrimary,
   },
+
   calendarDayText: {
-    fontSize: 15,
+    fontSize: FontSize.base,
+    color: Colors.textPrimary,
   },
+
   selectedDateText: {
-    color: '#fff',
+    color: Colors.bgPrimary,
     fontWeight: '700',
   },
+
   otherMonthText: {
-    color: '#bbb',
+    color: Colors.textTertiary,
   },
+
   selectedDateBox: {
-    marginTop: 10,
+    marginTop: Spacing.sm,
     alignItems: 'center',
   },
+
   selectedDateTextSmall: {
-    fontSize: 12,
-    color: '#555',
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
   },
+
   dayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 24,
-    marginBottom: 30,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
+
   dayButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.bgSecondary,
   },
+
   activeDay: {
-    backgroundColor: '#2f751c',
+    backgroundColor: Colors.textPrimary,
   },
+
   dayText: {
-    fontSize: 13,
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
   },
+
   activeDayText: {
-    color: '#fff',
+    color: Colors.bgPrimary,
     fontWeight: '700',
   },
+
   resultInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
     justifyContent: 'center',
-    marginTop: 6,
+    marginTop: Spacing.xs,
   },
+
   resultLabel: {
-    fontSize: 16,
+    fontSize: FontSize.base,
+    color: Colors.textPrimary,
   },
+
   fakeInput: {
     width: 135,
-    height: 28,
+    height: 34,
     borderWidth: 1,
-    borderColor: '#555',
-    borderRadius: 4,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.bgSecondary,
   },
+
+  fakeInputText: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+
   resultBox: {
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: Spacing.md,
   },
+
   resultNumber: {
     fontSize: 56,
     fontWeight: '700',
+    color: Colors.textPrimary,
   },
+
   resultText: {
-    fontSize: 13,
+    fontSize: FontSize.sm,
     textAlign: 'center',
+    color: Colors.textSecondary,
   },
+
   bottomNav: {
-    height: 55,
+    height: 60,
     borderTopWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgPrimary,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
+    paddingBottom: 5,
   },
+
+  navItem: {
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+  },
+
+  navItemActive: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+
   modalBackground: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.18)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   bookModalBox: {
     width: 360,
-    backgroundColor: '#d9d9d9',
-    borderRadius: 12,
-    paddingVertical: 36,
-    paddingHorizontal: 28,
+    backgroundColor: Colors.bgPrimary,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
     alignItems: 'center',
   },
+
   bookModalTitle: {
     fontSize: 24,
     fontWeight: '700',
-    marginBottom: 28,
+    marginBottom: Spacing.lg,
+    color: Colors.textPrimary,
   },
+
   searchHeader: {
     width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 28,
-    marginBottom: 14,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
   },
+
   searchHeaderText: {
-    fontSize: 28,
-    color: '#aaa',
+    fontSize: 20,
+    color: Colors.textTertiary,
     fontWeight: '600',
   },
+
   searchDropdown: {
     width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 22,
-    minHeight: 170,
-    marginBottom: 14,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+   minHeight: 150,
+    maxHeight: 260,
+    marginBottom: Spacing.md,
   },
+
   searchInput: {
-    fontSize: 20,
-    color: '#333',
+    fontSize: 18,
+    color: Colors.textPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: '#aaa',
-    paddingBottom: 8,
-    marginBottom: 18,
+    borderBottomColor: Colors.border,
+    paddingBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
+
+  loadingText: {
+    marginTop: Spacing.sm,
+    color: Colors.textSecondary,
+  },
+
+  emptyText: {
+    marginTop: Spacing.sm,
+    color: Colors.textSecondary,
+  },
+
   searchResult: {
-    marginTop: 6,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  searchResultText: {
-    fontSize: 22,
-    color: '#aaa',
+
+  searchResultTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
+
+  searchResultAuthor: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+
   manualInputBox: {
     width: '100%',
-    gap: 10,
+    gap: Spacing.sm,
   },
+
   manualInput: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.textPrimary,
   },
+
   modalButtonRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+    gap: Spacing.md,
+    marginTop: Spacing.lg,
   },
-  modalSmallButton: {
+
+  modalCancelButton: {
     width: 110,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 10,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
     alignItems: 'center',
   },
-  searchResultTitle: {
-  fontSize: 17,
-  fontWeight: '700',
-},
 
-searchResultAuthor: {
-  fontSize: 13,
-  color: '#666',
-  marginTop: 2,
-},
+  modalConfirmButton: {
+    width: 110,
+    backgroundColor: Colors.textPrimary,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+  },
+
+  modalCancelText: {
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+
+  modalConfirmText: {
+    color: Colors.bgPrimary,
+    fontWeight: '700',
+  },
 });

@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 
-const API_URL = "http://172.20.6.25:3000/api/v1/threads";
+const API_URL = "http://localhost:3000/api/v1/threads";
 
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 const BOOK_ID = "160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a";
@@ -178,7 +178,7 @@ export default function ThreadScreen() {
         return;
       }
 
-      const res = await fetch("http://localhost:3000/threads-ai/summary", {
+      const res = await fetch("http://172.20.6.25:3000/api/v1//threads-ai/summary", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

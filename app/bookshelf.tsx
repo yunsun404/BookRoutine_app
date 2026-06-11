@@ -11,9 +11,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import styles from "../components/bookshelf.styles";
 import Header from "../components/Header";
 import { supabase } from "../lib/supabase";
-import styles from "./styles/bookshelf.styles";
 
 interface BookshelfItem {
   bookshelf_id: string;
@@ -46,7 +46,7 @@ interface FolderItem {
   }[];
 }
 
-const BASE_URL = "http://172.20.6.25:3000/api/v1";
+const BASE_URL = "http://localhost:3000/api/v1";
 const formatAge = (age: number) => {
   if (age >= 10 && age < 20) return "10대";
   if (age >= 20 && age < 30) return "20대";
@@ -57,6 +57,7 @@ const formatAge = (age: number) => {
 };
 
 export default function BookshelfScreen() {
+  // ✅ 수정: 초기값을 [] 로 설정
   const [books, setBooks] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"bookshelf" | "garden">(
@@ -86,9 +87,13 @@ export default function BookshelfScreen() {
     try {
       const response = await fetch(`${BASE_URL}/bookshelf`);
       const data = await response.json();
-      setBooks(data);
+      console.log("응답 상태:", response.status);
+      console.log("응답 데이터:", JSON.stringify(data)); // ← 추가
+      // 배열인지 확인 후 set
+      setBooks(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("에러:", error);
+      setBooks([]); // 에러 시에도 빈 배열 보장
     } finally {
       setLoading(false);
     }
@@ -98,9 +103,10 @@ export default function BookshelfScreen() {
     try {
       const response = await fetch(`${BASE_URL}/bookshelf/folders`);
       const data = await response.json();
-      setFolders(data);
+      setFolders(Array.isArray(data) ? data : []); // 동일하게 방어
     } catch (error) {
       console.error("폴더 에러:", error);
+      setFolders([]);
     }
   };
 

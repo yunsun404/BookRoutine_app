@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 백엔드 주소로 바꿔줘
+// const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
 const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
+// const BASE_URL = 'http://172.20.17.241:3000/api/v1'; // 차319 와이파이
 
 // 기본 요청 함수
 async function request<T>(
@@ -41,17 +42,17 @@ async function request<T>(
 // ────────────────────────────────────────
 
 export const authApi = {
-  // 회원가입
+  // 회원가입 (최신 확장 필드 유지)
   register: (body: {
     username: string;
     email: string;
     password: string;
     nickname: string;
-    // age: number | null;
-    // profile_image: string | null;
-    // reading_style: JSON | null;
-    // reading_habit: JSON | null;
-    // favorite_genre: JSON | null;
+    age: number | null;
+    profile_image: string | null;
+    reading_style: object | null;
+    reading_habit: object | null;
+    favorite_genre: object | null;
   }) =>
     request<{ user_id: string; access_token: string; refresh_token: string }>(
       '/auth/register',
@@ -92,24 +93,44 @@ export const authApi = {
 // ────────────────────────────────────────
 
 export const userApi = {
-  // 내 프로필 조회
+  // 내 프로필 조회 (최신 확장 데이터 타입 반영)
   getMe: () =>
     request<{
       user_id: string;
       nickname: string;
-      profile_image?: string;
-      reading_style?: JSON;
-      favorite_genre?: JSON;
+      age?: number | null;
+      email: string;
+      password: string;
+      profile_image?: string | null;
+      reading_style?: object | null;
+      reading_habit?: object | null;
+      favorite_genre?: object | null;
+      created_at: Date;
     }>('/users/me'),
 
   // 프로필 수정
   updateMe: (body: {
     nickname?: string;
+    age?: number;
+    email?: string;
+    password?: string;
     profile_image?: string;
-    reading_style?: JSON;
-    favorite_genre?: JSON;
+    reading_style?: object;
+    reading_habit?: object;
+    favorite_genre?: object;
   }) =>
-    request<{ user_id: string; nickname: string; updated_at: string }>(
+    request<{
+      user_id: string;
+      nickname: string;
+      age?: number;
+      email?: string;
+      password?: string;
+      profile_image?: string;
+      reading_style?: object;
+      reading_habit?: object;
+      favorite_genre?: object;
+      updated_at: Date;
+    }>(
       '/users/me',
       { method: 'PATCH', body: JSON.stringify(body) }
     ),
@@ -124,6 +145,109 @@ export const userApi = {
       stats: object;
       favorite_genre?: JSON;
     }>(`/users/${user_id}`),
+};
+
+// ────────────────────────────────────────
+// 그룹 (Group) - 새로 병합된 섹션
+// ────────────────────────────────────────
+
+export const groupApi = {
+  // 그룹 생성
+  create: (body: { group_name: string; people_count?: number; book_id?: string; target_date?: Date; }) =>
+    request<{
+      new_group: { group_name: string, people_count: number, invite_code: string, created_by: string, created_at: Date };
+      new_group_member: { group_id: string, user_id: string, role: number, joined_at: Date };
+      new_group_book: { group_id: string, book_id: string, target_date: Date, created_at: Date } | null;
+    }>('/groups', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // 그룹 목록 조회
+  getList: () =>
+    request<{
+      group_id: string;
+      group_name: string;
+      people_count?: number;
+      invite_code?: string;
+      created_by: string;
+      created_at: Date;
+      group_books: [{
+        book_id?: string;
+      }]
+    }[]>('/groups'),
+
+  // 그룹 상세 조회
+  getDetail: (group_id: string) =>
+    request<{
+      group_id: string;
+      group_name: string;
+      people_count?: number;
+      invite_code?: string;
+      created_by: string;
+      created_at: Date;
+      group_books: [{
+        book_id?: string;
+      }]
+    }>(`/groups/${group_id}`),
+
+  // 그룹 입장
+  joinGroup: (body: { invite_code: string }) =>
+    request<{
+      group_id: string;
+      user_id: string;
+      role: number;
+      joined_at: Date;
+    }>(`/groups/join`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+
+  // 그룹 퇴장
+  leaveGroup: (group_id: string) =>
+    request<{ success: boolean }>(`/groups/${group_id}/leave`, {
+      method: 'POST',
+    }),
+
+  // 그룹 타래 조회
+  getGroupThread: (group_id: string) =>
+    request<{
+      thread_id: string;
+      user_id: string;
+      book_id: string;
+      group_id?: string;
+      content: string;
+      current_page?: number;
+      is_public: boolean;
+      likes: number;
+      created_at: Date;
+      updated_at: Date;
+    }[]>(`/groups/${group_id}/threads`),
+
+  // 독서방 활성 여부
+  getReadingRoomStatus: (group_id: string) =>
+    request<{ is_active: boolean }>(`/groups/${group_id}/realtime-status`),
+
+  // 그룹 편집
+  updateGroup: (group_id: string, body: {
+    group_name?: string;
+    people_count?: number;
+    book_id?: string;
+  }) =>
+    request<{
+      group_name?: string;
+      people_count?: number;
+      book_id?: string;
+    }>(`/groups/${group_id}/update`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }),
+
+  // 그룹 삭제
+  deleteGroup: (group_id: string) =>
+    request<{}>(`/groups/${group_id}`, {
+      method: 'DELETE'
+    })
 };
 
 // ────────────────────────────────────────

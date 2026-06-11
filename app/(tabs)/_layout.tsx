@@ -23,7 +23,7 @@ const TAB_CONFIG: {
     iconActive: "calendar",
   },
   {
-    name: "index",
+    name: "homescreen",
     title: "홈",
     icon: "home-outline",
     iconActive: "home",
