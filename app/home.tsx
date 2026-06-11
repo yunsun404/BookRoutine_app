@@ -11,7 +11,7 @@ export default function HomeScreen() {
             <TouchableOpacity onPress={() => router.push('/logout')}>
                 <Text>로그아웃</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/readingroomstart')}>
+            <TouchableOpacity onPress={() => router.push('/reading-room')}>
                 <Text>독서방 시작 화면</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/deleteaccount')}>
