@@ -1,9 +1,11 @@
 import BookCarousel, { type Book } from "@/components/home/BookCarousel";
 import FeedCard, { type FeedItem } from "@/components/home/FeedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
+import { authFetch, BASE_URL } from "@/constants/api"; // ✅ 토큰 인증 방식 사용
 import { Colors, FontSize, Spacing } from "@/constants/tokens";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+
 import {
   ActivityIndicator,
   Dimensions,
@@ -16,8 +18,6 @@ import {
 } from "react-native";
 import Header from "../../components/Header";
 
-const BASE_URL = "http://localhost:3000/api/v1";
-const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type ChecklistItem = {
@@ -44,7 +44,7 @@ function toTask(item: ChecklistItem): Task {
   };
 }
 
-// 시연용 Mock 데이터 (현재 등록된 도서 정보)
+// Mock 데이터 (필요 시 API로 대체)
 const MOCK_BOOKS: Book[] = [{
   id: "1", title: "데미안", author: "Hermann Hesse", subtitle: "Emil Sinclair",
   coverUrl: null, currentPage: 24, totalPages: 48,
@@ -65,26 +65,31 @@ export default function HomeScreen() {
 
   async function fetchUpcoming() {
     try {
-      const res = await fetch(`${BASE_URL}/checklists/upcoming?user_id=${USER_ID}`);
+      const res = await authFetch(`${BASE_URL}/checklists/upcoming`); // ✅ 인증 헤더 포함
       const data: BookGroup[] = await res.json();
       setBookGroups(data);
-    } catch (e) { 
-      console.error("체크리스트 불러오기 실패:", e); 
-    } finally { 
-      setLoading(false); 
+    } catch (e) {
+      console.error("체크리스트 불러오기 실패:", e);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function handleToggle(bookId: string, taskId: string) {
+    // 1. 낙관적 업데이트
     setBookGroups((prev) => prev.map((group) => group.book_id !== bookId ? group : {
       ...group, tasks: group.tasks.map((t) => t.checklist_id === taskId ? { ...t, check_box: !t.check_box } : t),
     }));
+
     try {
-      await fetch(`${BASE_URL}/checklists/${taskId}/check`, { method: "PATCH" });
+      // 2. 서버 요청
+      await authFetch(`${BASE_URL}/checklists/${taskId}/check`, { method: "PATCH" });
     } catch (e) {
+      // 3. 실패 시 롤백
       setBookGroups((prev) => prev.map((group) => group.book_id !== bookId ? group : {
         ...group, tasks: group.tasks.map((t) => t.checklist_id === taskId ? { ...t, check_box: !t.check_box } : t),
       }));
+      console.error("체크 업데이트 실패:", e);
     }
   }
 
@@ -95,15 +100,12 @@ export default function HomeScreen() {
       <Header />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* 1. 상단 책 캐러셀 섹션 (등록된 책 카드들과 빈 추가 카드가 함께 스와이프됨) */}
+        {/* 1. 상단 캐러셀 */}
         <View style={styles.carouselContainer}>
-          <BookCarousel
-            books={MOCK_BOOKS}
-            onPress={() => router.push("/goals")}
-          />
+          <BookCarousel books={MOCK_BOOKS} onPress={() => router.push("/goals")} />
         </View>
 
-        {/* 2. 하단 오늘 해야 할 독서 목표 태스크 섹션 */}
+        {/* 2. 체크리스트 섹션 */}
         {bookGroups.length === 0 ? (
           <Pressable style={styles.emptyBox} onPress={() => router.push("/goals")}>
             <Text style={styles.emptyText}>목표를 설정해보세요</Text>
@@ -111,11 +113,11 @@ export default function HomeScreen() {
         ) : (
           <View>
             <FlatList
-              data={bookGroups} 
-              horizontal 
-              pagingEnabled 
+              data={bookGroups}
+              horizontal
+              pagingEnabled
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.book_id} 
+              keyExtractor={(item) => item.book_id}
               scrollEventThrottle={16}
               onScroll={(e) => setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH))}
               renderItem={({ item: group }) => (
@@ -137,21 +139,14 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* 3. 최근 타래 피드 섹션 */}
+        {/* 3. 최근 타래 섹션 */}
         <View style={styles.feedSection}>
           <Text style={styles.sectionTitle}>최근 타래</Text>
-          {MOCK_FEED.length > 0 ? (
-            MOCK_FEED.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => router.push("/thread")}
-              >
-                <FeedCard item={item} />
-              </Pressable>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>등록된 타래가 없습니다.</Text>
-          )}
+          {MOCK_FEED.map((item) => (
+            <Pressable key={item.id} onPress={() => router.push("/thread")}>
+              <FeedCard item={item} />
+            </Pressable>
+          ))}
         </View>
       </ScrollView>
     </>

@@ -44,10 +44,12 @@ export default function RankingScreen() {
 
   async function fetchRanking() {
     try {
-      const res = await fetch(`${BASE_URL}/ranking/age-group?user_id=${USER_ID}`);
+      // 💡 [오류 수정] 통계 스크린과 마찬가지로 백엔드 주소 꼬임을 방지하기 위해 
+      // 중복될 수 있는 '/ranking' 경로 구조를 정리하여 백엔드 라우팅에 정확히 맞췄습니다.
+      const res = await fetch(`${BASE_URL}/age-group?user_id=${USER_ID}`);
       const data: ApiResponse = await res.json();
-      setRankingData(data.ranking);
-      setAgeGroup(data.ageGroup);
+      setRankingData(data.ranking || []); // 데이터가 null로 올 경우를 대비해 예외 처리 추가
+      setAgeGroup(data.ageGroup || 0);
     } catch (e) {
       console.error("랭킹 데이터 불러오기 실패:", e);
     } finally {

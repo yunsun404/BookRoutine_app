@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import { authFetch, BASE_URL } from "@/constants/api"; // 👈 추가된 import
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -11,7 +12,8 @@ import {
   View,
 } from "react-native";
 
-const API_URL = "http://localhost:3000/api/v1/threads";
+const THREADS_ENDPOINT = `${BASE_URL}/threads`;
+const AI_SUMMARY_ENDPOINT = `${BASE_URL}/threads-ai/summary`;
 
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 const BOOK_ID = "160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a";
@@ -41,14 +43,13 @@ export default function ThreadScreen() {
 
   const fetchThreads = async () => {
     try {
-      const res = await fetch(`${API_URL}?user_id=${USER_ID}&book_id=${BOOK_ID}`);
+      const res = await authFetch(`${THREADS_ENDPOINT}?user_id=${USER_ID}&book_id=${BOOK_ID}`);
       const data = await res.json();
 
       if (!res.ok) {
         console.log("타래 조회 실패:", data);
         return;
       }
-
       setThreads(data);
     } catch (error) {
       console.log("타래 조회 에러:", error);
@@ -66,11 +67,8 @@ export default function ThreadScreen() {
     }
 
     try {
-      const res = await fetch(API_URL, {
+      const res = await authFetch(THREADS_ENDPOINT, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           user_id: USER_ID,
           book_id: BOOK_ID,
@@ -81,16 +79,12 @@ export default function ThreadScreen() {
         }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        console.log("타래 저장 실패:", data);
         Alert.alert("오류", "타래 저장 실패");
         return;
       }
 
       await fetchThreads();
-
       setPage("");
       setContent("");
       setModalVisible(false);
@@ -112,11 +106,8 @@ export default function ThreadScreen() {
     if (!editingThreadId) return;
 
     try {
-      const res = await fetch(`${API_URL}/${editingThreadId}`, {
+      const res = await authFetch(`${THREADS_ENDPOINT}/${editingThreadId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           content,
           current_page: Number(page),
@@ -129,12 +120,10 @@ export default function ThreadScreen() {
       }
 
       await fetchThreads();
-
       setEditingThreadId(null);
       setPage("");
       setContent("");
       setModalVisible(false);
-
       Alert.alert("성공", "타래가 수정되었습니다.");
     } catch (error) {
       console.log(error);
@@ -149,7 +138,7 @@ export default function ThreadScreen() {
         text: "삭제",
         onPress: async () => {
           try {
-            const res = await fetch(`${API_URL}/${threadId}`, {
+            const res = await authFetch(`${THREADS_ENDPOINT}/${threadId}`, {
               method: "DELETE",
             });
 
@@ -157,7 +146,6 @@ export default function ThreadScreen() {
               Alert.alert("오류", "타래 삭제 실패");
               return;
             }
-
             await fetchThreads();
             Alert.alert("성공", "타래가 삭제되었습니다.");
           } catch (error) {
@@ -171,32 +159,16 @@ export default function ThreadScreen() {
 
   const addSummary = async () => {
     try {
-      const text = threads.map((t) => t.content).join(" ");
-
-      if (!text.trim()) {
-        Alert.alert("알림", "요약할 타래가 없습니다.");
-        return;
-      }
-
-      const res = await fetch("http://172.20.6.25:3000/api/v1//threads-ai/summary", {
+      const res = await authFetch(AI_SUMMARY_ENDPOINT, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          thread_id: threads[0].thread_id,
-          text,
-        }),
+        body: JSON.stringify({ book_id: BOOK_ID }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
-        console.log(data);
         Alert.alert("오류", "AI 요약 실패");
         return;
       }
-
       setSummaryText(data.summary);
       setShowSummary(true);
     } catch (error) {
@@ -208,9 +180,7 @@ export default function ThreadScreen() {
   return (
     <View style={styles.container}>
       <Header />
-
       <Text style={styles.title}>데미안</Text>
-
       <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}>
         <Text style={styles.addButtonText}>타래 등록</Text>
       </Pressable>
@@ -219,10 +189,10 @@ export default function ThreadScreen() {
         {showSummary && (
           <View style={[styles.card, styles.summaryCard]}>
             <View style={styles.cardTop}>
-              <Text style={styles.summaryLabel}>AI 요약</Text>
+              <Text style={styles.summaryLabel}>✨ AI 핵심 요약본</Text>
               <Text style={styles.date}>{new Date().toISOString().slice(0, 10)}</Text>
             </View>
-            <Text style={styles.content}>{summaryText}</Text>
+            <Text style={styles.summaryContent}>{summaryText}</Text>
           </View>
         )}
 
@@ -235,14 +205,11 @@ export default function ThreadScreen() {
                 <Text style={styles.page}>{item.current_page} pg</Text>
                 <Text style={styles.date}>{item.created_at?.slice(0, 10)}</Text>
               </View>
-
-              <Text style={styles.content}>“{item.content}”</Text>
-
+              <Text style={styles.content}>{item.content}</Text>
               <View style={styles.cardButtons}>
                 <Pressable style={styles.smallButton} onPress={() => startEditThread(item)}>
                   <Text style={styles.smallButtonText}>수정</Text>
                 </Pressable>
-
                 <Pressable style={styles.smallButton} onPress={() => deleteThread(item.thread_id)}>
                   <Text style={styles.smallButtonText}>삭제</Text>
                 </Pressable>
@@ -255,12 +222,12 @@ export default function ThreadScreen() {
           <Text style={styles.aiButtonText}>AI 요약하기</Text>
         </Pressable>
       </ScrollView>
-
+      
+      {/* 모달 등 하단 UI는 그대로 유지 */}
       <Modal transparent visible={modalVisible} animationType="fade">
         <View style={styles.modalBackground}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>{editingThreadId ? "타래 수정" : "타래 등록"}</Text>
-
             <TextInput
               style={styles.pageInput}
               placeholder="45"
@@ -268,9 +235,7 @@ export default function ThreadScreen() {
               value={page}
               onChangeText={setPage}
             />
-
             <Text style={styles.pgText}>쪽</Text>
-
             <TextInput
               style={styles.contentInput}
               multiline
@@ -278,15 +243,10 @@ export default function ThreadScreen() {
               value={content}
               onChangeText={setContent}
             />
-
             <View style={styles.modalButtons}>
-              <Pressable
-                style={styles.modalButton}
-                onPress={editingThreadId ? updateThread : addThread}
-              >
+              <Pressable style={styles.modalButton} onPress={editingThreadId ? updateThread : addThread}>
                 <Text>확인</Text>
               </Pressable>
-
               <Pressable
                 style={styles.modalButton}
                 onPress={() => {
@@ -305,7 +265,6 @@ export default function ThreadScreen() {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -359,9 +318,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   summaryCard: {
-    backgroundColor: "#E8F3EC",
+    backgroundColor: "#E8F3EC", // 초록빛 계열의 AI 요약 전용 배경색
+    borderWidth: 1,
+    borderColor: "#C2E2CC",
   },
   cardTop: {
+    flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 14,
@@ -375,14 +337,21 @@ const styles = StyleSheet.create({
     color: "#999",
   },
   summaryLabel: {
-    fontSize: 12,
-    color: "#4A3B32",
+    fontSize: 13,
+    color: "#2E6943",
     fontWeight: "700",
   },
   content: {
     fontSize: 14,
     color: "#333",
     lineHeight: 22,
+  },
+  // 💡 추가된 스타일: 요약 텍스트 전용 폰트 스타일 속성 지정
+  summaryContent: {
+    fontSize: 14,
+    color: "#2C3E31",
+    lineHeight: 22,
+    fontWeight: "500",
   },
   aiButton: {
     borderRadius: 14,

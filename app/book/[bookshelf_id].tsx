@@ -1,3 +1,4 @@
+import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -11,8 +12,6 @@ import {
   View,
 } from "react-native";
 import Header from "../../components/Header";
-
-const BASE_URL = "http://localhost:3000/api/v1";
 
 interface BookDetail {
   bookshelf_id: string;
@@ -55,12 +54,12 @@ export default function BookDetailScreen() {
   useEffect(() => {
     fetchDetail();
   }, []);
+
   const fetchDetail = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/bookshelf/${bookshelf_id}`);
-      console.log("status:", response.status);
+      // ✅ authFetch로 교체 — 토큰 자동 포함
+      const response = await authFetch(`${BASE_URL}/bookshelf/${bookshelf_id}`);
       const data = await response.json();
-      console.log("detail:", JSON.stringify(data));
       setDetail(data);
     } catch (error) {
       console.error("책 상세 에러:", error);
@@ -91,13 +90,11 @@ export default function BookDetailScreen() {
     <View style={styles.container}>
       <Header />
 
-      {/* 뒤로가기 */}
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 책 정보 */}
         <View style={styles.bookInfoRow}>
           <Image source={{ uri: detail.book.cover_url }} style={styles.cover} />
           <View style={styles.bookInfo}>
@@ -116,7 +113,6 @@ export default function BookDetailScreen() {
               </Text>
             )}
 
-            {/* 진행 바 */}
             <View style={styles.progressRow}>
               <View style={styles.progressBarBackground}>
                 <View
@@ -132,12 +128,6 @@ export default function BookDetailScreen() {
             </View>
           </View>
         </View>
-
-        {/* <View style={styles.divider} />
-
-        <TouchableOpacity style={styles.addButton}>
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity> */}
       </ScrollView>
     </View>
   );
@@ -195,11 +185,6 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 2,
   },
-  publisher: {
-    fontSize: 12,
-    color: "#999",
-    marginBottom: 8,
-  },
   goalDays: {
     fontSize: 12,
     color: "#555",
@@ -229,28 +214,6 @@ const styles = StyleSheet.create({
   },
   pageText: {
     fontSize: 11,
-    color: "#999",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#E0E0E0",
-    marginHorizontal: 16,
-    marginVertical: 16,
-  },
-  addButton: {
-    marginHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  addButtonText: {
-    fontSize: 24,
     color: "#999",
   },
 });

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router"; // ← 에포 라우터 이동 도구 추가
 import React, { useState } from "react";
+
 import {
   SafeAreaView,
   ScrollView,

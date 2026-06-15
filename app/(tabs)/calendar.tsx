@@ -1,3 +1,4 @@
+import { authFetch, BASE_URL } from "@/constants/api";
 import {
   Colors,
   FontSize,
@@ -7,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,17 +17,11 @@ import {
 } from "react-native";
 import Header from "../../components/Header";
 
-const BASE_URL = "http://localhost:3000/api/v1";
-const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
-
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-// 달성 level에 따른 색상
-// 물이 차오르듯 — 0은 투명, 1은 연한 빨강, 2는 진한 빨강
+// 기존 getLevelColor 전체를 아래로 교체
 function getLevelColor(level: number) {
-  if (level === 2) return "#C0392B"; // 전체 완료
-  if (level === 1) return "#E8A09A"; // 일부 완료
-  return "transparent"; // 없음
+  return "transparent";
 }
 
 type MonthlyItem = {
@@ -43,6 +39,11 @@ type ChecklistItem = {
   book: { title: string };
 };
 
+type PawItem = {
+  date: string;
+  has_paw: boolean;
+};
+
 export default function CalendarScreen() {
   const today = new Date();
 
@@ -52,6 +53,7 @@ export default function CalendarScreen() {
   const [monthlyData, setMonthlyData] = useState<Record<string, MonthlyItem>>(
     {},
   );
+  const [pawData, setPawData] = useState<Record<string, boolean>>({});
   const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [loadingChecklist, setLoadingChecklist] = useState(false);
@@ -65,17 +67,27 @@ export default function CalendarScreen() {
   async function fetchMonthly() {
     setLoadingCalendar(true);
     try {
-      const res = await fetch(
-        `${BASE_URL}/checklists/monthly?user_id=${USER_ID}&year=${year}&month=${month}`,
+      await authFetch(`${BASE_URL}/checklists/check-paw`, { method: "POST" });
+
+      const res = await authFetch(
+        `${BASE_URL}/checklists/monthly?year=${year}&month=${month}`,
       );
       const data: MonthlyItem[] = await res.json();
-
-      // 배열 → 날짜 키 Record로 변환 — O(1) 조회 가능
       const map: Record<string, MonthlyItem> = {};
       data.forEach((item) => {
         map[item.date] = item;
       });
       setMonthlyData(map);
+
+      const pawRes = await authFetch(
+        `${BASE_URL}/calendar-records/monthly?year=${year}&month=${month}`,
+      );
+      const pawList: PawItem[] = await pawRes.json();
+      const pawMap: Record<string, boolean> = {};
+      pawList.forEach((item) => {
+        if (item.has_paw) pawMap[item.date] = true;
+      });
+      setPawData(pawMap);
     } catch (e) {
       console.error("월별 데이터 불러오기 실패:", e);
     } finally {
@@ -83,14 +95,12 @@ export default function CalendarScreen() {
     }
   }
 
+  // fetchChecklist 전체 교체
   async function fetchChecklist(dateStr: string) {
     setLoadingChecklist(true);
     try {
-      const res = await fetch(
-        `${BASE_URL}/checklists?user_id=${USER_ID}&date=${dateStr}`,
-      );
+      const res = await authFetch(`${BASE_URL}/checklists?date=${dateStr}`);
       const data: ChecklistItem[] = await res.json();
-      console.log("체크리스트 응답:", data); // ✅ 로그 추가
       setChecklists(data);
     } catch (e) {
       console.error("체크리스트 불러오기 실패:", e);
@@ -100,7 +110,6 @@ export default function CalendarScreen() {
   }
 
   function handleDatePress(day: number) {
-    // ✅ UTC 변환 없이 로컬 날짜 문자열로 직접 생성
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     setSelectedDate(dateStr);
     fetchChecklist(dateStr);
@@ -120,17 +129,14 @@ export default function CalendarScreen() {
     } else setMonth((m) => m + 1);
   }
 
-  // 해당 월의 1일 요일과 마지막 날짜 계산
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
   const lastDay = new Date(year, month, 0).getDate();
 
-  // 캘린더 그리드 — 빈칸 + 날짜 채우기
   const cells: (number | null)[] = [
     ...Array(firstDayOfWeek).fill(null),
     ...Array.from({ length: lastDay }, (_, i) => i + 1),
   ];
 
-  // 7개씩 잘라서 주(row) 단위로
   const weeks: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) {
     weeks.push(cells.slice(i, i + 7));
@@ -157,7 +163,6 @@ export default function CalendarScreen() {
 
         {/* 캘린더 */}
         <View style={styles.calendarBox}>
-          {/* 요일 헤더 */}
           <View style={styles.weekRow}>
             {DAYS.map((d, i) => (
               <Text key={i} style={styles.dayLabel}>
@@ -166,7 +171,6 @@ export default function CalendarScreen() {
             ))}
           </View>
 
-          {/* 날짜 그리드 */}
           {loadingCalendar ? (
             <ActivityIndicator style={{ marginVertical: 32 }} />
           ) : (
@@ -180,7 +184,9 @@ export default function CalendarScreen() {
                   const level = data?.level ?? 0;
                   const isToday = dateStr === todayStr;
                   const isSelected = dateStr === selectedDate;
+                  const hasPaw = pawData[dateStr] ?? false; // ✅ 발자국 여부
 
+                  // 날짜 셀 부분 교체
                   return (
                     <TouchableOpacity
                       key={di}
@@ -191,17 +197,26 @@ export default function CalendarScreen() {
                       <View
                         style={[
                           styles.dayCircle,
-                          { backgroundColor: getLevelColor(level) },
                           isToday && styles.todayCircle,
                           isSelected && styles.selectedCircle,
                         ]}
                       >
+                        {/* ✅ 발자국 배경으로 깔기 */}
+                        {hasPaw && (
+                          <View style={styles.pawWrapper}>
+                            <Image
+                              source={require("../../assets/images/paw.png")}
+                              style={styles.paw}
+                            />
+                          </View>
+                        )}
+                        {/* ✅ 숫자는 발자국 위에 */}
                         <Text
                           style={[
                             styles.dayText,
                             isToday && styles.todayText,
                             isSelected && styles.selectedText,
-                            level > 0 && styles.levelText,
+                            hasPaw && styles.pawDayText,
                           ]}
                         >
                           {day}
@@ -210,7 +225,6 @@ export default function CalendarScreen() {
                     </TouchableOpacity>
                   );
                 })}
-                {/* 주의 빈 칸 채우기 */}
                 {week.length < 7 &&
                   Array(7 - week.length)
                     .fill(null)
@@ -265,7 +279,6 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: 32 },
-
   monthRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -280,7 +293,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
   },
-
   calendarBox: {
     marginHorizontal: Spacing.lg,
     backgroundColor: Colors.bgSecondary,
@@ -325,17 +337,25 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
   },
-  todayText: {
-    fontWeight: "600",
+  todayText: { fontWeight: "600" },
+  selectedText: { color: "#C0392B", fontWeight: "600" },
+  levelText: { color: "#fff" },
+  // ✅ 추가: 발자국 스타일
+  pawWrapper: {
+    position: "absolute",
+    transform: [{ rotate: "20deg" }], // ✅ 원하는 각도로 조절
   },
-  selectedText: {
-    color: "#C0392B",
-    fontWeight: "600",
+  paw: {
+    width: 36,
+    height: 36,
+    opacity: 0.85,
+    tintColor: "#381c08",
   },
-  levelText: {
+  pawDayText: {
     color: "#fff",
+    fontWeight: "600",
+    zIndex: 1,
   },
-
   checklistBox: {
     marginHorizontal: Spacing.lg,
     marginTop: 16,
@@ -373,13 +393,6 @@ const styles = StyleSheet.create({
   },
   checkboxDone: { backgroundColor: Colors.check },
   checkmark: { fontSize: 11, color: "#fff", fontWeight: "700" },
-  checkText: {
-    flex: 1,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  checkTextDone: {
-    textDecorationLine: "line-through",
-    opacity: 0.5,
-  },
+  checkText: { flex: 1, fontSize: FontSize.base, color: Colors.textPrimary },
+  checkTextDone: { textDecorationLine: "line-through", opacity: 0.5 },
 });

@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Header from "../../components/Header"; // 프로젝트에 이미 있는 공통 헤더 컴포넌트 연결
+import Header from "../../components/Header";
 
 const BASE_URL = "http://localhost:3000/api/v1";
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
@@ -32,7 +32,6 @@ export default function StatsScreen() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<StatsData | null>(null);
   
-  // 드롭다운 셀렉터 상태값
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(4);
   const [tabType, setTabType] = useState<"weekly" | "monthly">("weekly");
@@ -46,10 +45,19 @@ export default function StatsScreen() {
   async function fetchStats() {
     try {
       setLoading(true);
-      const res = await fetch(
-        `${BASE_URL}/reading-goals/stats?user_id=${USER_ID}&year=${selectedYear}&month=${selectedMonth}&type=${tabType}`
-      );
+      const url = `${BASE_URL}/stats?user_id=${USER_ID}&year=${selectedYear}&month=${selectedMonth}&type=${tabType}`;
+      console.log("요청 URL:", url); // 👈 로그 추가: URL이 맞는지 확인
+
+      const res = await fetch(url);
+      
+      // 401 에러 등을 잡기 위해 응답 상태 체크
+      if (!res.ok) {
+        console.error("서버 응답 에러 상태:", res.status);
+        return;
+      }
+
       const resData = await res.json();
+      console.log("서버에서 받은 데이터:", resData); // 👈 로그 추가: 데이터가 오는지 확인
       setData(resData);
     } catch (e) {
       console.error("통계 데이터 가져오기 실패:", e);
@@ -58,45 +66,26 @@ export default function StatsScreen() {
     }
   }
 
-  const maxVal = data?.graphData ? Math.max(...data.graphData, 1) : 1;
+  const maxVal = data?.graphData && data.graphData.length > 0 ? Math.max(...data.graphData, 1) : 1;
 
   return (
     <View style={styles.safeArea}>
-      
-      {/* 1. 기존 프로젝트에 정의된 공통 헤더 컴포넌트 사용 */}
       <Header />
-
-      {/* 2. 상단 날짜 필터 선택 및 요약 타이틀 */}
       <View style={styles.headerRow}>
-        <Text style={styles.mainTitle}>
-          {selectedMonth}<Text style={styles.mainTitleSub}>월의 통계</Text>
-        </Text>
-        
+        <Text style={styles.mainTitle}>{selectedMonth}<Text style={styles.mainTitleSub}>월의 통계</Text></Text>
         <View style={styles.pickerContainer}>
-          <TouchableOpacity style={styles.pickerBubble}>
-            <Text style={styles.pickerText}>Apr ▾</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pickerBubble}>
-            <Text style={styles.pickerText}>2026 ▾</Text>
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.pickerBubble}><Text style={styles.pickerText}>Apr ▾</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.pickerBubble}><Text style={styles.pickerText}>2026 ▾</Text></TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* 3. 대형 통계 차트 카드 */}
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.chartCard}>
           <View style={styles.tabContainer}>
-            <TouchableOpacity 
-              style={[styles.tabButton, tabType === "weekly" && styles.tabButtonActive]} 
-              onPress={() => setTabType("weekly")}
-            >
+            <TouchableOpacity style={[styles.tabButton, tabType === "weekly" && styles.tabButtonActive]} onPress={() => setTabType("weekly")}>
               <Text style={[styles.tabButtonText, tabType === "weekly" && styles.tabButtonTextActive]}>✓ 주간</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tabButton, tabType === "monthly" && styles.tabButtonActive]} 
-              onPress={() => setTabType("monthly")}
-            >
+            <TouchableOpacity style={[styles.tabButton, tabType === "monthly" && styles.tabButtonActive]} onPress={() => setTabType("monthly")}>
               <Text style={[styles.tabButtonText, tabType === "monthly" && styles.tabButtonTextActive]}>월간</Text>
             </TouchableOpacity>
           </View>
@@ -106,7 +95,7 @@ export default function StatsScreen() {
           ) : (
             <View style={styles.graphWrapper}>
               <View style={styles.barsContainer}>
-                {data?.graphData.map((val, idx) => (
+                {(data?.graphData || []).map((val, idx) => (
                   <View key={idx} style={styles.barColumn}>
                     <View style={[styles.barActiveShape, { height: `${(val / maxVal) * 100}%` }]} />
                   </View>
@@ -114,31 +103,26 @@ export default function StatsScreen() {
               </View>
               <View style={styles.xAxisLine} />
               <View style={styles.labelsContainer}>
-                {tabType === "weekly" 
-                  ? ["일", "월", "화", "수", "목", "금", "토"].map((day, i) => <Text key={i} style={styles.axisLabel}>{day}</Text>)
-                  : ["1주", "2주", "3주", "4주", "5주"].map((week, i) => <Text key={i} style={styles.axisLabel}>{week}</Text>)
-                }
+                {tabType === "weekly" ? ["일", "월", "화", "수", "목", "금", "토"].map((day, i) => <Text key={i} style={styles.axisLabel}>{day}</Text>) : ["1주", "2주", "3주", "4주", "5주"].map((week, i) => <Text key={i} style={styles.axisLabel}>{week}</Text>)}
               </View>
             </View>
           )}
         </View>
 
-        {/* 4. 주 독서 시간 평균 배너 */}
         <View style={styles.infoBanner}>
           <Text style={styles.infoBannerText}>
             {myNickname} 님의 주 독서 시간대는 <Text style={{ fontWeight: "bold" }}>{data?.averageReadingTime || "00:00"}</Text> 입니다.
           </Text>
         </View>
 
-        {/* 5. 내가 진행중인 목표 전체 진행률 리스트 */}
         <View style={styles.bookSection}>
-          {data?.booksProgress.map((book) => (
+          {/* 데이터가 없으면 안내 문구를 띄워 확인하기 쉽게 함 */}
+          {(!data?.booksProgress || data.booksProgress.length === 0) && !loading && (
+            <Text style={{ textAlign: 'center', marginTop: 20 }}>표시할 독서 데이터가 없습니다.</Text>
+          )}
+          {(data?.booksProgress || []).map((book) => (
             <View key={book.id} style={styles.bookCard}>
-              <Image 
-                source={book.coverUrl ? { uri: book.coverUrl } : require("@/assets/images/react-logo.png")} 
-                style={styles.bookCover}
-                resizeMode="cover"
-              />
+              <Image source={book.coverUrl ? { uri: book.coverUrl } : require("@/assets/images/react-logo.png")} style={styles.bookCover} resizeMode="cover" />
               <View style={styles.progressContainer}>
                 <View style={styles.progressBarBg}>
                   <View style={[styles.progressBarFill, { width: `${book.progress}%` }]} />
@@ -148,11 +132,11 @@ export default function StatsScreen() {
             </View>
           ))}
         </View>
-
       </ScrollView>
     </View>
   );
 }
+// (Styles)
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
@@ -167,7 +151,6 @@ const styles = StyleSheet.create({
   pickerBubble: { borderWidth: 1, borderColor: "#DDD", borderRadius: 8, backgroundColor: "#FAFAFA" },
   pickerText: { fontSize: FontSize.sm, color: "#666", paddingHorizontal: 10, paddingVertical: 4 },
 
-  // 수정한 차트 카드 스타일 (한자 및 중복 에러 깔끔하게 정리 완료)
   chartCard: { 
     borderWidth: 1, 
     borderColor: "#E0E0E0", 

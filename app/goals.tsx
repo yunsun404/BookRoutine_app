@@ -1,3 +1,4 @@
+import { authFetch, BASE_URL } from "@/constants/api";
 import { Colors, FontSize, Spacing } from "@/constants/tokens";
 import React, { useMemo, useState } from 'react';
 import {
@@ -13,7 +14,7 @@ import {
 
 import { useRouter } from 'expo-router';
 
-const API_URL = 'http://localhost:3000/reading-goals';
+const API_URL = `${BASE_URL}/reading-goals`;
 
 // Prisma Studio에서 실제 값으로 바꾸기
 const USER_ID = '7ff77428-bdab-4724-9a67-ed5587217978';
@@ -55,6 +56,7 @@ type Book = {
   title: string;
   author: string;
   total_pages: number;
+  isbn?: string;
 };
 
 type CalendarCell = {
@@ -86,7 +88,37 @@ export default function GoalsScreen() {
   const [startDate, setStartDate] = useState('2025-09-09');
   const [endDate, setEndDate] = useState('2025-09-30');
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 3, 5]);
+  
+  const openBookModal = () => {
+    setTempTitle(book.title);
+    setTempAuthor(book.author);
+    setTempPages(String(book.total_pages));
+    setSearchTitle('');
+    setSearchResults([]);
+    setTitleOpen(false);
+    setBookModalVisible(true);
+  };
+  const applyTempBook = () => {
+    if (!tempTitle.trim() || !tempAuthor.trim() || !tempPages.trim()) {
+      Alert.alert('알림', '제목, 저자, 총 페이지 수를 입력해주세요.');
+      return;
+    }
 
+    const pageNumber = Number(tempPages);
+    if (Number.isNaN(pageNumber) || pageNumber <= 0) {
+      Alert.alert('알림', '총 페이지 수는 숫자로 입력해주세요.');
+      return;
+    }
+
+    setBook({
+      ...book,
+      title: tempTitle,
+      author: tempAuthor,
+      total_pages: pageNumber,
+    });
+
+    setBookModalVisible(false);
+  };
   const readingDates = useMemo(() => {
     const result: Date[] = [];
 
@@ -224,130 +256,73 @@ export default function GoalsScreen() {
     );
   };
 
-  const searchBooks = async (text: string) => {
-    setSearchTitle(text);
-    setTempTitle(text);
+  // 1. 검색 함수 수정
+const searchBooks = async (text: string) => {
+  setSearchTitle(text);
+  setTempTitle(text);
 
-    if (text.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setSearchLoading(true);
-
-      const res = await fetch(
-        `http://localhost:3000/api/v1/reading-goals/search?title=${encodeURIComponent(text)}`
-      );
-
-      const data = await res.json();
-
-      if (Array.isArray(data)) {
-        setSearchResults(data);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (error) {
-      console.log(error);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const openBookModal = () => {
-    setTempTitle(book.title);
-    setTempAuthor(book.author);
-    setTempPages(String(book.total_pages));
-    setSearchTitle('');
+  if (text.trim().length < 2) {
     setSearchResults([]);
-    setTitleOpen(false);
-    setBookModalVisible(true);
-  };
+    return;
+  }
 
-  const applyTempBook = () => {
-    if (!tempTitle.trim() || !tempAuthor.trim() || !tempPages.trim()) {
-      Alert.alert('알림', '제목, 저자, 총 페이지 수를 입력해주세요.');
-      return;
-    }
+  try {
+    setSearchLoading(true);
+    // authFetch 사용
+    const res = await authFetch(
+      `${BASE_URL}/reading-goals/search?title=${encodeURIComponent(text)}`
+    );
+    const data = await res.json();
+    setSearchResults(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error("검색 중 에러 발생:", error);
+    setSearchResults([]);
+  } finally {
+    setSearchLoading(false);
+  }
+};
 
-    const pageNumber = Number(tempPages);
+// 2. 목표 생성 함수 수정
+const createGoal = async () => {
+  if (!startDate || !endDate) {
+    Alert.alert('알림', '시작일과 종료일을 선택해주세요.');
+    return;
+  }
 
-    if (Number.isNaN(pageNumber) || pageNumber <= 0) {
-      Alert.alert('알림', '총 페이지 수는 숫자로 입력해주세요.');
-      return;
-    }
+  if (selectedDays.length === 0) {
+    Alert.alert('알림', '독서할 요일을 선택해주세요.');
+    return;
+  }
 
-    setBook({
-      ...book,
-      title: tempTitle,
-      author: tempAuthor,
-      total_pages: pageNumber,
+  try {
+    // authFetch 사용 및 user_id 제거
+    const res = await authFetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        book_id: book.book_id!==''?book.book_id:undefined,
+        title: book.title,
+        author: book.author,
+        total_pages: book.total_pages,
+        isbn: book.isbn||undefined,
+        start_date: startDate,
+        end_date: endDate,
+        preferred_days: selectedDays,
+      }),
     });
 
-    setBookModalVisible(false);
-  };
+    const data = await res.json();
 
-  const handleSearch = async (query) => {
-    try {
-      console.log("검색 시도 중:", query); // 1. 검색어 확인
-
-      const response = await fetch(`/api/v1/reading-goals/search?title=${query}`);
-
-      console.log("서버 응답 상태:", response.status); // 2. HTTP 상태 코드 확인 (200, 404, 500 등)
-
-      if (!response.ok) {
-        throw new Error(`서버 에러 발생: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("받아온 검색 결과 데이터:", data); // 3. 실제 데이터 구조 확인
-
-      setSearchResults(data);
-    } catch (error) {
-      console.error("검색 중 에러 발생:", error); // 4. 어디서 실패했는지 상세 로그
-    }
-  };
-
-  const createGoal = async () => {
-    if (!startDate || !endDate) {
-      Alert.alert('알림', '시작일과 종료일을 선택해주세요.');
+    if (!res.ok) {
+      Alert.alert('오류', '목표 생성에 실패했습니다.');
       return;
     }
 
-    if (selectedDays.length === 0) {
-      Alert.alert('알림', '독서할 요일을 선택해주세요.');
-      return;
-    }
-
-    try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: USER_ID,
-          book_id: book.book_id,
-          start_date: startDate,
-          end_date: endDate,
-          preferred_days: selectedDays,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.log(data);
-        Alert.alert('오류', '목표 생성에 실패했습니다.');
-        return;
-      }
-
-      Alert.alert('성공', '목표가 생성되었습니다.');
-      console.log(data);
-    } catch (error) {
-      console.log(error);
-      Alert.alert('오류', '서버 연결에 실패했습니다.');
-    }
-  };
+    Alert.alert('성공', '목표가 생성되었습니다.');
+  } catch (error) {
+    console.error(error);
+    Alert.alert('오류', '서버 연결에 실패했습니다.');
+  }
+};
 
   return (
     <View style={styles.container}>
@@ -539,15 +514,16 @@ export default function GoalsScreen() {
                       style={styles.searchResult}
                       onPress={() => {
                         setBook({
-                          book_id: item.book_id || `temp-${index}`,
+                          book_id: '', // 검색 API에서 book_id가 제공되지 않는 경우 빈 문자열로 설정
                           title: item.title || '',
                           author: item.author || '',
-                          total_pages: item.total_pages || 0,
+                          total_pages: item.subInfo?.itemPage ?? 0,
+                          isbn: item.isbn || '',
                         });
 
                         setTempTitle(item.title || '');
                         setTempAuthor(item.author || '');
-                        setTempPages(String(item.total_pages || 0));
+                        setTempPages(String(item.subInfo?.itemPage ?? 0));
 
                         setTitleOpen(false);
                       }}

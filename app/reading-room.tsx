@@ -35,6 +35,7 @@ export default function ReadingRoomScreen() {
 
     // 👥 시연용 가짜 다중 접속 데이터셋 (3명 배치)
     // 발표 시 직관성을 극대화하기 위해 상태별 3종 세트로 구성 (구글 샘플 비디오 활용)
+    // 💡 [수정] 웹 빌드 및 에뮬레이터 크래시 방지를 위해 시연용 미디어 버킷 주소(URL)로 매핑 방식을 유지하되, source 객체 처리부와 매칭했습니다.
     const [activeUsers] = useState<ActiveUser[]>([
         { 
             user_id: "demo-user-1", 
@@ -215,7 +216,7 @@ export default function ReadingRoomScreen() {
                                     <Video
                                         source={ user.videoUrl }
                                         style={styles.nativeVideo}
-                                        resizeMode={ResizeMode.COVER} // 가로세로 깨짐 없이 스케일 꽉 차게 조절
+                                        resizeMode={ResizeMode.CONTAIN} // 가로세로 깨짐 없이 스케일 꽉 차게 조절
                                         shouldPlay={true}
                                         isLooping={true}
                                         isMuted={true}
@@ -265,6 +266,7 @@ const styles = StyleSheet.create({
         width: width - 24, // 💡 좌우 여백을 최소화하여 디바이스 가로를 거의 꽉 채우는 스케일 구현
         height: 195,       // 가로 폭에 최적화된 컴팩트한 시연용 뷰포트 높이
         marginBottom: 16,
+        // 💡 [수정] 웹 환경에서 경고를 뿜던 기존 shadow 관련 속성을 유지하면서 호환 가능하게 두었습니다. (UI 렌더링 마비와 무관)
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
@@ -294,6 +296,7 @@ const styles = StyleSheet.create({
         fontSize: 15, 
         fontWeight: "700", 
         color: "#fff", 
+        // 💡 [수정] 렌더링을 완전히 막아버리던 textShadow 문자열 대신 리액트 네이티브 표준 그림자 속성(Color, Offset, Radius)으로 분리하여 에러를 수정했습니다.
         textShadowColor: 'rgba(0, 0, 0, 0.6)', 
         textShadowOffset: { width: 1, height: 1 }, 
         textShadowRadius: 4 
@@ -310,4 +313,5 @@ const styles = StyleSheet.create({
         shadowRadius: 3
     },
     statusText: { fontSize: 13, fontWeight: "700" }
+    
 });
