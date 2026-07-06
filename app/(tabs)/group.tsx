@@ -1,16 +1,18 @@
+import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router"; // ← 에포 라우터 이동 도구 추가
-import React, { useState } from "react";
-
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Header from "../../components/Header";
+
+
 
 type ViewMode = "LIST" | "FEED";
 
@@ -32,35 +34,41 @@ export default function GroupScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
-  const mockGroups: Group[] = [
-    { id: "group_1", name: "홍길동과 친구들", memberCount: 5 },
-    { id: "group_2", name: "알고리즘 스터디방", memberCount: 3 },
-    { id: "group_3", name: "매일 독서 30분", memberCount: 8 },
-  ];
 
-  const mockPosts: Post[] = [
-    {
-      id: "p1",
-      username: "hongildong1",
-      date: "2026-04-30",
-      bookTitle: "데미안",
-      quote: "“내 속에서 솟아 나오려는 것, 바로 그것을 나는 살아보려 했다. 왜 그것이 그토록 어려웠을까.”",
-    },
-    {
-      id: "p2",
-      username: "hongildong2",
-      date: "2026-04-30",
-      bookTitle: "데미안",
-      quote: "“가장 중요한 것은 눈에 보이지 않아” 이 문장이 책의 전체 내용을 얘기하고 있는 것 같아 읽자마자 집중할 수 있었다.",
-    },
-  ];
+  // 코드 2 로직으로 교체
+  // 그룹 목록 조회
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  useEffect (() => {
+    const fetchGroups = async () => {
+      try {
+        setLoading(true);
+        const result = await groupApi.getList();
+        // API 응답 형태를 Group 타입에 맞게 변환
+        const formatted = result.map((g: any) => ({
+          id: g.group_id,
+          name: g.group_name,
+          memberCount: g.people_count ?? 0,
+        }));
+        setGroups(formatted);
+      } catch (e) {
+        console.error("그룹 목록 조회 실패:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGroups();
+  }, []);
+ 
 
   const handleGroupPress = (group: Group) => {
     setSelectedGroup(group);
     setViewMode("FEED");
   };
 
-  // 🔴 독서방 화면으로 이동하면서 데이터(방 이름) 전달
+  // 독서방 화면으로 이동하면서 데이터(방 이름) 전달
   const handleEnterRoom = () => {
     if (!selectedGroup) return;
     router.push({
@@ -77,7 +85,7 @@ export default function GroupScreen() {
       {viewMode === "LIST" && (
         <ScrollView contentContainerStyle={styles.centerContent}>
           <Text style={styles.sectionTitle}>내 그룹 목록</Text>
-          {mockGroups.map((group) => (
+          {groups.map((group) => (
             <TouchableOpacity
               key={group.id}
               style={styles.groupCard}
@@ -109,7 +117,7 @@ export default function GroupScreen() {
           </View>
 
           <ScrollView contentContainerStyle={styles.feedContent}>
-            {mockPosts.map((post) => (
+            {posts.map((post) => (
               <View key={post.id} style={styles.feedCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.userInfoRow}>

@@ -17,6 +17,7 @@ export default function GroupDetailScreen() {
         created_at: Date;
         group_books: [{ book_id?: string; }]
     }>();
+
     const [threads, setThreads] = useState<{
         thread_id: string;
         user_id: string;
@@ -29,7 +30,8 @@ export default function GroupDetailScreen() {
         created_at: Date;
         updated_at: Date;
     }[]>([]);
-    const [readingroom, setReadingRoom] = useState<{ is_active: Boolean }>();
+
+    // const [readingroom, setReadingRoom] = useState<{ is_active: Boolean }>();
 
     const handleGroupDetail = async () => {
         try {
@@ -40,8 +42,9 @@ export default function GroupDetailScreen() {
             // console.log('threads 타입:', Array.isArray(resultT));
             // console.log('threads 길이:', resultT.length);
             setThreads(resultT);
-            const resultR = await groupApi.getReadingRoomStatus(group_id);
-            setReadingRoom(resultR);
+
+            // const resultR = await groupApi.getReadingRoomStatus(group_id);
+            // setReadingRoom(resultR);
         } catch (error) {
             console.log("group list 에러: ", error)
         } finally {
@@ -82,7 +85,8 @@ export default function GroupDetailScreen() {
                 <Text>그룹 퇴장하기</Text>
             </TouchableOpacity>
 
-            <Text>독서방 {readingroom?.is_active ? "활성 중" : "비활성됨"}</Text>
+            {/* 제거: 독서방 상태 표시 UI 임시 제거 */}
+            {/* <Text>독서방 {readingroom?.is_active ? "활성 중" : "비활성됨"}</Text> */}
 
             <Text>스레드</Text>
             <FlatList
