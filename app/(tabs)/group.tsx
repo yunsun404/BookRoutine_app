@@ -28,6 +28,7 @@ interface Post {
   date: string;
   bookTitle: string;
   quote: string;
+  likes:number;
 }
 
 export default function GroupScreen() {
@@ -62,10 +63,27 @@ export default function GroupScreen() {
     fetchGroups();
   }, []);
  
-
-  const handleGroupPress = (group: Group) => {
-    setSelectedGroup(group);
-    setViewMode("FEED");
+  const handleGroupPress = async (group: Group) => {
+    try{
+      setLoading(true);
+      setSelectedGroup(group);
+      setViewMode("FEED");
+      const result=await groupApi.getGroupThread(group.id);
+      const formatted=result.map((p:any)=>({
+        id: p.thread_id,
+        username: p.user.nickname,
+        date: p.updated_at,
+        bookTitle: p.book.title,
+        quote: p.content,
+        likes:p.likes
+      }));
+      setPosts(formatted);
+      // console.log('posts: ',posts)
+    } catch (e){
+      console.error("타래 불러오기 실패: ",e)
+    }finally{
+      setLoading(false);
+    }
   };
 
   // 독서방 화면으로 이동하면서 데이터(방 이름) 전달
@@ -127,7 +145,8 @@ export default function GroupScreen() {
                       <Text style={styles.bookTag}>“ {post.bookTitle} ”</Text>
                     </View>
                   </View>
-                  <Text style={styles.dateText}>{post.date}</Text>
+                  <Text style={styles.dateText}>{(post.date).toString().split('T')[0]}</Text>
+                  <Text>❤️{post.likes ?? 0}</Text>
                 </View>
                 <Text style={styles.quoteText}>{post.quote}</Text>
               </View>
