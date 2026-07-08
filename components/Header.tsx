@@ -1,15 +1,17 @@
+import { authFetch, BASE_URL } from "@/constants/api";
+import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
 
 interface UserProfile {
     nickname: string;
@@ -24,15 +26,48 @@ export default function Header() {
         fetchProfile();
     }, []);
 
-    const fetchProfile = async () => {
-        const { data, error } = await supabase
-            .from("users")
-            .select("nickname, profile_image")
-            .eq("user_id", "7ff77428-bdab-4724-9a67-ed5587217978")
-            .single();
+    // const fetchProfile = async () => {
+    //     const { data, error } = await supabase
+    //         .from("users")
+    //         .select("nickname, profile_image")
+    //         .eq("user_id", "7ff77428-bdab-4724-9a67-ed5587217978")
+    //         .single();
 
-        if (!error && data) setProfile(data);
+    //     if (!error && data) setProfile(data);
+    // };
+
+    // ✅ supabase 직접 호출 제거 — user API로 교체(bookshelf.tsx에서 복붙)
+    const fetchProfile = async () => {
+    try {
+        const response = await authFetch(`${BASE_URL}/users/me`);
+        const data = await response.json();
+        if (data) setProfile(data);
+    } catch (error) {
+        console.error("프로필 에러:", error);
+    }
     };
+
+    // 로그아웃
+    const { clearAuth } = useAuthStore();
+
+    const [refresh_token, setRefreshToken] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleLogout = async () => {
+        try {
+            setLoading(true);
+            // 1. 로그아웃 API 호출 (백엔드에 맞게 body 조정)
+            await authApi.logout({ refresh_token });
+            // 2. 로그인 상태 업데이트
+            clearAuth();
+            // 3. 로그인 화면으로 이동
+            router.replace('/');
+        } catch (error) {
+            console.error('로그아웃 오류:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
 
     return (
         <>
@@ -80,7 +115,10 @@ export default function Header() {
 
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => setMenuVisible(false)}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/(profile)/editprofile");  // 아직 ui가 없음!
+                            }}
                         >
                             <Text style={styles.menuItemText}>내 프로필 수정</Text>
                         </TouchableOpacity>
@@ -100,7 +138,10 @@ export default function Header() {
 
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => setMenuVisible(false)}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                handleLogout();
+                            }}
                         >
                             <Text style={[styles.menuItemText, { color: "#E53935" }]}>
                                 로그아웃
