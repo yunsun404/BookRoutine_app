@@ -174,6 +174,7 @@ export const groupApi = {
       created_at: Date;
       group_books: [{
         book_id?: string;
+        target_date?: Date;
       }]
     }[]>('/groups'),
 
@@ -188,6 +189,7 @@ export const groupApi = {
       created_at: Date;
       group_books: [{
         book_id?: string;
+        target_date?: Date;
       }]
     }>(`/groups/${group_id}`),
 
@@ -233,11 +235,13 @@ export const groupApi = {
     group_name?: string;
     people_count?: number;
     book_id?: string;
+    target_date?: Date;
   }) =>
     request<{
       group_name?: string;
       people_count?: number;
       book_id?: string;
+      target_date?: Date;
     }>(`/groups/${group_id}/update`, {
       method: 'PATCH',
       body: JSON.stringify(body)

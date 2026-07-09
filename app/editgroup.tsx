@@ -1,7 +1,8 @@
 import { groupApi } from "@/lib/api";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function EditgroupScreen() {
     const [loading, setLoading] = useState(false);
@@ -13,6 +14,8 @@ export default function EditgroupScreen() {
     const [created_by, setCreatedBy] = useState('');
     const [created_at, setCreatedAt] = useState<Date>();
     const [book_id, setBookId] = useState<string | undefined>('');
+    const [target_date, setTargetDate] = useState<Date | undefined>(undefined);
+    const [showPicker, setShowPicker] = useState(false);
 
     // 기존 그룹 불러오기
     useEffect(() => {
@@ -25,6 +28,7 @@ export default function EditgroupScreen() {
                 setCreatedBy(result.created_by ?? '');
                 setCreatedAt(result.created_at);
                 setBookId(result.group_books[0]?.book_id ?? '');
+                setTargetDate(result.group_books[0]?.target_date ? new Date(result.group_books[0].target_date) : undefined);
             } catch (error) {
                 console.error('그룹 불러오기 오류:', error);
             }
@@ -39,6 +43,7 @@ export default function EditgroupScreen() {
                 group_name: group_name || undefined,
                 people_count: people_count || undefined,
                 book_id: book_id || undefined,
+                target_date: target_date || undefined
             });
             router.back();
         } catch (error) {
@@ -88,6 +93,34 @@ export default function EditgroupScreen() {
                 onChangeText={setBookId}
                 autoCapitalize="none"
             />
+
+            {Platform.OS === 'web' ? (
+                // 웹(html input)
+                <input
+                    type="date"
+                    value={target_date ? target_date.toISOString().split('T')[0] : ''}
+                    onChange={(e) => setTargetDate(e.target.value ? new Date(e.target.value) : undefined)}
+                    style={{ padding: 8, fontSize: 16 }}
+                />
+            ) : (
+                // 모바일(DateTimePicker)
+                <>
+                    <TouchableOpacity onPress={() => setShowPicker(true)}>
+                        <Text>{target_date ? target_date.toISOString().split('T')[0] : '목표 날짜 선택'}</Text>
+                    </TouchableOpacity>
+                    {showPicker && (
+                        <DateTimePicker
+                            value={target_date ?? new Date()}
+                            mode="date"
+                            onChange={(event, selectedDate) => {
+                                setShowPicker(false);
+                                if (selectedDate) setTargetDate(selectedDate);
+                            }}
+                        >
+                        </DateTimePicker>
+                    )}
+                </>
+            )}
 
             <TouchableOpacity onPress={handleUpdateGroup} disabled={loading}>
                 {loading ? (
