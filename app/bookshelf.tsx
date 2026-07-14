@@ -1,4 +1,5 @@
 import { authFetch, BASE_URL } from "@/constants/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -62,6 +63,8 @@ export default function BookshelfScreen() {
     "bookshelf",
   );
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { user } = useAuthStore();    // 프로필을 store에서 바로 가져오기
+
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [folderName, setFolderName] = useState("");
@@ -178,16 +181,16 @@ export default function BookshelfScreen() {
       <View style={styles.profileRow}>
         <Image
           source={
-            profile?.profile_image
-              ? { uri: profile.profile_image }
+            user?.profile_image
+              ? { uri: user.profile_image }
               : { uri: "https://via.placeholder.com/64" }
           }
           style={styles.avatar}
         />
         <View style={styles.profileInfo}>
-          <Text style={styles.nickname}>{profile?.nickname ?? "닉네임"}</Text>
+          <Text style={styles.nickname}>{user?.nickname ?? "닉네임"}</Text>
           <Text style={styles.ageGroup}>
-            {profile?.age ? formatAge(profile.age) : "-"}
+            {user?.age ? formatAge(user.age) : "-"}
           </Text>
         </View>
       </View>

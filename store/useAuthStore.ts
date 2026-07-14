@@ -4,6 +4,7 @@ import { create } from 'zustand';
 interface User {
   user_id: string;
   nickname: string;
+  age?: number | null;
   profile_image?: string | null;
   reading_style?: object | null;
   reading_habit?: object | null;
@@ -29,6 +30,9 @@ interface AuthState {
 
   // 탈퇴
   deleteAuth: () => Promise<void>;
+
+  // 수정된 프로필 반영
+  updateUser: (user: Partial<User>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -64,5 +68,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     await AsyncStorage.removeItem('access_token');
     await AsyncStorage.removeItem('refreshToken');
     set({ user: null, access_token: null, isLoggedIn: false });
+  },
+
+  updateUser: async (user: Partial<User>) => {
+    set((state) => ({ user: { ...state.user, ...user } as User }));
+    console.log('updateUser: ', user);
   }
 }));
