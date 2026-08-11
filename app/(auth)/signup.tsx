@@ -49,9 +49,9 @@ export default function SignupScreen() {
                 nickname,
                 age: age || null,
                 profile_image: profile_image || null,
-                reading_style: reading_style ? { reading_style: reading_style } : null,
-                reading_habit: reading_habit ? { reading_habit: reading_habit } : null,
-                favorite_genre: favorite_genre.length > 0 ? { favorite_genre: favorite_genre } : null,
+                reading_style: reading_style ? { reading_style } : null,
+                reading_habit: reading_habit ? { reading_habit } : null,
+                favorite_genre: favorite_genre.length > 0 ? { favorite_genre } : null,
             };
 
             // 1. 회원가입 API 호출 (백엔드에 맞게 body 조정)
