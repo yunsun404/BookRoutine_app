@@ -80,6 +80,16 @@ export default function GroupDetailScreen() {
             <Text>방장: {group?.created_by}</Text>
             <Text>생성일: {group?.created_at.toString().split('T')[0]}</Text>
 
+            {/* ── 독서방 입장 버튼 (추가) ── */}
+            <TouchableOpacity
+                onPress={() =>
+                    router.push(
+                        `/reading-room?room_name=${group?.group_name}&username=나`
+                    )
+                }
+            >
+                <Text>독서방 입장</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity onPress={handleLeaveGroup}>
                 <Text>그룹 퇴장하기</Text>
