@@ -41,7 +41,7 @@ export default function SignupScreen() {
     const handleSignup = async () => {
         try {
             setLoading(true);
-            
+
             const payload: RegisterPayload = {
                 username,
                 email,
@@ -57,12 +57,12 @@ export default function SignupScreen() {
             // 1. 회원가입 API 호출 (백엔드에 맞게 body 조정)
             // 임시로 as any 처리를 하여 속성 오류를 우회합니다. 추후 lib/api.ts의 타입 정의도 업데이트가 필요합니다.
             const { user_id, access_token, refresh_token } = await authApi.register(payload as any);
-            
+
             // 2. 로그인 상태 업데이트
             setAuth({ user_id: user_id, nickname: nickname }, access_token, refresh_token);
-            
+
             // 3. 메인 화면으로 이동
-            router.replace('/(tabs)/home');
+            router.replace('/(tabs)/homescreen');
         } catch (error) {
             console.error('회원가입 오류:', error);
         } finally {
