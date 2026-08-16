@@ -21,6 +21,7 @@ interface UserProfile {
 export default function Header() {
     const [menuVisible, setMenuVisible] = useState(false);
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const { user } = useAuthStore();    // 프로필을 store에서 바로 가져오기
 
     useEffect(() => {
         fetchProfile();
@@ -80,14 +81,14 @@ export default function Header() {
                         <View style={styles.menuProfile}>
                             <Image
                                 source={
-                                    profile?.profile_image
-                                        ? { uri: profile.profile_image }
+                                    user?.profile_image
+                                        ? { uri: user.profile_image }
                                         : { uri: "https://via.placeholder.com/48" }
                                 }
                                 style={styles.menuAvatar}
                             />
                             <Text style={styles.menuNickname}>
-                                {profile?.nickname ?? "닉네임"}
+                                {user?.nickname ?? "닉네임"}
                             </Text>
                         </View>
 

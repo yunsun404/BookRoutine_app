@@ -94,7 +94,7 @@ export default function LoginScreen() {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => router.push('/signup')}>
+      <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
         <Text style={styles.link}>계정이 없으신가요? 회원가입</Text>
       </TouchableOpacity>
     </View>

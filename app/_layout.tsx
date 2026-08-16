@@ -1,5 +1,6 @@
 import { useColorScheme } from "@/components/useColorScheme";
-import { authFetch, BASE_URL, initAuth } from "@/constants/api";
+import { authFetch, BASE_URL } from "@/constants/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
@@ -18,7 +19,7 @@ export default function RootLayout() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     ...FontAwesome.font,
   });
-  
+
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -26,9 +27,12 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
+  // 새로고침 시 자동 로그인 시도
+  const { restoreToken } = useAuthStore();
+
   useEffect(() => {
     if (loaded) {
-      initAuth().then(async () => {
+      restoreToken().then(async () => {
         try {
           // 인증 로직 실행
           await authFetch(`${BASE_URL}/checklists/check-paw`, { method: "POST" });

@@ -1,9 +1,11 @@
+import { userApi } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 interface User {
   user_id: string;
   nickname: string;
+  age?: number | null;
   profile_image?: string | null;
   reading_style?: object | null;
   reading_habit?: object | null;
@@ -29,6 +31,9 @@ interface AuthState {
 
   // 탈퇴
   deleteAuth: () => Promise<void>;
+
+  // 수정된 프로필 반영
+  updateUser: (user: Partial<User>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -46,6 +51,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     const access_token = await AsyncStorage.getItem('access_token');
     if (access_token) {
       set({ access_token, isLoggedIn: true });
+      try {
+        const me = await userApi.getMe();
+        set({ user: me });
+      } catch (e) {
+        // 토큰 만료 등으로 getMe 실패하면 로그아웃 처리
+        await AsyncStorage.removeItem('access_token');
+        await AsyncStorage.removeItem('refresh_token');
+        set({ user: null, access_token: null, isLoggedIn: false });
+      }
     }
   },
 
@@ -64,5 +78,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     await AsyncStorage.removeItem('access_token');
     await AsyncStorage.removeItem('refreshToken');
     set({ user: null, access_token: null, isLoggedIn: false });
+  },
+
+  updateUser: async (user: Partial<User>) => {
+    set((state) => ({ user: { ...state.user, ...user } as User }));
+    console.log('updateUser: ', user);
   }
 }));
