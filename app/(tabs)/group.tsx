@@ -35,11 +35,12 @@ interface Post {
   date: string;
   bookTitle: string;
   quote: string;
+  likes: number;
 }
 
 // ── 컴포넌트 ───────────────────────────────────────────────────────
 export default function GroupScreen() {
-  const router = useRouter(); 
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
@@ -77,7 +78,7 @@ export default function GroupScreen() {
       setGroupsLoading(false);
     }
   };
- 
+
   useEffect(() => {
     fetchGroups();
   }, []);
@@ -168,7 +169,7 @@ export default function GroupScreen() {
               <Ionicons name="chevron-back" size={24} color="#1a1a1a" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{selectedGroup.name}</Text>
-            
+
             {/* 🔴 새 페이지로 네비게이션 트리거 */}
             <TouchableOpacity style={styles.cameraIconButton} onPress={handleEnterRoom}>
               <Ionicons name="camera" size={20} color="#fff" />
@@ -186,7 +187,8 @@ export default function GroupScreen() {
                       <Text style={styles.bookTag}>“ {post.bookTitle} ”</Text>
                     </View>
                   </View>
-                  <Text style={styles.dateText}>{post.date}</Text>
+                  <Text style={styles.dateText}>{(post.date).toString().split('T')[0]}</Text>
+                  <Text>❤️{post.likes ?? 0}</Text>
                 </View>
                 <Text style={styles.quoteText}>{post.quote}</Text>
               </View>
