@@ -35,6 +35,7 @@ type Thread = {
   likes: number;
   created_at: string;
   updated_at: string;
+  isAiSummary?: boolean; // AI 요약 카드 구분을 위한 플래그
 };
 
 export default function ThreadScreen() {
@@ -45,27 +46,18 @@ export default function ThreadScreen() {
   const [content, setContent] = useState("");
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
 
-  const [showSummary, setShowSummary] = useState(false);
-  const [summaryText, setSummaryText] = useState("");
-
   // [설명: API 연동 - 도서별 타래 목록 조회 (GET)]
   const fetchThreads = async () => {
     try {
-      // 💡 백엔드 컨트롤러 구조에 맞게 ?book_id 파라미터 방식으로 변경
       const url = `${THREADS_ENDPOINT}?book_id=${BOOK_ID}`;
-      console.log("🔍 요청 URL:", url);
-
       const res = await authFetch(url);
       const data = await res.json();
       
-      console.log("📦 서버가 응답한 전체 데이터:", data);
-
       if (!res.ok) {
         console.log("타래 조회 실패:", data);
         return;
       }
 
-      // 서버 응답이 배열이거나 객체 내부에 감싸져 있을 경우를 대비한 안전 처리
       if (Array.isArray(data)) {
         setThreads(data);
       } else if (data && Array.isArray(data.threads)) {
@@ -80,7 +72,7 @@ export default function ThreadScreen() {
     }
   };
 
-  // [설명: 화면이 처음 켜질 때(Mount) 타래 조회 함수 실행]
+  // [설명: 화면이 처음 켜질 때 타래 조회 함수 실행]
   useEffect(() => {
     fetchThreads();
   }, []);
@@ -121,7 +113,7 @@ export default function ThreadScreen() {
     }
   };
 
-  // [설명: 수정 모드 진입 (기존 데이터 입력창에 세팅)]
+  // [설명: 수정 모드 진입]
   const startEditThread = (item: Thread) => {
     setEditingThreadId(item.thread_id);
     setPage(String(item.current_page));
@@ -186,7 +178,7 @@ export default function ThreadScreen() {
     ]);
   };
 
-  // [설명: API 연동 - AI 요약 요청 (POST)]
+  // [설명: API 연동 - AI 요약 요청 (POST) 및 맨 위에 새 카드 추가]
   const addSummary = async () => {
     try {
       const res = await authFetch(AI_SUMMARY_ENDPOINT, {
@@ -199,8 +191,25 @@ export default function ThreadScreen() {
         Alert.alert("오류", "AI 요약 실패");
         return;
       }
-      setSummaryText(data.summary);
-      setShowSummary(true);
+
+      // 새로운 AI 요약 타래 객체 생성 (일반 타래와 구별하기 위해 isAiSummary: true 설정)
+      const aiSummaryThread: Thread = {
+        thread_id: `ai-summary-${Date.now()}`,
+        user_id: USER_ID,
+        book_id: BOOK_ID,
+        group_id: null,
+        content: `✨ [AI 핵심 요약]\n${data.summary}`,
+        current_page: 0,
+        is_public: true,
+        likes: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        isAiSummary: true, // 색상 분기용 플래그
+      };
+
+      // 기존 타래 리스트의 맨 앞에 추가
+      setThreads((prevThreads) => [aiSummaryThread, ...prevThreads]);
+      Alert.alert("성공", "AI 요약 타래가 맨 위에 생성되었습니다!");
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "AI 서버 연결 실패");
@@ -211,48 +220,66 @@ export default function ThreadScreen() {
   return (
     <View style={styles.container}>
       <Header />
-      <Text style={styles.title}>데미안</Text>
-      <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}>
-        <Text style={styles.addButtonText}>타래 등록</Text>
-      </Pressable>
+      <Text style={styles.title}>“ 데미안 ”</Text>
 
-      <ScrollView contentContainerStyle={styles.threadArea}>
-        {showSummary && (
-          <View style={[styles.card, styles.summaryCard]}>
-            <View style={styles.cardTop}>
-              <Text style={styles.summaryLabel}>✨ AI 핵심 요약본</Text>
-              <Text style={styles.date}>{new Date().toISOString().slice(0, 10)}</Text>
-            </View>
-            <Text style={styles.summaryContent}>{summaryText}</Text>
-          </View>
-        )}
-
+      {/* [설명: 상단 탭 버튼 영역 (타래 등록 / 문장 수집)] */}
+      <View style={styles.tabContainer}>
+        <Pressable style={styles.activeTabButton} onPress={() => setModalVisible(true)}>
+          <Text style={styles.activeTabText}>타래 등록</Text>
+        </Pressable>
+        <Pressable style={styles.tabButton}>
+          <Text style={styles.tabText}>문장 수집</Text>
+        </Pressable>
+      </View>
+{/* [설명: 타임라인 및 스크롤 영역 (초록색 선, 동그라미 적용)] */}
+   <ScrollView contentContainerStyle={styles.timelineContainer}>
         {threads.length === 0 ? (
           <Text style={styles.emptyText}>아직 등록된 타래가 없습니다.</Text>
         ) : (
-          threads.map((item) => (
-            <View key={item.thread_id} style={styles.card}>
-              <View style={styles.cardTop}>
-                <Text style={styles.page}>{item.current_page} pg</Text>
-                <Text style={styles.date}>{item.created_at?.slice(0, 10)}</Text>
-              </View>
-              <Text style={styles.content}>{item.content}</Text>
-              <View style={styles.cardButtons}>
-                <Pressable style={styles.smallButton} onPress={() => startEditThread(item)}>
-                  <Text style={styles.smallButtonText}>수정</Text>
-                </Pressable>
-                <Pressable style={styles.smallButton} onPress={() => deleteThread(item.thread_id)}>
-                  <Text style={styles.smallButtonText}>삭제</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))
-        )}
+          threads.map((item, index) => {
+            const isLast = index === threads.length - 1;
 
-        <Pressable style={styles.aiButton} onPress={addSummary}>
-          <Text style={styles.aiButtonText}>AI 요약하기</Text>
-        </Pressable>
+            return (
+              <View key={item.thread_id} style={styles.timelineWrapper}>
+                {/* 마지막 타래만 세로선이 짧게 끝나고, 나머지는 아래로 계속 이어짐 */}
+                <View style={isLast ? styles.lastItemLine : styles.itemLine} />
+                <View style={styles.dot} />
+                {/* 마지막 타래만 꺾인 선, 나머지는 일반 가로선 */}
+               <View style={styles.connectorLine} />
+                
+                <View 
+                  style={[
+                    styles.card, 
+                    item.isAiSummary && { backgroundColor: "#F3EBF6", borderColor: "#D1C4E9" }
+                  ]}
+                >
+                  <View style={styles.cardTop}>
+                    <Text style={styles.page}>{item.isAiSummary ? "✨ 요약" : `${item.current_page} pg`}</Text>
+                    <Text style={styles.date}>{item.created_at?.slice(0, 10)}</Text>
+                  </View>
+                  <Text style={styles.content}>{item.content}</Text>
+                  
+                  {!item.isAiSummary && (
+                    <View style={styles.cardButtons}>
+                      <Pressable style={styles.smallButton} onPress={() => startEditThread(item)}>
+                        <Text style={styles.smallButtonText}>수정</Text>
+                      </Pressable>
+                      <Pressable style={styles.smallButton} onPress={() => deleteThread(item.thread_id)}>
+                        <Text style={styles.smallButtonText}>삭제</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
+
+      {/* [설명: AI 요약하기 버튼을 하단에 고정 배치] */}
+      <Pressable style={styles.aiButtonFixed} onPress={addSummary}>
+        <Text style={styles.aiButtonText}>AI 요약하기</Text>
+      </Pressable>
 
       {/* [설명: 타래 등록/수정 모달창 UI] */}
       <Modal transparent visible={modalVisible} animationType="fade">
