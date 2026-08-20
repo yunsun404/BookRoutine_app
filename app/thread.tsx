@@ -17,7 +17,6 @@ import { styles } from "./styles/thread.styles";
 
 // [설명: API 엔드포인트(URL) 상수 정의]
 const THREADS_ENDPOINT = `${BASE_URL}/threads`;
-const BOOKS_THREADS_ENDPOINT = `${BASE_URL}/books`;
 const AI_SUMMARY_ENDPOINT = `${BASE_URL}/threads-ai/summary`;
 
 // [설명: 고정된 유저 ID와 도서 ID 설정]
@@ -52,14 +51,30 @@ export default function ThreadScreen() {
   // [설명: API 연동 - 도서별 타래 목록 조회 (GET)]
   const fetchThreads = async () => {
     try {
-      const res = await authFetch(`${BOOKS_THREADS_ENDPOINT}/${BOOK_ID}/threads`);
+      // 💡 백엔드 컨트롤러 구조에 맞게 ?book_id 파라미터 방식으로 변경
+      const url = `${THREADS_ENDPOINT}?book_id=${BOOK_ID}`;
+      console.log("🔍 요청 URL:", url);
+
+      const res = await authFetch(url);
       const data = await res.json();
+      
+      console.log("📦 서버가 응답한 전체 데이터:", data);
 
       if (!res.ok) {
         console.log("타래 조회 실패:", data);
         return;
       }
-      setThreads(data);
+
+      // 서버 응답이 배열이거나 객체 내부에 감싸져 있을 경우를 대비한 안전 처리
+      if (Array.isArray(data)) {
+        setThreads(data);
+      } else if (data && Array.isArray(data.threads)) {
+        setThreads(data.threads);
+      } else if (data && Array.isArray(data.data)) {
+        setThreads(data.data);
+      } else {
+        setThreads([]);
+      }
     } catch (error) {
       console.log("타래 조회 에러:", error);
     }
