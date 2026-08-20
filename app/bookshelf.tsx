@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import Header from "../components/Header";
+import ProfileCard from "../components/ProfileCard";
 import styles from "./styles/bookshelf.styles";
 
 interface BookshelfItem {
@@ -24,12 +25,6 @@ interface BookshelfItem {
     title: string;
     cover_url: string;
   };
-}
-
-interface UserProfile {
-  nickname: string;
-  age: number;
-  profile_image: string;
 }
 
 interface FolderItem {
@@ -46,46 +41,23 @@ interface FolderItem {
   }[];
 }
 
-const formatAge = (age: number) => {
-  if (age >= 10 && age < 20) return "10대";
-  if (age >= 20 && age < 30) return "20대";
-  if (age >= 30 && age < 40) return "30대";
-  if (age >= 40 && age < 50) return "40대";
-  if (age >= 50 && age < 60) return "50대";
-  return `${age}대`;
-};
-
 export default function BookshelfScreen() {
   const [books, setBooks] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"bookshelf" | "garden">(
     "bookshelf",
   );
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [folderName, setFolderName] = useState("");
 
   useEffect(() => {
-    fetchProfile();
     fetchBooks();
     fetchFolders();
   }, []);
 
-  // ✅ supabase 직접 호출 제거 — user API로 교체
-  const fetchProfile = async () => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users/me`);
-      const data = await response.json();
-      if (data) setProfile(data);
-    } catch (error) {
-      console.error("프로필 에러:", error);
-    }
-  };
-
   const fetchBooks = async () => {
     try {
-      // ✅ authFetch로 교체
       const response = await authFetch(`${BASE_URL}/bookshelf`);
       const data = await response.json();
       setBooks(Array.isArray(data) ? data : []);
@@ -99,7 +71,6 @@ export default function BookshelfScreen() {
 
   const fetchFolders = async () => {
     try {
-      // ✅ authFetch로 교체
       const response = await authFetch(`${BASE_URL}/bookshelf/folders`);
       const data = await response.json();
       setFolders(Array.isArray(data) ? data : []);
@@ -122,7 +93,6 @@ export default function BookshelfScreen() {
   const createFolder = async () => {
     if (!folderName.trim()) return;
     try {
-      // ✅ authFetch로 교체
       await authFetch(`${BASE_URL}/bookshelf/folders`, {
         method: "POST",
         body: JSON.stringify({ folder_name: folderName }),
@@ -170,27 +140,11 @@ export default function BookshelfScreen() {
   return (
     <View style={styles.container}>
       <Header />
+      <ProfileCard />
+
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
-
-      {/* 프로필 */}
-      <View style={styles.profileRow}>
-        <Image
-          source={
-            profile?.profile_image
-              ? { uri: profile.profile_image }
-              : { uri: "https://via.placeholder.com/64" }
-          }
-          style={styles.avatar}
-        />
-        <View style={styles.profileInfo}>
-          <Text style={styles.nickname}>{profile?.nickname ?? "닉네임"}</Text>
-          <Text style={styles.ageGroup}>
-            {profile?.age ? formatAge(profile.age) : "-"}
-          </Text>
-        </View>
-      </View>
 
       {/* 탭 */}
       <View style={styles.tabRow}>
