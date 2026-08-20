@@ -1,23 +1,30 @@
+// [설명: 외부 컴포넌트 및 API 유틸리티 불러오기]
 import Header from "@/components/Header";
-import { authFetch, BASE_URL } from "@/constants/api"; // 👈 추가된 import
+import { authFetch, BASE_URL } from "@/constants/api";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
   Modal,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 
+// [설명: 디자인 스타일 파일 불러오기]
+import { styles } from "./styles/thread.styles";
+
+// [설명: API 엔드포인트(URL) 상수 정의]
 const THREADS_ENDPOINT = `${BASE_URL}/threads`;
+const BOOKS_THREADS_ENDPOINT = `${BASE_URL}/books`;
 const AI_SUMMARY_ENDPOINT = `${BASE_URL}/threads-ai/summary`;
 
+// [설명: 고정된 유저 ID와 도서 ID 설정]
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 const BOOK_ID = "160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a";
 
+// [설명: 타래 데이터의 구조(Type) 정의]
 type Thread = {
   thread_id: string;
   user_id: string;
@@ -32,6 +39,7 @@ type Thread = {
 };
 
 export default function ThreadScreen() {
+  // [설명: 화면 상태(State) 관리 영역]
   const [threads, setThreads] = useState<Thread[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [page, setPage] = useState("");
@@ -41,9 +49,10 @@ export default function ThreadScreen() {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryText, setSummaryText] = useState("");
 
+  // [설명: API 연동 - 도서별 타래 목록 조회 (GET)]
   const fetchThreads = async () => {
     try {
-      const res = await authFetch(`${THREADS_ENDPOINT}?user_id=${USER_ID}&book_id=${BOOK_ID}`);
+      const res = await authFetch(`${BOOKS_THREADS_ENDPOINT}/${BOOK_ID}/threads`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -56,10 +65,12 @@ export default function ThreadScreen() {
     }
   };
 
+  // [설명: 화면이 처음 켜질 때(Mount) 타래 조회 함수 실행]
   useEffect(() => {
     fetchThreads();
   }, []);
 
+  // [설명: API 연동 - 새로운 타래 등록 (POST)]
   const addThread = async () => {
     if (!content.trim()) {
       Alert.alert("알림", "내용을 입력해주세요.");
@@ -95,6 +106,7 @@ export default function ThreadScreen() {
     }
   };
 
+  // [설명: 수정 모드 진입 (기존 데이터 입력창에 세팅)]
   const startEditThread = (item: Thread) => {
     setEditingThreadId(item.thread_id);
     setPage(String(item.current_page));
@@ -102,6 +114,7 @@ export default function ThreadScreen() {
     setModalVisible(true);
   };
 
+  // [설명: API 연동 - 기존 타래 수정 (PATCH)]
   const updateThread = async () => {
     if (!editingThreadId) return;
 
@@ -131,6 +144,7 @@ export default function ThreadScreen() {
     }
   };
 
+  // [설명: API 연동 - 선택한 타래 삭제 (DELETE)]
   const deleteThread = async (threadId: string) => {
     Alert.alert("삭제 확인", "이 타래를 삭제하시겠습니까?", [
       { text: "취소" },
@@ -157,6 +171,7 @@ export default function ThreadScreen() {
     ]);
   };
 
+  // [설명: API 연동 - AI 요약 요청 (POST)]
   const addSummary = async () => {
     try {
       const res = await authFetch(AI_SUMMARY_ENDPOINT, {
@@ -177,6 +192,7 @@ export default function ThreadScreen() {
     }
   };
 
+  // [설명: 화면 레이아웃(UI) 및 이벤트 연결 영역]
   return (
     <View style={styles.container}>
       <Header />
@@ -222,8 +238,8 @@ export default function ThreadScreen() {
           <Text style={styles.aiButtonText}>AI 요약하기</Text>
         </Pressable>
       </ScrollView>
-      
-      {/* 모달 등 하단 UI는 그대로 유지 */}
+
+      {/* [설명: 타래 등록/수정 모달창 UI] */}
       <Modal transparent visible={modalVisible} animationType="fade">
         <View style={styles.modalBackground}>
           <View style={styles.modalBox}>
@@ -265,173 +281,3 @@ export default function ThreadScreen() {
     </View>
   );
 }
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F0EFED",
-  },
-  title: {
-    textAlign: "center",
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#333",
-    marginTop: 8,
-    marginBottom: 18,
-  },
-  addButton: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  addButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#333",
-  },
-  threadArea: {
-    paddingHorizontal: 16,
-    paddingBottom: 90,
-  },
-  emptyText: {
-    textAlign: "center",
-    color: "#777",
-    marginTop: 30,
-    marginBottom: 30,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  summaryCard: {
-    backgroundColor: "#E8F3EC", // 초록빛 계열의 AI 요약 전용 배경색
-    borderWidth: 1,
-    borderColor: "#C2E2CC",
-  },
-  cardTop: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-  page: {
-    fontSize: 12,
-    color: "#777",
-  },
-  date: {
-    fontSize: 12,
-    color: "#999",
-  },
-  summaryLabel: {
-    fontSize: 13,
-    color: "#2E6943",
-    fontWeight: "700",
-  },
-  content: {
-    fontSize: 14,
-    color: "#333",
-    lineHeight: 22,
-  },
-  // 💡 추가된 스타일: 요약 텍스트 전용 폰트 스타일 속성 지정
-  summaryContent: {
-    fontSize: 14,
-    color: "#2C3E31",
-    lineHeight: 22,
-    fontWeight: "500",
-  },
-  aiButton: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginHorizontal: 48,
-    marginTop: 4,
-    backgroundColor: "#4A3B32",
-  },
-  aiButtonText: {
-    fontSize: 13,
-    color: "#fff",
-    fontWeight: "700",
-  },
-  modalBackground: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBox: {
-    width: "86%",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 22,
-  },
-  modalTitle: {
-    textAlign: "center",
-    marginBottom: 16,
-    fontWeight: "700",
-    fontSize: 18,
-    color: "#333",
-  },
-  pageInput: {
-    width: 70,
-    backgroundColor: "#F8F7F5",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  pgText: {
-    marginLeft: 78,
-    marginTop: -28,
-    marginBottom: 16,
-    color: "#555",
-  },
-  contentInput: {
-    height: 150,
-    backgroundColor: "#F8F7F5",
-    borderRadius: 12,
-    padding: 14,
-    textAlignVertical: "top",
-    marginBottom: 18,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    backgroundColor: "#F0EFED",
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  cardButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginTop: 14,
-  },
-  smallButton: {
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#F0EFED",
-  },
-  smallButtonText: {
-    fontSize: 12,
-    color: "#333",
-  },
-});

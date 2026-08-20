@@ -1,24 +1,19 @@
 import BookCarousel, { type Book } from "@/components/home/BookCarousel";
 import FeedCard, { type FeedItem } from "@/components/home/FeedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
-import { authFetch, BASE_URL } from "@/constants/api"; // ✅ 토큰 인증 방식 사용
-import { Colors, FontSize, Spacing } from "@/constants/tokens";
+import { authFetch, BASE_URL } from "@/constants/api";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-
 import {
   ActivityIndicator,
-  Dimensions,
-  FlatList,
+  Image,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 import Header from "../../components/Header";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+import { styles } from "../styles/home.styles";
 
 type ChecklistItem = {
   checklist_id: string;
@@ -44,30 +39,27 @@ function toTask(item: ChecklistItem): Task {
   };
 }
 
-// Mock 데이터 (필요 시 API로 대체)
-const MOCK_BOOKS: Book[] = [{
-  id: "1", title: "데미안", author: "Hermann Hesse", subtitle: "Emil Sinclair",
-  coverUrl: null, currentPage: 24, totalPages: 48,
-}];
-
 const MOCK_FEED: FeedItem[] = [{
-  id: "f1", bookTitle: "데미안", username: "hongildong1", avatarEmoji: "🦊",
-  date: "2026-04-30", content: '"내 속에서 솟아 나오려는 것, 바로 그것을 나는 살아보려 했다."'
+  id: "f1", 
+  bookTitle: "데미안", 
+  username: "hongildong1", 
+  avatarEmoji: "🦊",
+  date: "2026-04-30", 
+  content: '"내 속에서 솟아 나오려는 것, 바로 그것을 나는 살아보려 했다. 왜 그것이 그토록 어려웠을까." 서문의 이 첫 문장이 책의 전세 내용을 얘기하고 있는 것 같아 읽자마자 집중할 수 있었다.'
 }];
 
 export default function HomeScreen() {
   const router = useRouter();
   const [bookGroups, setBookGroups] = useState<BookGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => { fetchUpcoming(); }, []);
 
   async function fetchUpcoming() {
     try {
-      const res = await authFetch(`${BASE_URL}/checklists/upcoming`); // ✅ 인증 헤더 포함
+      const res = await authFetch(`${BASE_URL}/checklists/upcoming`);
       const data: BookGroup[] = await res.json();
-      setBookGroups(data);
+      setBookGroups(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error("체크리스트 불러오기 실패:", e);
     } finally {
@@ -75,23 +67,32 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleToggle(bookId: string, taskId: string) {
-    // 1. 낙관적 업데이트
-    setBookGroups((prev) => prev.map((group) => group.book_id !== bookId ? group : {
-      ...group, tasks: group.tasks.map((t) => t.checklist_id === taskId ? { ...t, check_box: !t.check_box } : t),
-    }));
+  // 임시 handleToggle 함수
+  const handleToggle = (bookId: string, taskId: string) => {
+    setBookGroups((prev) =>
+      prev.map((group) => {
+        if (group.book_id !== bookId) return group;
+        return {
+          ...group,
+          tasks: group.tasks.map((task) =>
+            task.checklist_id === taskId
+              ? { ...task, check_box: !task.check_box }
+              : task
+          ),
+        };
+      })
+    );
+  };
 
-    try {
-      // 2. 서버 요청
-      await authFetch(`${BASE_URL}/checklists/${taskId}/check`, { method: "PATCH" });
-    } catch (e) {
-      // 3. 실패 시 롤백
-      setBookGroups((prev) => prev.map((group) => group.book_id !== bookId ? group : {
-        ...group, tasks: group.tasks.map((t) => t.checklist_id === taskId ? { ...t, check_box: !t.check_box } : t),
-      }));
-      console.error("체크 업데이트 실패:", e);
-    }
-  }
+  const booksForCarousel: Book[] = bookGroups.map((group) => ({
+    id: group.book_id,
+    title: group.book_title,
+    author: "",
+    subtitle: "",
+    coverUrl: group.cover_url,
+    currentPage: 24,
+    totalPages: 48,
+  }));
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
 
@@ -100,68 +101,90 @@ export default function HomeScreen() {
       <Header />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* 1. 상단 캐러셀 */}
-        <View style={styles.carouselContainer}>
-          <BookCarousel books={MOCK_BOOKS} onPress={() => router.push("/goals")} />
-        </View>
-
-        {/* 2. 체크리스트 섹션 */}
+        {/* 📚 책 등록 여부에 따른 분기 처리 */}
         {bookGroups.length === 0 ? (
-          <Pressable style={styles.emptyBox} onPress={() => router.push("/goals")}>
-            <Text style={styles.emptyText}>목표를 설정해보세요</Text>
-          </Pressable>
-        ) : (
-          <View>
-            <FlatList
-              data={bookGroups}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.book_id}
-              scrollEventThrottle={16}
-              onScroll={(e) => setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH))}
-              renderItem={({ item: group }) => (
-                <View style={{ width: SCREEN_WIDTH }}>
-                  <GoalSection
-                    goal={group.book_title}
-                    tasks={group.tasks.map(toTask)}
-                    onGoalEdit={() => router.push("/goals")}
-                    onTaskToggle={(taskId) => handleToggle(group.book_id, taskId)}
-                  />
-                </View>
-              )}
-            />
-            {bookGroups.length > 1 && (
-              <View style={styles.dotRow}>
-                {bookGroups.map((_, i) => <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />)}
+          // [디자인 1] 등록된 책이 없을 때
+          <View style={styles.emptyContainer}>
+            {/* 동그라미 배경 제거를 위해 backgroundColor 및 borderRadius를 transparent/0 으로 재정의 */}
+            <View style={[styles.emptyCarouselBox, { backgroundColor: "transparent", borderRadius: 0 }]}>
+              <View style={styles.arrowButton}><Text style={styles.arrowText}>{"<"}</Text></View>
+              
+              <View style={[styles.illustrationPlaceholder, { backgroundColor: "transparent", borderRadius: 0 }]}>
+                <Image 
+                  source={require("@/assets/images/empty_book.png")} 
+                  style={{ width: 180, height: 180, resizeMode: "contain" }} 
+                />
               </View>
-            )}
+
+              <View style={styles.arrowButton}><Text style={styles.arrowText}>{">"}</Text></View>
+            </View>
+
+            <Text style={styles.emptyTitle}>아직 등록된 책이 없어요</Text>
+            <Text style={styles.emptySubText}>책을 등록하고 독서 목표를 시작해보세요 :)</Text>
+
+           {/* 버튼 너비 확장 및 텍스트 정중앙 정렬 */}
+            <Pressable 
+              style={[
+                styles.registerButton, 
+                { 
+                  width: "75%", 
+                  minWidth: 240, 
+                  alignSelf: "center", 
+                  paddingVertical: 14,
+                  alignItems: "center",    // 가로 중앙 정렬
+                  justifyContent: "center" // 세로 중앙 정렬
+                }
+              ]} 
+              onPress={() => router.push("/goals")}
+            >
+              <Text style={[styles.registerButtonText, { textAlign: "center" }]}>+ 책 등록하기</Text>
+            </Pressable>
+
+            <View style={styles.guideBox}>
+              <Text style={styles.guideTitle}>책을 등록하면</Text>
+              <View style={styles.guideItem}><Text style={styles.guideIcon}>📝</Text><Text style={styles.guideText}>오늘의 독서 목표를 설정하고</Text></View>
+              <View style={styles.guideItem}><Text style={styles.guideIcon}>📈</Text><Text style={styles.guideText}>독서 진행률을 한눈에 확인하고</Text></View>
+              <View style={styles.guideItem}><Text style={styles.guideIcon}>🔖</Text><Text style={styles.guideText}>나만의 독서 기록을 남길 수 있어요</Text></View>
+            </View>
+
+            <View style={styles.quoteCard}>
+              <View style={styles.avatarCircle}><Text style={styles.avatarEmoji}>🦊</Text></View>
+              <View style={styles.quoteTextContainer}>
+                <Text style={styles.quoteTitle}>“함께 읽고, 함께 성장해요”</Text>
+                <Text style={styles.quoteSubText}>오늘도 한 페이지의 변화가{'\n'}내일의 나를 만들어갑니다.</Text>
+              </View>
+            </View>
           </View>
+        ) : (
+          // [디자인 2] 등록된 책이 있을 때 (캐러셀, 목표/체크리스트, 피드)
+          <>
+            <View style={styles.carouselContainer}>
+              <BookCarousel books={booksForCarousel} onPress={() => router.push("/goals")} />
+            </View>
+
+            {/* 목표 및 체크리스트 섹션 */}
+            {bookGroups.map((group) => (
+              <View key={group.book_id}>
+                <GoalSection 
+                  goal={group.book_title}
+                  tasks={group.tasks.map(toTask)}
+                  onGoalEdit={() => router.push("/goals")}
+                  onTaskToggle={(taskId) => handleToggle(group.book_id, taskId)}
+                />
+              </View>
+            ))}
+
+            {/* 최근 타래 섹션 */}
+            <Text style={styles.sectionTitle}>최근 타래</Text>
+            {MOCK_FEED.map((item) => (
+              <Pressable key={item.id} onPress={() => router.push("/thread")}>
+                <FeedCard item={item} />
+              </Pressable>
+            ))}
+          </>
         )}
 
-        {/* 3. 최근 타래 섹션 */}
-        <View style={styles.feedSection}>
-          <Text style={styles.sectionTitle}>최근 타래</Text>
-          {MOCK_FEED.map((item) => (
-            <Pressable key={item.id} onPress={() => router.push("/thread")}>
-              <FeedCard item={item} />
-            </Pressable>
-          ))}
-        </View>
       </ScrollView>
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: "#fff" },
-  content: { paddingBottom: 24 },
-  carouselContainer: { marginVertical: 12 },
-  sectionTitle: { fontSize: FontSize.md, fontWeight: "bold", paddingHorizontal: 16, marginTop: 20 },
-  feedSection: { paddingHorizontal: 16, paddingTop: 4 },
-  emptyBox: { marginHorizontal: Spacing.lg, marginVertical: 16, padding: 24, alignItems: "center", borderWidth: 1, borderColor: Colors.border, borderRadius: 12, borderStyle: 'dashed' },
-  emptyText: { fontSize: FontSize.sm, color: Colors.textTertiary },
-  dotRow: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 8, marginBottom: 4 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.border },
-  dotActive: { backgroundColor: Colors.textSecondary },
-});
