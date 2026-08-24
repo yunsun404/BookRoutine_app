@@ -13,14 +13,6 @@ import {
 } from 'react-native';
 import { styles } from '../styles/goals.styles';
 
-const defaultBook = {
-  book_id: '160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a',
-  title: '데미안',
-  author: '헤르만 헤세',
-  total_pages: 212,
-  isbn: '',
-};
-
 type Book = {
   book_id: string;
   title: string;
@@ -32,21 +24,26 @@ type Book = {
 export default function BookSelectScreen() {
   const router = useRouter();
 
-  const [book, setBook] = useState<Book>(defaultBook);
+  const [book, setBook] = useState<Book | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [bookModalVisible, setBookModalVisible] = useState(false);
   const [titleOpen, setTitleOpen] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
+  
   const [tempTitle, setTempTitle] = useState('');
   const [tempAuthor, setTempAuthor] = useState('');
   const [tempPages, setTempPages] = useState('');
+  const [tempIsbn, setTempIsbn] = useState('');
+  const [tempBookId, setTempBookId] = useState('');
 
   const openBookModal = () => {
-    setTempTitle(book.title);
-    setTempAuthor(book.author);
-    setTempPages(String(book.total_pages));
+    setTempTitle('');
+    setTempAuthor('');
+    setTempPages('');
+    setTempIsbn('');
+    setTempBookId('');
     setSearchTitle('');
     setSearchResults([]);
     setTitleOpen(false);
@@ -55,29 +52,30 @@ export default function BookSelectScreen() {
 
   const applyTempBook = () => {
     if (!tempTitle.trim() || !tempAuthor.trim() || !tempPages.trim()) {
-      Alert.alert('알림', '제목, 저자, 총 페이지 수를 입력해주세요.');
+      Alert.alert('알림', '제목, 지은이, 쪽수를 모두 입력해주세요.');
       return;
     }
 
     const pageNumber = Number(tempPages);
     if (Number.isNaN(pageNumber) || pageNumber <= 0) {
-      Alert.alert('알림', '총 페이지 수는 숫자로 입력해주세요.');
+      Alert.alert('알림', '쪽수는 숫자로 입력해주세요.');
       return;
     }
 
     setBook({
-      ...book,
+      book_id: tempBookId,
       title: tempTitle,
       author: tempAuthor,
       total_pages: pageNumber,
+      isbn: tempIsbn,
     });
 
     setBookModalVisible(false);
   };
 
+  // 💡 이전 단일 파일 시절의 정상 작동하던 백엔드 API 경로로 복구 완료
   const searchBooks = async (text: string) => {
     setSearchTitle(text);
-    setTempTitle(text);
 
     if (text.trim().length < 2) {
       setSearchResults([]);
@@ -99,8 +97,11 @@ export default function BookSelectScreen() {
     }
   };
 
-  // 💡 계획 화면으로 이동하면서 책 정보를 query params로 전달
   const goToPlanScreen = () => {
+    if (!book) {
+      Alert.alert('알림', '먼저 책을 추가해주세요!');
+      return;
+    }
     router.push({
       pathname: '/reading-goals/reading-plan',
       params: {
@@ -123,16 +124,27 @@ export default function BookSelectScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Pressable style={styles.bookAddBox} onPress={openBookModal}>
-          <Text style={styles.plusText}>+ 책 추가</Text>
+          <Text style={styles.plusText}>
+            {book ? '+ 다른 책으로 변경하기' : '+ 책 추가'}
+          </Text>
         </Pressable>
 
-        <View style={styles.card}>
-          <InfoRow label="제목" value={book.title} />
-          <InfoRow label="저자" value={book.author} />
-          <InfoRow label="총 페이지" value={`${book.total_pages}쪽`} />
-        </View>
+        {book ? (
+          <View style={styles.card}>
+            <InfoRow label="제목" value={book.title} />
+            <InfoRow label="지은이" value={book.author} />
+            <InfoRow label="쪽수" value={`${book.total_pages}쪽`} />
+          </View>
+        ) : (
+          <View style={[styles.card, { alignItems: 'center', paddingVertical: 30 }]}>
+            <Text style={{ color: '#9ca3af', fontSize: 14 }}>등록된 책이 없습니다. 책을 추가해 주세요!</Text>
+          </View>
+        )}
 
-        <Pressable style={styles.mainButton} onPress={goToPlanScreen}>
+        <Pressable 
+          style={[styles.mainButton, !book && { backgroundColor: '#d1d5db' }]} 
+          onPress={goToPlanScreen}
+        >
           <Text style={styles.mainButtonText}>계획 생성하기</Text>
         </Pressable>
       </ScrollView>
@@ -148,85 +160,101 @@ export default function BookSelectScreen() {
         <Text style={styles.navItem}>추천</Text>
       </View>
 
-      {/* 책 검색 및 직접 입력 모달 */}
+      {/* 책 추가 팝업 모달 */}
       <Modal transparent visible={bookModalVisible} animationType="fade">
         <View style={styles.modalBackground}>
           <View style={styles.bookModalBox}>
             <Text style={styles.bookModalTitle}>책 추가하기</Text>
 
-            <Pressable
-              style={styles.searchHeader}
-              onPress={() => setTitleOpen((prev) => !prev)}
-            >
-              <Text style={styles.searchHeaderText}>+ 제목 검색</Text>
-            </Pressable>
-
-            {titleOpen && (
-              <View style={styles.searchDropdown}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="제목을 입력하세요"
-                  value={searchTitle}
-                  onChangeText={searchBooks}
-                />
-
-                {searchLoading ? (
-                  <Text style={styles.loadingText}>검색 중...</Text>
-                ) : searchResults.length === 0 && searchTitle.length >= 2 ? (
-                  <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
-                ) : (
-                  searchResults.map((item, index) => (
-                    <Pressable
-                      key={`${item.book_id || item.title}-${index}`}
-                      style={styles.searchResult}
-                      onPress={() => {
-                        setBook({
-                          book_id: '',
-                          title: item.title || '',
-                          author: item.author || '',
-                          total_pages: item.subInfo?.itemPage ?? 0,
-                          isbn: item.isbn || '',
-                        });
-
-                        setTempTitle(item.title || '');
-                        setTempAuthor(item.author || '');
-                        setTempPages(String(item.subInfo?.itemPage ?? 0));
-
-                        setTitleOpen(false);
-                      }}
-                    >
-                      <Text style={styles.searchResultTitle}>{item.title}</Text>
-                      <Text style={styles.searchResultAuthor}>
-                        {item.author}
-                      </Text>
-                    </Pressable>
-                  ))
-                )}
-              </View>
-            )}
-
+            {/* 1. 제목 입력 박스 (클릭 시 검색 드롭다운 토글) */}
             <View style={styles.manualInputBox}>
-              <TextInput
-                style={styles.manualInput}
-                placeholder="제목"
-                value={tempTitle}
-                onChangeText={setTempTitle}
-              />
-              <TextInput
-                style={styles.manualInput}
-                placeholder="저자"
-                value={tempAuthor}
-                onChangeText={setTempAuthor}
-              />
-              <TextInput
-                style={styles.manualInput}
-                placeholder="총 페이지 수"
-                keyboardType="number-pad"
-                value={tempPages}
-                onChangeText={setTempPages}
-              />
+              <Pressable 
+                style={styles.inputRowContainer}
+                onPress={() => setTitleOpen((prev) => !prev)}
+              >
+                <Text style={styles.inputRowLabel}>제목</Text>
+                <TextInput
+                  style={[styles.manualInput, { pointerEvents: 'none' }]}
+                  placeholder="+ 눌러서 제목을 추가해보세요"
+                  placeholderTextColor="#9ca3af"
+                  value={tempTitle}
+                  editable={false}
+                />
+              </Pressable>
+
+              {/* 검색 드롭다운 영역 */}
+              {titleOpen && (
+                <View style={styles.searchDropdown}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="검색할 책 제목 입력..."
+                    placeholderTextColor="#9ca3af"
+                    value={searchTitle}
+                    onChangeText={searchBooks}
+                    autoFocus
+                  />
+                  {searchLoading ? (
+                    <Text style={styles.loadingText}>검색 중...</Text>
+                  ) : searchResults.length > 0 ? (
+                    <ScrollView style={{ maxHeight: 130 }} nestedScrollEnabled>
+                      {searchResults.map((item, index) => {
+                        const pages = item.total_pages ?? item.subInfo?.itemPage ?? 0;
+                        return (
+                          <Pressable
+                            key={`${item.book_id || item.isbn || item.title}-${index}`}
+                            style={styles.searchResult}
+                            onPress={() => {
+                              setTempBookId(item.book_id || '');
+                              setTempTitle(item.title || '');
+                              setTempAuthor(item.author || '');
+                              setTempPages(String(pages));
+                              setTempIsbn(item.isbn13 || item.isbn || '');
+                              setTitleOpen(false);
+                            }}
+                          >
+                            <Text style={styles.searchResultTitle} numberOfLines={1}>{item.title}</Text>
+                            <Text style={styles.searchResultAuthor} numberOfLines={1}>{item.author}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  ) : searchTitle.trim().length >= 2 ? (
+                    <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
+                  ) : null}
+                </View>
+              )}
             </View>
 
+            {/* 2. 지은이 입력 박스 */}
+            <View style={styles.manualInputBox}>
+              <View style={styles.inputRowContainer}>
+                <Text style={styles.inputRowLabel}>지은이</Text>
+                <TextInput
+                  style={styles.manualInput}
+                  placeholder="지은이"
+                  placeholderTextColor="#9ca3af"
+                  value={tempAuthor}
+                  onChangeText={setTempAuthor}
+                />
+              </View>
+            </View>
+
+            {/* 3. 쪽수 입력 박스 */}
+            <View style={styles.manualInputBox}>
+              <View style={styles.inputRowContainer}>
+                <Text style={styles.inputRowLabel}>쪽수</Text>
+                <TextInput
+                  style={styles.manualInput}
+                  placeholder="쪽수"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="number-pad"
+                  value={tempPages}
+                  onChangeText={setTempPages}
+                />
+              </View>
+            </View>
+
+            {/* 하단 버튼 영역 */}
             <View style={styles.modalButtonRow}>
               <Pressable
                 style={styles.modalCancelButton}
@@ -235,7 +263,10 @@ export default function BookSelectScreen() {
                 <Text style={styles.modalCancelText}>취소</Text>
               </Pressable>
 
-              <Pressable style={styles.modalConfirmButton} onPress={applyTempBook}>
+              <Pressable 
+                style={styles.modalConfirmButton} 
+                onPress={applyTempBook}
+              >
                 <Text style={styles.modalConfirmText}>확인</Text>
               </Pressable>
             </View>

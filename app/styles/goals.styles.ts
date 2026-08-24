@@ -1,4 +1,4 @@
-// app/reading-goals/goals.styles.ts (또는 적절한 경로)
+// app/reading-goals/goals.styles.ts
 import { Colors, FontSize, Spacing } from '@/constants/tokens';
 import { StyleSheet } from 'react-native';
 
@@ -257,6 +257,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingBottom: 8,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   navItem: {
     fontSize: FontSize.xs,
@@ -273,9 +277,11 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   bookModalBox: {
     width: '90%',
+    maxWidth: 400,
     backgroundColor: Colors.bgPrimary,
     borderRadius: 28,
     paddingVertical: Spacing.xl,
@@ -306,19 +312,22 @@ export const styles = StyleSheet.create({
   },
   searchDropdown: {
     width: '100%',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#EFEFEF',
     padding: Spacing.md,
-    maxHeight: 220,
-    marginBottom: Spacing.md,
+    maxHeight: 180,
   },
   searchInput: {
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.textPrimary,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#EFEFEF',
-    paddingBottom: 10,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
   },
   loadingText: {
     fontSize: 13,
@@ -333,12 +342,13 @@ export const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   searchResult: {
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F8F9FA',
   },
   searchResultTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
     letterSpacing: -0.2,
@@ -346,19 +356,34 @@ export const styles = StyleSheet.create({
   searchResultAuthor: {
     fontSize: 12,
     color: Colors.textTertiary,
-    marginTop: 3,
+    marginTop: 2,
   },
   manualInputBox: {
     width: '100%',
-    gap: Spacing.md,
-  },
-  manualInput: {
     backgroundColor: '#F8F9FA',
     borderRadius: 14,
-    paddingVertical: 14,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    overflow: 'hidden',
+  },
+  inputRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
     paddingHorizontal: 16,
+  },
+  inputRowLabel: {
+    width: 60,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  manualInput: {
+    flex: 1,
     fontSize: 15,
     color: Colors.textPrimary,
+    paddingVertical: 0,
   },
   modalButtonRow: {
     flexDirection: 'row',
@@ -374,7 +399,7 @@ export const styles = StyleSheet.create({
   },
   modalConfirmButton: {
     flex: 1,
-    backgroundColor: Colors.textPrimary,
+    backgroundColor: Colors.textPrimary, // 또는 보라색 포인트 컬러 원하시면 '#6b46c1' 등으로 변경 가능
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
