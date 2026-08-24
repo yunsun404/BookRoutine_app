@@ -135,7 +135,7 @@ export default function HomeScreen() {
                   justifyContent: "center" // 세로 중앙 정렬
                 }
               ]} 
-              onPress={() => router.push("/goals")}
+              onPress={() => router.push("/reading-goals/book-select")}
             >
               <Text style={[styles.registerButtonText, { textAlign: "center" }]}>+ 책 등록하기</Text>
             </Pressable>
@@ -159,7 +159,7 @@ export default function HomeScreen() {
           // [디자인 2] 등록된 책이 있을 때 (캐러셀, 목표/체크리스트, 피드)
           <>
             <View style={styles.carouselContainer}>
-              <BookCarousel books={booksForCarousel} onPress={() => router.push("/goals")} />
+              <BookCarousel books={booksForCarousel} onPress={() => router.push("/reading-goals/book-select")} />
             </View>
 
             {/* 목표 및 체크리스트 섹션 */}
@@ -168,7 +168,7 @@ export default function HomeScreen() {
                 <GoalSection 
                   goal={group.book_title}
                   tasks={group.tasks.map(toTask)}
-                  onGoalEdit={() => router.push("/goals")}
+                  onGoalEdit={() => router.push("/reading-goals/book-select")}
                   onTaskToggle={(taskId) => handleToggle(group.book_id, taskId)}
                 />
               </View>
