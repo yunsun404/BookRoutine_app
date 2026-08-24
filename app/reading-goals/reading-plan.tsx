@@ -3,11 +3,11 @@ import { authFetch, BASE_URL } from "@/constants/api";
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from 'react-native';
 import { styles } from '../styles/goals.styles';
 
@@ -236,7 +236,8 @@ export default function ReadingPlanScreen() {
         return;
       }
 
-      Alert.alert('성공', '목표가 생성되었습니다.');
+      // [수정됨] 목표 생성 성공 시 알림창 없이 바로 homescreen으로 이동
+      router.push('/homescreen');
     } catch (error) {
       console.error(error);
       Alert.alert('오류', '서버 연결에 실패했습니다.');
@@ -369,7 +370,7 @@ export default function ReadingPlanScreen() {
       <View style={styles.bottomNav}>
         <Text style={styles.navItem}>통계</Text>
         <Text style={styles.navItem}>달력</Text>
-        <Pressable onPress={() => router.push('/home')}>
+        <Pressable onPress={() => router.push('/homescreen')}>
           <Text style={styles.navItemActive}>홈</Text>
         </Pressable>
         <Text style={styles.navItem}>그룹</Text>
