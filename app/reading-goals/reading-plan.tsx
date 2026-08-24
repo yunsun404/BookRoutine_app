@@ -24,8 +24,8 @@ const days = [
 ];
 
 const monthNames = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  '1월', '2월', '3월', '4월', '5월', '6월',
+  '7월', '8월', '9월', '10월', '11월', '12월'
 ];
 
 type CalendarCell = {
@@ -48,12 +48,17 @@ export default function ReadingPlanScreen() {
     isbn: (params.isbn as string) || '',
   };
 
-  const [currentYear, setCurrentYear] = useState(2025);
-  const [currentMonth, setCurrentMonth] = useState(8);
+  // 현재 날짜를 기준으로 초기 연도와 월 설정
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
 
-  const [startDate, setStartDate] = useState('2025-09-09');
-  const [endDate, setEndDate] = useState('2025-09-30');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 3, 5]);
+
+  // 오늘 날짜 문자열 ( 비교용: YYYY-MM-DD )
+  const todayString = formatDate(today);
 
   // 시작일과 종료일이 모두 선택되었을 때, 그 기간에 포함되는 요일 자동 추출
   useEffect(() => {
@@ -173,6 +178,12 @@ export default function ReadingPlanScreen() {
   };
 
   const selectCalendarDate = (dateString: string) => {
+    // 오늘 이전 날짜는 선택 불가 처리
+    if (dateString < todayString) {
+      Alert.alert('알림', '오늘 이전의 날짜는 선택할 수 없습니다.');
+      return;
+    }
+
     if (!startDate || (startDate && endDate)) {
       setStartDate(dateString);
       setEndDate('');
@@ -236,7 +247,6 @@ export default function ReadingPlanScreen() {
         return;
       }
 
-      // [수정됨] 목표 생성 성공 시 알림창 없이 바로 homescreen으로 이동
       router.push('/homescreen');
     } catch (error) {
       console.error(error);
@@ -295,6 +305,7 @@ export default function ReadingPlanScreen() {
               const selected =
                 isStartDate(item.dateString) || isEndDate(item.dateString);
               const inRange = isInRange(item.dateString);
+              const isPast = item.dateString < todayString; // 오늘 이전 날짜 여부
 
               return (
                 <Pressable
@@ -309,7 +320,7 @@ export default function ReadingPlanScreen() {
                   <Text
                     style={[
                       styles.calendarDayText,
-                      !item.currentMonth && styles.otherMonthText,
+                      (!item.currentMonth || isPast) && styles.otherMonthText, // 과거 날짜는 흐리게 표시
                       selected && styles.selectedDateText,
                     ]}
                   >
