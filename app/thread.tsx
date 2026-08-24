@@ -34,10 +34,13 @@ type Thread = {
 };
 
 export default function ThreadScreen() {
-  // 💡 홈 화면에서 전달받은 파라미터 처리 (없을 경우 기존 데미안 ID/제목 유지)
+  // 💡 홈 화면에서 전달받은 파라미터 처리 (배열 형태로 올 경우 첫 번째 값 사용, 없으면 기존 데미안 유지)
   const params = useLocalSearchParams();
-  const BOOK_ID = (params.bookId as string) || "160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a";
-  const BOOK_TITLE = (params.bookTitle as string) || "데미안";
+  const rawBookId = Array.isArray(params.bookId) ? params.bookId[0] : params.bookId;
+  const rawBookTitle = Array.isArray(params.bookTitle) ? params.bookTitle[0] : params.bookTitle;
+
+  const BOOK_ID = rawBookId || "160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a";
+  const BOOK_TITLE = rawBookTitle || "데미안";
 
   const [threads, setThreads] = useState<Thread[]>([]);
   const [modalVisible, setModalVisible] = useState(false);

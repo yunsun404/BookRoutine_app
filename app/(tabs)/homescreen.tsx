@@ -155,15 +155,59 @@ export default function HomeScreen() {
   };
 
   const booksForCarousel: Book[] = [
-    ...bookGroups.map((group) => ({
-      id: group.book_id,
-      title: group.book_title,
-      author: "",
-      subtitle: "",
-      coverUrl: group.cover_url,
-      currentPage: 24,
-      totalPages: 48,
-    })),
+    ...bookGroups.map((group) => {
+      let totalMaxPage = 0; // 책의 전체 쪽수 (모든 태스크 중 가장 마지막 끝 페이지 번호)
+      let currentMaxPage = 0; // 현재 읽은 쪽수 (체크된 항목들의 끝 페이지 중 가장 큰 값)
+      let firstUncheckedStartPage = -1; // 체크되지 않은 첫 번째 항목의 시작 페이지
+
+      if (group.tasks && group.tasks.length > 0) {
+        // 1. 전체 쪽수 구하기 (마지막 체크리스트의 끝 페이지)
+        const lastTask = group.tasks[group.tasks.length - 1];
+        const lastMatch = lastTask.goal_content.match(/~(\s*[\d,]+)/);
+        if (lastMatch) {
+          const pageNum = parseInt(lastMatch[1].replace(/,/g, ""), 10);
+          if (!isNaN(pageNum)) {
+            totalMaxPage = pageNum;
+          }
+        }
+
+        // 2. 체크된 항목들의 최대 끝 페이지 및 체크되지 않은 첫 항목의 시작 페이지 찾기
+        group.tasks.forEach((task) => {
+          const rangeMatch = task.goal_content.match(/([\d,]+)\s*~\s*([\d,]+)/);
+          if (rangeMatch) {
+            const startNum = parseInt(rangeMatch[1].replace(/,/g, ""), 10);
+            const endNum = parseInt(rangeMatch[2].replace(/,/g, ""), 10);
+
+            if (!isNaN(endNum)) {
+              if (task.check_box && endNum > currentMaxPage) {
+                currentMaxPage = endNum;
+              }
+            }
+
+            if (!task.check_box && firstUncheckedStartPage === -1) {
+              if (!isNaN(startNum)) {
+                firstUncheckedStartPage = startNum;
+              }
+            }
+          }
+        });
+
+        // 만약 체크된 항목이 없고, 체크되지 않은 첫 번째 항목이 있다면 그 시작 페이지를 현재 페이지로 설정 (예: 92~105면 92)
+        if (currentMaxPage === 0 && firstUncheckedStartPage !== -1) {
+          currentMaxPage = firstUncheckedStartPage;
+        }
+      }
+
+      return {
+        id: group.book_id,
+        title: group.book_title,
+        author: "",
+        subtitle: "",
+        coverUrl: group.cover_url,
+        currentPage: currentMaxPage,
+        totalPages: totalMaxPage > 0 ? totalMaxPage : 100,
+      };
+    }),
     {
       id: "empty-slot",
       title: "책 등록하기",
@@ -210,7 +254,7 @@ export default function HomeScreen() {
                   minWidth: 240, 
                   alignSelf: "center", 
                   paddingVertical: 14,
-                  alignItems: "center",   
+                  alignItems: "center",  
                   justifyContent: "center" 
                 }
               ]} 
@@ -251,7 +295,14 @@ export default function HomeScreen() {
             {feedLoading ? (
               <ActivityIndicator style={{ marginVertical: 20 }} />
             ) : latestFeed ? (
-              <Pressable onPress={() => router.push("/thread")}>
+              <Pressable 
+                onPress={() => {
+                  router.push({
+                    pathname: "/thread",
+                    params: { bookId: activeGroup.book_id, bookTitle: activeGroup.book_title }
+                  });
+                }}
+              >
                 <FeedCard item={latestFeed} />
               </Pressable>
             ) : (
