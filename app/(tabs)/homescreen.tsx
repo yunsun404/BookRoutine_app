@@ -2,15 +2,14 @@ import BookCarousel, { type Book } from "@/components/home/BookCarousel";
 import FeedCard, { type FeedItem } from "@/components/home/FeedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
 import { authFetch, BASE_URL } from "@/constants/api";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   Text,
-  View,
+  View
 } from "react-native";
 import Header from "../../components/Header";
 import { styles } from "../styles/home.styles";
@@ -28,6 +27,18 @@ type BookGroup = {
   book_title: string;
   cover_url: string | null;
   tasks: ChecklistItem[];
+  created_at?: string;
+};
+
+type ThreadResponse = {
+  id?: string;
+  thread_id?: string;
+  content: string;
+  created_at: string;
+  user?: {
+    username?: string;
+    avatarEmoji?: string;
+  };
 };
 
 function toTask(item: ChecklistItem): Task {
@@ -39,27 +50,32 @@ function toTask(item: ChecklistItem): Task {
   };
 }
 
-const MOCK_FEED: FeedItem[] = [{
-  id: "f1", 
-  bookTitle: "데미안", 
-  username: "hongildong1", 
-  avatarEmoji: "🦊",
-  date: "2026-04-30", 
-  content: '"내 속에서 솟아 나오려는 것, 바로 그것을 나는 살아보려 했다. 왜 그것이 그토록 어려웠을까." 서문의 이 첫 문장이 책의 전세 내용을 얘기하고 있는 것 같아 읽자마자 집중할 수 있었다.'
-}];
-
 export default function HomeScreen() {
   const router = useRouter();
   const [bookGroups, setBookGroups] = useState<BookGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => { fetchUpcoming(); }, []);
+  const [latestFeed, setLatestFeed] = useState<FeedItem | null>(null);
+  const [feedLoading, setFeedLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUpcoming();
+    }, [])
+  );
 
   async function fetchUpcoming() {
     try {
       const res = await authFetch(`${BASE_URL}/checklists/upcoming`);
       const data: BookGroup[] = await res.json();
-      setBookGroups(Array.isArray(data) ? data : []);
+      
+      if (Array.isArray(data)) {
+        const sortedData = [...data].reverse(); 
+        setBookGroups(sortedData);
+      } else {
+        setBookGroups([]);
+      }
     } catch (e) {
       console.error("체크리스트 불러오기 실패:", e);
     } finally {
@@ -67,8 +83,49 @@ export default function HomeScreen() {
     }
   }
 
-  // 임시 handleToggle 함수
-  const handleToggle = (bookId: string, taskId: string) => {
+  const activeGroup = bookGroups[currentIndex];
+
+  useEffect(() => {
+    if (!activeGroup) {
+      setLatestFeed(null);
+      return;
+    }
+
+    async function fetchThreadsForBook() {
+      setFeedLoading(true);
+      try {
+        const res = await authFetch(`${BASE_URL}/threads?book_id=${activeGroup.book_id}`);
+        const data: ThreadResponse[] = await res.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+          const sortedThreads = [...data].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          const newest = sortedThreads[0];
+
+          setLatestFeed({
+            id: newest.id || newest.thread_id || "thread-1",
+            bookTitle: activeGroup.book_title,
+            username: newest.user?.username || "독서메이트",
+            avatarEmoji: newest.user?.avatarEmoji || "📖",
+            date: newest.created_at ? newest.created_at.split("T")[0] : "",
+            content: newest.content,
+          });
+        } else {
+          setLatestFeed(null);
+        }
+      } catch (e) {
+        console.error("책별 타래 불러오기 실패:", e);
+        setLatestFeed(null);
+      } finally {
+        setFeedLoading(false);
+      }
+    }
+
+    fetchThreadsForBook();
+  }, [activeGroup]);
+
+  const handleToggle = async (bookId: string, taskId: string) => {
     setBookGroups((prev) =>
       prev.map((group) => {
         if (group.book_id !== bookId) return group;
@@ -82,17 +139,43 @@ export default function HomeScreen() {
         };
       })
     );
+
+    try {
+      const res = await authFetch(`${BASE_URL}/checklists/${taskId}/check`, {
+        method: "PATCH",
+      });
+
+      if (!res.ok) {
+        fetchUpcoming();
+      }
+    } catch (e) {
+      console.error("체크 상태 변경 실패:", e);
+      fetchUpcoming();
+    }
   };
 
-  const booksForCarousel: Book[] = bookGroups.map((group) => ({
-    id: group.book_id,
-    title: group.book_title,
-    author: "",
-    subtitle: "",
-    coverUrl: group.cover_url,
-    currentPage: 24,
-    totalPages: 48,
-  }));
+  const booksForCarousel: Book[] = [
+    ...bookGroups.map((group) => ({
+      id: group.book_id,
+      title: group.book_title,
+      author: "",
+      subtitle: "",
+      coverUrl: group.cover_url,
+      currentPage: 24,
+      totalPages: 48,
+    })),
+    {
+      id: "empty-slot",
+      title: "책 등록하기",
+      author: "",
+      subtitle: "",
+      coverUrl: null,
+      currentPage: 0,
+      totalPages: 0,
+    }
+  ];
+
+  const isLastEmptyPage = bookGroups.length === 0 || currentIndex === booksForCarousel.length - 1;
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
 
@@ -101,28 +184,24 @@ export default function HomeScreen() {
       <Header />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* 📚 책 등록 여부에 따른 분기 처리 */}
-        {bookGroups.length === 0 ? (
-          // [디자인 1] 등록된 책이 없을 때
+        <View style={styles.carouselContainer}>
+          <BookCarousel 
+            books={booksForCarousel} 
+            currentIndex={currentIndex}
+            onIndexChange={setCurrentIndex}
+            onPress={() => {
+              if (isLastEmptyPage) {
+                router.push("/reading-goals/book-select");
+              }
+            }} 
+          />
+        </View>
+
+        {isLastEmptyPage ? (
           <View style={styles.emptyContainer}>
-            {/* 동그라미 배경 제거를 위해 backgroundColor 및 borderRadius를 transparent/0 으로 재정의 */}
-            <View style={[styles.emptyCarouselBox, { backgroundColor: "transparent", borderRadius: 0 }]}>
-              <View style={styles.arrowButton}><Text style={styles.arrowText}>{"<"}</Text></View>
-              
-              <View style={[styles.illustrationPlaceholder, { backgroundColor: "transparent", borderRadius: 0 }]}>
-                <Image 
-                  source={require("@/assets/images/empty_book.png")} 
-                  style={{ width: 180, height: 180, resizeMode: "contain" }} 
-                />
-              </View>
-
-              <View style={styles.arrowButton}><Text style={styles.arrowText}>{">"}</Text></View>
-            </View>
-
             <Text style={styles.emptyTitle}>아직 등록된 책이 없어요</Text>
             <Text style={styles.emptySubText}>책을 등록하고 독서 목표를 시작해보세요 :)</Text>
 
-           {/* 버튼 너비 확장 및 텍스트 정중앙 정렬 */}
             <Pressable 
               style={[
                 styles.registerButton, 
@@ -131,8 +210,8 @@ export default function HomeScreen() {
                   minWidth: 240, 
                   alignSelf: "center", 
                   paddingVertical: 14,
-                  alignItems: "center",    // 가로 중앙 정렬
-                  justifyContent: "center" // 세로 중앙 정렬
+                  alignItems: "center",   
+                  justifyContent: "center" 
                 }
               ]} 
               onPress={() => router.push("/reading-goals/book-select")}
@@ -156,31 +235,56 @@ export default function HomeScreen() {
             </View>
           </View>
         ) : (
-          // [디자인 2] 등록된 책이 있을 때 (캐러셀, 목표/체크리스트, 피드)
           <>
-            <View style={styles.carouselContainer}>
-              <BookCarousel books={booksForCarousel} onPress={() => router.push("/reading-goals/book-select")} />
-            </View>
-
-            {/* 목표 및 체크리스트 섹션 */}
-            {bookGroups.map((group) => (
-              <View key={group.book_id}>
+            {activeGroup && (
+              <View key={activeGroup.book_id}>
                 <GoalSection 
-                  goal={group.book_title}
-                  tasks={group.tasks.map(toTask)}
+                  goal={activeGroup.book_title}
+                  tasks={activeGroup.tasks.map(toTask)}
                   onGoalEdit={() => router.push("/reading-goals/book-select")}
-                  onTaskToggle={(taskId) => handleToggle(group.book_id, taskId)}
+                  onTaskToggle={(taskId) => handleToggle(activeGroup.book_id, taskId)}
                 />
               </View>
-            ))}
+            )}
 
-            {/* 최근 타래 섹션 */}
             <Text style={styles.sectionTitle}>최근 타래</Text>
-            {MOCK_FEED.map((item) => (
-              <Pressable key={item.id} onPress={() => router.push("/thread")}>
-                <FeedCard item={item} />
+            {feedLoading ? (
+              <ActivityIndicator style={{ marginVertical: 20 }} />
+            ) : latestFeed ? (
+              <Pressable onPress={() => router.push("/thread")}>
+                <FeedCard item={latestFeed} />
               </Pressable>
-            ))}
+            ) : (
+              <Pressable 
+                onPress={() => {
+                  router.push({
+                    pathname: "/thread",
+                    params: { bookId: activeGroup.book_id, bookTitle: activeGroup.book_title }
+                  });
+                }}
+              >
+                <View style={{
+                  backgroundColor: "#d0d0dc",
+                  borderRadius: 12,
+                  padding: 20,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginVertical: 4,
+                  borderWidth: 1,
+                  borderColor: "#bcbcc8",
+                  borderStyle: "dashed",
+                  gap: 8,
+                }}>
+                  <Text style={{ fontSize: 20 }}>✏️</Text>
+                  <Text style={{ color: "#333333", fontSize: 15, fontWeight: "600" }}>
+                    이 책의 첫 번째 타래를 남겨보세요
+                  </Text>
+                  <Text style={{ color: "#666666", fontSize: 13, textAlign: "center" }}>
+                    터치해서 '{activeGroup.book_title}' 타래 쓰러 가기 &gt;
+                  </Text>
+                </View>
+              </Pressable>
+            )}
           </>
         )}
 
