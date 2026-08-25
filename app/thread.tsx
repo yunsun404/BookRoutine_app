@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -47,6 +48,8 @@ export default function ThreadScreen() {
   const [page, setPage] = useState("");
   const [content, setContent] = useState("");
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  // 👇 웹에서 쓸 커스텀 삭제 확인 모달용 상태
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const fetchThreads = async () => {
     try {
@@ -142,23 +145,48 @@ export default function ThreadScreen() {
     setModalVisible(false);
   };
 
-  const deleteThread = async (threadId: string) => {
-    Alert.alert("삭제 확인", "이 타래를 삭제하시겠습니까?", [
-      { text: "취소" },
-      {
-        text: "삭제",
-        onPress: async () => {
-          try {
-            const res = await authFetch(`${THREADS_ENDPOINT}/${threadId}`, {
-              method: "DELETE",
-            });
-            if (res.ok) await fetchThreads();
-          } catch (error) {
-            Alert.alert("오류", "삭제 실패");
-          }
-        },
-      },
-    ]);
+  // 실제 삭제 통신 로직 (플랫폼 공통)
+  const performDelete = async (threadId: string) => {
+    try {
+      console.log("삭제 요청 보냄:", `${THREADS_ENDPOINT}/${threadId}`);
+      const res = await authFetch(`${THREADS_ENDPOINT}/${threadId}`, {
+        method: "DELETE",
+      });
+
+      // 서버 응답 상태 및 본문 확인
+      const responseText = await res.text();
+      console.log("삭제 응답 상태 코드:", res.status);
+      console.log("삭제 응답 본문:", responseText);
+
+      if (res.ok) {
+        await fetchThreads();
+        Alert.alert("성공", "타래가 삭제되었습니다.");
+      } else {
+        Alert.alert("오류", `삭제 실패 (코드: ${res.status})`);
+      }
+    } catch (error) {
+      console.log("삭제 중 에러 발생:", error);
+      Alert.alert("오류", "삭제 통신 중 에러가 발생했습니다.");
+    }
+  };
+
+  const deleteThread = (threadId: string) => {
+    if (Platform.OS === "web") {
+      // 웹에서는 네이티브 window.confirm 대신 커스텀 모달을 띄움
+      setDeleteTargetId(threadId);
+    } else {
+      Alert.alert("삭제 확인", "이 타래를 삭제하시겠습니까?", [
+        { text: "취소" },
+        { text: "삭제", onPress: () => performDelete(threadId) },
+      ]);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
+    await performDelete(id);
   };
 
   const addSummary = async () => {
@@ -225,7 +253,14 @@ export default function ThreadScreen() {
                       <Pressable style={styles.smallButton} onPress={() => startEditThread(item)}>
                         <Text style={styles.smallButtonText}>수정</Text>
                       </Pressable>
-                      <Pressable style={styles.smallButton} onPress={() => deleteThread(item.thread_id)}>
+                      {/* 👇 삭제 버튼 클릭 시 확실하게 반응하도록 이벤트 연결 및 로그 추가 */}
+                      <Pressable 
+                        style={styles.smallButton} 
+                        onPress={() => {
+                          console.log("삭제 버튼 클릭됨, ID:", item.thread_id);
+                          deleteThread(item.thread_id);
+                        }}
+                      >
                         <Text style={styles.smallButtonText}>삭제</Text>
                       </Pressable>
                     </View>
@@ -261,7 +296,6 @@ export default function ThreadScreen() {
               onChangeText={setContent}
             />
             <View style={styles.modalButtons}>
-              {/* 버튼 터치 영역 보장 및 로직 연결 */}
               <Pressable 
                 style={styles.modalButton} 
                 onPress={() => editingThreadId ? updateThread() : addThread()}
@@ -269,6 +303,26 @@ export default function ThreadScreen() {
                 <Text>확인</Text>
               </Pressable>
               <Pressable style={styles.modalButton} onPress={resetForm}>
+                <Text>취소</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 👇 웹 전용 커스텀 삭제 확인 모달 (기존 modalBox 스타일 재사용) */}
+      <Modal transparent visible={!!deleteTargetId} animationType="fade">
+        <View style={styles.modalBackground}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>삭제 확인</Text>
+            <Text style={{ textAlign: "center", color: "#555", marginBottom: 20 }}>
+              이 타래를 삭제하시겠습니까?
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalButton} onPress={confirmDelete}>
+                <Text>삭제</Text>
+              </Pressable>
+              <Pressable style={styles.modalButton} onPress={() => setDeleteTargetId(null)}>
                 <Text>취소</Text>
               </Pressable>
             </View>

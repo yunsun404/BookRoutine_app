@@ -140,7 +140,6 @@ export const styles = StyleSheet.create({
     borderColor: "#C2E2CC",
   },
   cardTop: {
-    flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 14,
@@ -227,7 +226,6 @@ export const styles = StyleSheet.create({
   },
   pgText: {
     marginLeft: 78,
-    marginTop: -28,
     marginBottom: 16,
     color: "#555",
   },
@@ -251,16 +249,19 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
   },
+  // 👇 여기 버튼 영역만 터치 우선순위(zIndex, elevation)와 패딩을 살짝 보완했습니다.
   cardButtons: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 8,
     marginTop: 14,
+    zIndex: 99,
+    elevation: 5,
   },
   smallButton: {
     borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     backgroundColor: "#F0EFED",
   },
   smallButtonText: {
