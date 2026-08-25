@@ -227,19 +227,27 @@ export default function ReadingPlanScreen() {
       return;
     }
 
-    try {
+try {
+      const requestBody: any = {
+        title: book.title,
+        author: book.author,
+        total_pages: book.total_pages,
+        isbn: book.isbn || undefined,
+        start_date: startDate,
+        end_date: endDate,
+        preferred_days: selectedDays,
+      };
+
+      if (book.book_id) {
+        requestBody.book_id = book.book_id;
+      }
+
       const res = await authFetch(API_URL, {
         method: 'POST',
-        body: JSON.stringify({
-          book_id: book.book_id !== '' ? book.book_id : undefined,
-          title: book.title,
-          author: book.author,
-          total_pages: book.total_pages,
-          isbn: book.isbn || undefined,
-          start_date: startDate,
-          end_date: endDate,
-          preferred_days: selectedDays,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok) {

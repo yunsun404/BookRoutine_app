@@ -3,13 +3,13 @@ import { authFetch, BASE_URL } from "@/constants/api";
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Modal,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { styles } from '../styles/goals.styles';
 
@@ -19,6 +19,7 @@ type Book = {
   author: string;
   total_pages: number;
   isbn?: string;
+  cover?: string;
 };
 
 export default function BookSelectScreen() {
@@ -37,6 +38,7 @@ export default function BookSelectScreen() {
   const [tempPages, setTempPages] = useState('');
   const [tempIsbn, setTempIsbn] = useState('');
   const [tempBookId, setTempBookId] = useState('');
+  const [tempCover, setTempCover] = useState('');
 
   const openBookModal = () => {
     setTempTitle('');
@@ -44,6 +46,7 @@ export default function BookSelectScreen() {
     setTempPages('');
     setTempIsbn('');
     setTempBookId('');
+    setTempCover('');
     setSearchTitle('');
     setSearchResults([]);
     setTitleOpen(false);
@@ -68,6 +71,7 @@ export default function BookSelectScreen() {
       author: tempAuthor,
       total_pages: pageNumber,
       isbn: tempIsbn,
+      cover: tempCover,
     });
 
     setBookModalVisible(false);
@@ -110,6 +114,7 @@ export default function BookSelectScreen() {
         author: book.author,
         total_pages: book.total_pages,
         isbn: book.isbn || '',
+        cover: book.cover || '',
       },
     });
   };
@@ -201,14 +206,15 @@ export default function BookSelectScreen() {
                         const pages = item.total_pages ?? item.subInfo?.itemPage ?? 0;
                         return (
                           <Pressable
-                            key={`${item.book_id || item.isbn || item.title}-${index}`}
+                            key={`${item.book_id || item.id || item.isbn || item.title}-${index}`}
                             style={styles.searchResult}
                             onPress={() => {
-                              setTempBookId(item.book_id || '');
+                              setTempBookId(item.book_id || item.id || item.bookId || '');
                               setTempTitle(item.title || '');
                               setTempAuthor(item.author || '');
                               setTempPages(String(pages));
                               setTempIsbn(item.isbn13 || item.isbn || '');
+                              setTempCover(item.cover || '');
                               setTitleOpen(false);
                             }}
                           >
