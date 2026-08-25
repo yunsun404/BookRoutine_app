@@ -53,6 +53,16 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+
+      {/* ── 개발용 홈 바로가기 (배포 전 제거) ── */}
+      <TouchableOpacity
+        style={styles.devButton}
+        onPress={() => router.replace('/(tabs)/homescreen')}
+      >
+        <Text style={styles.devButtonText}>dev →</Text>
+      </TouchableOpacity>
+
+
       <Text style={styles.title}>로그인</Text>
 
       <TextInput
@@ -98,6 +108,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     backgroundColor: '#fff',
   },
+
+  // ── 개발용 버튼 ──
+  devButton: {
+    position: 'absolute',
+    top: 56,
+    left: 16,
+  },
+  devButtonText: {
+    fontSize: 12,
+    color: '#aaa',
+  },
+
+
   title: {
     fontSize: 28,
     fontWeight: 'bold',

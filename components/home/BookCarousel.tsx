@@ -1,6 +1,6 @@
 import ProgressBar from "@/components/common/ProgressBar";
 import { Colors, FontSize, Spacing } from "@/constants/tokens";
-import React, { useState } from "react";
+import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export type Book = {
@@ -15,18 +15,18 @@ export type Book = {
 
 type Props = {
   books: Book[];
-  onPress?: () => void; // 클릭 이벤트 추가
+  currentIndex: number;          // 👈 외부에서 받는 현재 인덱스
+  onIndexChange: (index: number) => void; // 👈 인덱스가 바뀔 때 실행할 함수
+  onPress?: () => void; 
 };
 
-export default function BookCarousel({ books, onPress }: Props) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-
+export default function BookCarousel({ books, currentIndex, onIndexChange, onPress }: Props) {
   if (books.length === 0) return null;
 
   const book = books[currentIndex];
 
-  const goPrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
-  const goNext = () => setCurrentIndex((i) => Math.min(books.length - 1, i + 1));
+  const goPrev = () => onIndexChange(Math.max(0, currentIndex - 1));
+  const goNext = () => onIndexChange(Math.min(books.length - 1, currentIndex + 1));
 
   return (
     <View style={styles.section}>
@@ -37,7 +37,6 @@ export default function BookCarousel({ books, onPress }: Props) {
           </TouchableOpacity>
         )}
 
-        {/* 책 표지 영역만 클릭 가능하게 수정 */}
         <TouchableOpacity style={styles.bookCard} onPress={onPress} activeOpacity={0.9}>
           {book.coverUrl ? (
             <Image source={{ uri: book.coverUrl }} style={styles.bookImage} resizeMode="cover" />
@@ -71,10 +70,9 @@ function BookPlaceholder({ book }: { book: Book }) {
 }
 
 const styles = StyleSheet.create({
-  // ... 스타일은 동일하게 유지
   section: { paddingVertical: Spacing.md, alignItems: "center" },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: Spacing.lg, gap: Spacing.sm },
-  arrow: { padding: Spacing.xs, width: 32, alignItems: "center", zIndex: 1 }, // 화살표 zIndex 추가
+  arrow: { padding: Spacing.xs, width: 32, alignItems: "center", zIndex: 1 },
   arrowText: { fontSize: 28, color: Colors.textSecondary },
   arrowDisabled: { opacity: 0.3 },
   bookCard: { width: 148, height: 210, borderRadius: 4, overflow: "hidden", backgroundColor: "#1a1a1a" },
