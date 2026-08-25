@@ -1,5 +1,6 @@
 import Header from '@/components/Header';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View, } from 'react-native';
 import { getStoreList, purchaseItem, StoreItem } from '../constants/storeApi';
@@ -38,6 +39,7 @@ export default function StoreListScreen() {
 
     const handlePurchase = async (item: StoreItem) => {
         if (item.is_owned) {
+            console.log('이미 구매한 상품입니다.');
             Alert.alert('알림', '이미 구매한 상품입니다.', [{ text: '닫기' }]);
             return;
         }
@@ -52,6 +54,7 @@ export default function StoreListScreen() {
                 prev.map((i) =>
                     i.character_id === item.character_id ? { ...i, is_owned: true } : i)
             );
+            console.log(`${result.name}을(를)을 구매했습니다.`);
             Alert.alert('알림', `${result.name}을(를)을 구매했습니다.`, [{ text: '닫기' }]);
         } catch (err: any) {
             if (err.status === 409) {
@@ -101,32 +104,45 @@ export default function StoreListScreen() {
                     const isPurchasing = purchasingId === item.character_id;
 
                     return (
-                        <View style={styles.card}>
-                            <View style={styles.imageWrapper}>
-                                {item.image_url ? (
-                                    <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="contain" />
-                                ) : (
-                                    <View style={styles.imagePlaceholder} />
-                                )}
-                            </View>
+                        <TouchableOpacity
+                            style={styles.card}
+                            onPress={() => router.push({
+                                pathname: '/store/items/[item_id]',
+                                params: { item_id: item.character_id }
+                            })
+                            }
+                            activeOpacity={0.8}>
 
-                            <View style={styles.infoRow}>
-                                <Text style={styles.name}>{item.name}</Text>
-                                <Text style={styles.price}>{item.price}코인</Text>
-                            </View>
+                            <View style={styles.card}>
+                                <View style={styles.imageWrapper}>
+                                    {item.image_url ? (
+                                        <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="contain" />
+                                    ) : (
+                                        <View style={styles.imagePlaceholder} />
+                                    )}
+                                </View>
 
-                            <TouchableOpacity
-                                style={[styles.buyButton, disabled && styles.buyButtonDisabled]}
-                                disabled={disabled || isPurchasing}
-                                onPress={() => handlePurchase(item)}
-                            >
-                                {isPurchasing ? (
-                                    <ActivityIndicator size="small" color="#fff" />
-                                ) : (
-                                    <Text style={styles.buyButtonText}>구매하기</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.name}>{item.name}</Text>
+                                    <Text style={styles.price}>{item.price}코인</Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={[styles.buyButton, disabled && styles.buyButtonDisabled]}
+                                    disabled={disabled || isPurchasing}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        handlePurchase(item);
+                                    }}
+                                >
+                                    {isPurchasing ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <Text style={styles.buyButtonText}>구매하기</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
                     );
                 }}
             />

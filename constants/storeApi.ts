@@ -10,6 +10,16 @@ export interface StoreItem {
     is_owned: boolean;
 }
 
+export interface StoreItemDetail {
+    character_id: string;
+    name: string;
+    description: string | null;
+    price: number;
+    image_url: string | null;
+    is_owned: boolean;
+    purchased_at: string | null;
+}
+
 export interface PurchaseResult {
     character_id: string;
     name: string;
@@ -29,6 +39,24 @@ export async function getStoreList(): Promise<StoreItem[]> {
     if (!res.ok) {
         throw new Error('상점 목록을 불러오지 못했습니다.');
     }
+    return res.json();
+}
+
+export async function getStoreItem(character_id: string): Promise<StoreItemDetail> {
+    const access_token = useAuthStore.getState().access_token;
+
+    const res = await fetch(`${BASE_URL}/store/items/${character_id}`, {
+        headers: {
+            Authorization: `Bearer ${access_token}`,
+        },
+    });
+
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.log('상세조회 실패', res.status, body); // 디버깅용
+        throw new Error('상품 정보를 불러오지 못했습니다.');
+    }
+
     return res.json();
 }
 
