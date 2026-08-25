@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -76,6 +76,15 @@ export default function Header() {
                             }}
                         >
                             <Text style={styles.menuItemText}>내 책장</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/ebook");
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>전자책 보기</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity

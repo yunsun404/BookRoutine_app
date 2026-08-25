@@ -1,6 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Header from '../../components/Header';
 import { fetchEbookList } from '../../lib/api/ebooks';
 import { EbookListItem } from '../../lib/types/ebook';
 
@@ -21,10 +23,14 @@ export default function EbookListScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (loading) return <ActivityIndicator style={styles.center} />;
-
   return (
     <View style={styles.container}>
+      <Header />
+
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={24} color="#333" />
+      </TouchableOpacity>
+
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>전자책</Text>
         <Pressable onPress={() => router.push('/ebook/history')}>
@@ -32,40 +38,45 @@ export default function EbookListScreen() {
         </Pressable>
       </View>
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.book_id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() =>
-              router.push({
-                pathname: '/ebook/[bookId]/read',
-                params: { bookId: item.book_id, title: item.title },
-              })
-            }
-          >
-            {item.cover_url ? (
-              <Image source={{ uri: item.cover_url }} style={styles.cover} />
-            ) : (
-              <View style={[styles.cover, styles.coverPlaceholder]} />
-            )}
-            <View style={styles.info}>
-              <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.author} numberOfLines={1}>{item.author}</Text>
-              {item.book_category && <Text style={styles.category}>{item.book_category}</Text>}
-            </View>
-          </Pressable>
-        )}
-      />
+      {loading ? (
+        <ActivityIndicator style={styles.center} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.book_id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <Pressable
+              style={styles.row}
+              onPress={() =>
+                router.push({
+                  pathname: '/ebook/[bookId]/read',
+                  params: { bookId: item.book_id, title: item.title },
+                })
+              }
+            >
+              {item.cover_url ? (
+                <Image source={{ uri: item.cover_url }} style={styles.cover} />
+              ) : (
+                <View style={[styles.cover, styles.coverPlaceholder]} />
+              )}
+              <View style={styles.info}>
+                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                <Text style={styles.author} numberOfLines={1}>{item.author}</Text>
+                {item.book_category && <Text style={styles.category}>{item.book_category}</Text>}
+              </View>
+            </Pressable>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center' },
   container: { flex: 1 },
+  center: { flex: 1, justifyContent: 'center' },
+  backButton: { paddingHorizontal: 16, paddingTop: 4 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
