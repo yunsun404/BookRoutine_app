@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const BASE_URL = "http://localhost:3000/api/v1";
+//export const BASE_URL = "http://localhost:3000/api/v1";
+export const BASE_URL = "http://172.20.4.29:3000/api/v1";
 
 // 임시. 로그인 화면이 있다면 필요 x
+/*
 export async function initAuth() {
   try {
     const res = await fetch(`${BASE_URL}/auth/login`, {
@@ -24,6 +26,7 @@ export async function initAuth() {
     console.error("자동 로그인 실패:", e);
   }
 }
+  */
 /*
 실제 로그인 화면에서 입력받은 값. 로그인 화면이 있다면 필요 x
 export async function initAuth(username: string, password: string) {
