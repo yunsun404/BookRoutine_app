@@ -1,8 +1,9 @@
 import {
-    EbookListResponse,
-    FocusSampleInput,
-    ReadingSession,
-    SessionReward,
+  EbookListItem,
+  EbookListResponse,
+  FocusSampleInput,
+  ReadingSession,
+  SessionReward,
 } from '../types/ebook';
 import { api } from './client';
 
@@ -13,6 +14,17 @@ export async function fetchEbookList(params: {
   search?: string;
 }): Promise<EbookListResponse> {
   const { data } = await api.get('/api/v1/ebooks', { params });
+  return data;
+}
+
+export interface EbookDetail extends EbookListItem {
+  content: string;
+  content_url: string | null;
+  source: string | null;
+}
+
+export async function fetchBookDetail(bookId: string): Promise<EbookDetail> {
+  const { data } = await api.get(`/api/v1/ebooks/${bookId}`);
   return data;
 }
 

@@ -1,13 +1,13 @@
+import { getToken } from '@/constants/api';
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '../../store/useAuthStore';
 
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_BASE_URL,
   timeout: 15000,
 });
 
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = useAuthStore.getState().access_token;
+api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

@@ -2,8 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
-import { endReadingSession, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
-import { fetchGonguFullText } from '../../../lib/api/gongu';
+import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
 import { ReadingSession } from '../../../lib/types/ebook';
 
 const SEND_INTERVAL_MS = 30000;
@@ -22,12 +21,12 @@ export default function EbookReadingScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [sessionRes, textRes] = await Promise.all([
+        const [sessionRes, bookDetail] = await Promise.all([
           startReadingSession(bookId),
-          fetchGonguFullText(title),
+          fetchBookDetail(bookId),
         ]);
         setSession(sessionRes);
-        setContent(textRes?.content ?? '원문을 불러오지 못했습니다.');
+        setContent(bookDetail.content ?? '원문을 불러오지 못했습니다.');
       } catch (e) {
         Alert.alert('오류', '읽기 세션을 시작하지 못했습니다.');
         router.back();

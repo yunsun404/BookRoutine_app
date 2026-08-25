@@ -1,3 +1,4 @@
+import { initAuth } from '@/constants/api'; // 추가
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -9,9 +10,10 @@ export default function EbookListScreen() {
   const [items, setItems] = useState<EbookListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+    const load = useCallback(async () => {
     setLoading(true);
     try {
+      await initAuth(); // 추가: 전자책 화면 진입 시 임시 자동 로그인
       const res = await fetchEbookList({ page: 1, limit: 20 });
       setItems(res.items);
     } finally {
