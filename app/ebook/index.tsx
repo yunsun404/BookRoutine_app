@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Header from '../../components/Header';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Header from '../../components/Header'; // 추가
 import { fetchEbookList } from '../../lib/api/ebooks';
 import { EbookListItem } from '../../lib/types/ebook';
 
@@ -25,13 +25,12 @@ export default function EbookListScreen() {
 
   return (
     <View style={styles.container}>
-      <Header />
-
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color="#333" />
-      </TouchableOpacity>
+      <Header /> {/* 추가 */}
 
       <View style={styles.headerRow}>
+        <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="arrow-back" size={22} color="#333" />
+        </Pressable>
         <Text style={styles.headerTitle}>전자책</Text>
         <Pressable onPress={() => router.push('/ebook/history')}>
           <Text style={styles.historyLink}>이력 보기</Text>
@@ -50,8 +49,8 @@ export default function EbookListScreen() {
               style={styles.row}
               onPress={() =>
                 router.push({
-                  pathname: '/ebook/[bookId]/read',
-                  params: { bookId: item.book_id, title: item.title },
+                  pathname: '/ebook/[bookId]',
+                  params: { bookId: item.book_id },
                 })
               }
             >
@@ -76,17 +75,16 @@ export default function EbookListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center' },
-  backButton: { paddingHorizontal: 16, paddingTop: 4 },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderColor: '#eee',
   },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerTitle: { fontSize: 18, fontWeight: '700', flex: 1 },
   historyLink: { fontSize: 14, color: '#555', fontWeight: '600' },
   list: { padding: 16, gap: 12 },
   row: { flexDirection: 'row', gap: 12 },
