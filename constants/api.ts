@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-//export const BASE_URL = "http://localhost:3000/api/v1";
-export const BASE_URL = "http://172.20.4.29:3000/api/v1";
+export const BASE_URL = "http://localhost:3000/api/v1";
+//export const BASE_URL = "http://172.20.2.6:3000/api/v1";
 
 // 임시. 로그인 화면이 있다면 필요 x
 /*
