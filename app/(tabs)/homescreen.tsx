@@ -241,60 +241,51 @@ export default function HomeScreen() {
 
 
 
+  // 💡 [수정됨] 체크 표시가 먼저 된 뒤에 0.3초 후 목록에서 자연스럽게 사라지도록 처리
   const handleToggle = async (bookId: string, taskId: string) => {
-
+    // 1. 먼저 해당 태스크의 check_box를 true로 변경하여 체크된 모습을 눈으로 보여줌
     setBookGroups((prev) =>
-
       prev.map((group) => {
-
         if (group.book_id !== bookId) return group;
-
         return {
-
           ...group,
-
           tasks: group.tasks.map((task) =>
-
-            task.checklist_id === taskId
-
-              ? { ...task, check_box: !task.check_box }
-
-              : task
-
+            task.checklist_id === taskId ? { ...task, check_box: true } : task
           ),
-
         };
-
       })
-
     );
 
-
-
+    // 2. 서버에 체크 요청 전송
     try {
-
       const res = await authFetch(`${BASE_URL}/checklists/${taskId}/check`, {
-
         method: "PATCH",
-
       });
 
-
-
       if (!res.ok) {
-
         fetchUpcoming();
-
+        return;
       }
 
+      // 3. 체크된 상태를 잠깐 보여준 후(300ms) 목록에서 제거
+      setTimeout(() => {
+        setBookGroups((prev) =>
+          prev
+            .map((group) => {
+              if (group.book_id !== bookId) return group;
+              return {
+                ...group,
+                tasks: group.tasks.filter((task) => task.checklist_id !== taskId),
+              };
+            })
+            .filter((group) => group.tasks.length > 0)
+        );
+      }, 300);
+
     } catch (e) {
-
       console.error("체크 상태 변경 실패:", e);
-
       fetchUpcoming();
-
     }
-
   };
 
 

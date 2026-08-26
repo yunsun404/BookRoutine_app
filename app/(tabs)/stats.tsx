@@ -1,16 +1,18 @@
 import { authFetch, BASE_URL } from "@/constants/api";
-import { Colors, FontSize } from "@/constants/tokens";
+import { Colors } from "@/constants/tokens";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Image,
+  Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import Header from "../../components/Header";
+import { styles } from "../styles/stats.styles";
 
 interface BookProgress {
   id: string;
@@ -23,16 +25,23 @@ interface StatsData {
   graphData: number[];
   averageReadingTime: string;
   overallProgress: number;
-  booksProgress: BookProgress[];
+  booksProgress: BookProgress[]; // 백엔드에서 넘어오는 책별 진행률 리스트
 }
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const YEARS = [2024, 2025, 2026, 2027];
 
 export default function StatsScreen() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<StatsData | null>(null);
 
-  const [selectedYear, setSelectedYear] = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(4);
+  const currentDate = new Date();
+const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [tabType, setTabType] = useState<"weekly" | "monthly">("weekly");
+
+  const [monthModalVisible, setMonthModalVisible] = useState(false);
+  const [yearModalVisible, setYearModalVisible] = useState(false);
 
   const myNickname = "hongildong";
 
@@ -40,106 +49,152 @@ export default function StatsScreen() {
     fetchStats();
   }, [selectedYear, selectedMonth, tabType]);
 
+  // ★ 백엔드 통계 API 하나만 호출하여 데이터와 책 진행률을 동시에 세팅합니다.
   async function fetchStats() {
     try {
       setLoading(true);
-      const url = `${BASE_URL}/stats?year=${selectedYear}&month=${selectedMonth}&type=${tabType}`;
-      console.log("요청 URL:", url);
 
-      const res = await authFetch(url);
+      const statsUrl = `${BASE_URL}/api/v1/stats/me?year=${selectedYear}&month=${selectedMonth}&type=${tabType}`;
+      const statsRes = await authFetch(statsUrl);
 
-      if (!res.ok) {
-        console.error("서버 응답 에러 상태:", res.status);
-        return;
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setData(statsData);
+      } else {
+        setData(null);
       }
-
-      const resData = await res.json();
-      console.log("서버에서 받은 데이터:", resData);
-      setData(resData);
     } catch (e) {
-      console.error("통계 데이터 가져오기 실패:", e);
+      console.error("통계 데이터 불러오기 실패:", e);
+      setData(null);
     } finally {
       setLoading(false);
     }
   }
 
-  const maxVal =
-    data?.graphData && data.graphData.length > 0
-      ? Math.max(...data.graphData, 1)
-      : 1;
+  const graphValues = data?.graphData || [];
+  const maxVal = graphValues.length > 0 ? Math.max(...graphValues, 1) : 10;
+  const booksWithProgress = data?.booksProgress || [];
 
   return (
     <View style={styles.safeArea}>
       <Header />
+      
+      {/* 상단 타이틀 및 드롭다운 선택 영역 */}
       <View style={styles.headerRow}>
-        <Text style={styles.mainTitle}>
-          {selectedMonth}
-          <Text style={styles.mainTitleSub}>월의 통계</Text>
-        </Text>
+        <View style={styles.mainTitleContainer}>
+          <Text style={styles.mainTitleNum}>{selectedMonth}</Text>
+          <Text style={styles.mainTitleText}>월의 통계</Text>
+        </View>
+
         <View style={styles.pickerContainer}>
-          <TouchableOpacity style={styles.pickerBubble}>
-            <Text style={styles.pickerText}>Apr ▾</Text>
+          <TouchableOpacity 
+            style={styles.pickerBubble} 
+            onPress={() => setMonthModalVisible(true)}
+          >
+            <Text style={styles.pickerText}>{MONTH_NAMES[selectedMonth - 1]}</Text>
+            <Text style={{ fontSize: 10, color: "#4A5568" }}>▼</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.pickerBubble}>
-            <Text style={styles.pickerText}>2026 ▾</Text>
+
+          <TouchableOpacity 
+            style={styles.pickerBubble} 
+            onPress={() => setYearModalVisible(true)}
+          >
+            <Text style={styles.pickerText}>{selectedYear}</Text>
+            <Text style={{ fontSize: 10, color: "#4A5568" }}>▼</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* 월 선택 모달 */}
+      <Modal visible={monthModalVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setMonthModalVisible(false)}>
+          <View style={styles.dropdownBox}>
+            <FlatList
+              data={MONTH_NAMES}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setSelectedMonth(index + 1);
+                    setMonthModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownItemText, selectedMonth === index + 1 && { color: "#8C7AE6", fontWeight: "bold" }]}>
+                    {item} ({index + 1}월)
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 연도 선택 모달 */}
+      <Modal visible={yearModalVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setYearModalVisible(false)}>
+          <View style={styles.dropdownBox}>
+            <FlatList
+              data={YEARS}
+              keyExtractor={(item) => item.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setSelectedYear(item);
+                    setYearModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownItemText, selectedYear === item && { color: "#8C7AE6", fontWeight: "bold" }]}>
+                    {item}년
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
       >
+        {/* 그래프 카드 영역 */}
         <View style={styles.chartCard}>
           <View style={styles.tabContainer}>
             <TouchableOpacity
-              style={[
-                styles.tabButton,
-                tabType === "weekly" && styles.tabButtonActive,
-              ]}
+              style={[styles.tabButton, tabType === "weekly" && styles.tabButtonActive]}
               onPress={() => setTabType("weekly")}
             >
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  tabType === "weekly" && styles.tabButtonTextActive,
-                ]}
-              >
-                ✓ 주간
+              <Text style={[styles.tabButtonText, tabType === "weekly" && styles.tabButtonTextActive]}>
+                주간
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[
-                styles.tabButton,
-                tabType === "monthly" && styles.tabButtonActive,
-              ]}
+              style={[styles.tabButton, tabType === "monthly" && styles.tabButtonActive]}
               onPress={() => setTabType("monthly")}
             >
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  tabType === "monthly" && styles.tabButtonTextActive,
-                ]}
-              >
+              <Text style={[styles.tabButtonText, tabType === "monthly" && styles.tabButtonTextActive]}>
                 월간
               </Text>
             </TouchableOpacity>
           </View>
 
           {loading ? (
-            <ActivityIndicator
-              style={{ height: 160 }}
-              color={Colors.textSecondary}
-            />
+            <ActivityIndicator style={{ height: 160 }} color={Colors.textSecondary} />
+          ) : graphValues.length === 0 ? (
+            <View style={{ height: 160, justifyContent: "center", alignItems: "center" }}>
+              <Text style={{ color: "#718096", fontSize: 13 }}>표시할 통계 데이터가 없습니다.</Text>
+            </View>
           ) : (
             <View style={styles.graphWrapper}>
               <View style={styles.barsContainer}>
-                {(data?.graphData || []).map((val, idx) => (
+                {graphValues.map((val, idx) => (
                   <View key={idx} style={styles.barColumn}>
                     <View
                       style={[
                         styles.barActiveShape,
-                        { height: `${(val / maxVal) * 100}%` },
+                        { height: `${Math.min((val / maxVal) * 100, 100)}%` },
                       ]}
                     />
                   </View>
@@ -149,20 +204,17 @@ export default function StatsScreen() {
               <View style={styles.labelsContainer}>
                 {tabType === "weekly"
                   ? ["일", "월", "화", "수", "목", "금", "토"].map((day, i) => (
-                      <Text key={i} style={styles.axisLabel}>
-                        {day}
-                      </Text>
+                      <Text key={i} style={styles.axisLabel}>{day}</Text>
                     ))
-                  : ["1주", "2주", "3주", "4주", "5주"].map((week, i) => (
-                      <Text key={i} style={styles.axisLabel}>
-                        {week}
-                      </Text>
+                  : ["1월", "2월", "3월", "4월", "5월", "6월", "7월"].map((month, i) => (
+                      <Text key={i} style={styles.axisLabel}>{month}</Text>
                     ))}
               </View>
             </View>
           )}
         </View>
 
+        {/* 평균 독서 시간 배너 */}
         <View style={styles.infoBanner}>
           <Text style={styles.infoBannerText}>
             {myNickname} 님의 주 독서 시간대는{" "}
@@ -173,170 +225,38 @@ export default function StatsScreen() {
           </Text>
         </View>
 
-        <View style={styles.bookSection}>
-          {(!data?.booksProgress || data.booksProgress.length === 0) &&
-            !loading && (
-              <Text style={{ textAlign: "center", marginTop: 20 }}>
-                표시할 독서 데이터가 없습니다.
-              </Text>
-            )}
-          {(data?.booksProgress || []).map((book) => (
-            <View key={book.id} style={styles.bookCard}>
-              <Image
-                source={
-                  book.coverUrl
-                    ? { uri: book.coverUrl }
-                    : require("@/assets/images/react-logo.png")
-                }
-                style={styles.bookCover}
-                resizeMode="cover"
-              />
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBarBg}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      { width: `${book.progress}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.progressPercentText}>
-                  {book.progress} %
-                </Text>
-              </View>
+        {/* 독서 진행률 카드 영역 */}
+        <View style={styles.bookSectionCard}>
+          <Text style={styles.sectionTitle}>독서 진행률</Text>
+
+          {loading ? (
+            <ActivityIndicator style={{ marginVertical: 20 }} color={Colors.textSecondary} />
+          ) : booksWithProgress.length === 0 ? (
+            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+              <Text style={{ color: "#718096", fontSize: 13 }}>등록된 독서 목표 도서가 없습니다.</Text>
             </View>
-          ))}
+          ) : (
+            <View style={styles.bookGrid}>
+              {booksWithProgress.map((book) => (
+                <View key={book.id} style={styles.bookCard}>
+                  <Image
+                    source={book.coverUrl ? { uri: book.coverUrl } : require("@/assets/images/react-logo.png")}
+                    style={styles.bookCover}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.bookTitle} numberOfLines={1}>{book.title}</Text>
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBarBg}>
+                      <View style={[styles.progressBarFill, { width: `${Math.min(book.progress, 100)}%` }]} />
+                    </View>
+                    <Text style={styles.progressPercentText}>{book.progress} %</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#fff" },
-  container: { flex: 1 },
-  content: { paddingHorizontal: 24, paddingBottom: 32 },
-
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  mainTitle: { fontSize: 28, fontWeight: "bold", color: "#000" },
-  mainTitleSub: { fontSize: 20, fontWeight: "600" },
-
-  pickerContainer: { flexDirection: "row", gap: 8 },
-  pickerBubble: {
-    borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 8,
-    backgroundColor: "#FAFAFA",
-  },
-  pickerText: {
-    fontSize: FontSize.sm,
-    color: "#666",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-
-  chartCard: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 24,
-    padding: 16,
-    backgroundColor: "#FFF",
-    marginBottom: 16,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    alignSelf: "flex-end",
-    backgroundColor: "#EFEFEF",
-    borderRadius: 12,
-    padding: 3,
-    marginBottom: 16,
-  },
-  tabButton: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 9 },
-  tabButtonActive: {
-    backgroundColor: "#FFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  tabButtonText: { fontSize: FontSize.xs, color: "#777", fontWeight: "500" },
-  tabButtonTextActive: { color: "#000", fontWeight: "bold" },
-
-  graphWrapper: { height: 180, justifyContent: "flex-end", paddingTop: 10 },
-  barsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-end",
-    flex: 1,
-    paddingHorizontal: 8,
-  },
-  barColumn: { width: 24, height: "100%", justifyContent: "flex-end" },
-  barActiveShape: {
-    width: "100%",
-    backgroundColor: "#C8C8C8",
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-  xAxisLine: {
-    height: 4,
-    backgroundColor: "#E0E0E0",
-    width: "100%",
-    marginTop: 4,
-  },
-  labelsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 8,
-  },
-  axisLabel: { fontSize: FontSize.xs, color: "#333", fontWeight: "600" },
-
-  infoBanner: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  infoBannerText: { fontSize: FontSize.sm, color: "#111" },
-
-  bookSection: { gap: 16 },
-  bookCard: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 24,
-    padding: 20,
-    alignItems: "center",
-    backgroundColor: "#FFF",
-  },
-  bookCover: {
-    width: 110,
-    height: 160,
-    borderRadius: 4,
-    marginBottom: 16,
-    backgroundColor: "#333",
-  },
-  progressContainer: { width: "100%", alignItems: "center" },
-  progressBarBg: {
-    width: "80%",
-    height: 8,
-    backgroundColor: "#EAEAEA",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 8,
-  },
-  progressBarFill: { height: "100%", backgroundColor: "#FFD200" },
-  progressPercentText: {
-    fontSize: FontSize.sm,
-    fontWeight: "bold",
-    color: "#333",
-  },
-});
