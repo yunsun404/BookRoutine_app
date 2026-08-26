@@ -138,6 +138,27 @@ export default function GroupDetailScreen() {
             {/* 타래 섹션 */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>그룹원 타래</Text>
+                <View style={styles.threadBtnSection}>
+                    <TouchableOpacity
+                        style={styles.threadBtn}
+                        onPress={() =>
+                            router.push({
+                                pathname: "/thread",
+                                params: {
+                                    book_id: group?.group_books[0]?.book_id,
+                                    book_title: group?.group_books[0]?.book?.title,
+                                    group_id: group_id,
+                                },
+                            })
+                        }
+                    >
+                        <Text style={styles.threadBtnText}>타래 등록</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.threadBtn}>
+                        <Text style={styles.threadBtnText}>문장 수집</Text>
+                    </TouchableOpacity>
+                </View>
+
             </View>
 
             {loading ? (
@@ -267,6 +288,9 @@ const styles = StyleSheet.create({
 
     // 타래 섹션
     sectionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderBottomWidth: 1,
@@ -276,6 +300,26 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: "600",
         color: "#111",
+    },
+    threadBtnSection: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-end"
+    },
+    threadBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "#111",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        marginLeft: 5,
+        borderRadius: 10,
+    },
+    threadBtnText: {
+        fontSize: 13,
+        color: "#fff",
+        fontWeight: "600",
     },
 
     listContent: {

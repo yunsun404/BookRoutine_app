@@ -49,9 +49,11 @@ export default function ThreadScreen() {
   const params = useLocalSearchParams();
   const rawBookId = Array.isArray(params.bookId) ? params.bookId[0] : params.bookId;
   const rawBookTitle = Array.isArray(params.bookTitle) ? params.bookTitle[0] : params.bookTitle;
+  const rawGroupId = Array.isArray(params.groupId) ? params.groupId[0] : params.groupId;
 
   const BOOK_ID = rawBookId || "160cdda3-cc2e-4715-b8e4-6d7fcfd3aa6a";
   const BOOK_TITLE = rawBookTitle || "데미안";
+  const GROUP_ID = rawGroupId || null;
 
   const [threads, setThreads] = useState<Thread[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -66,7 +68,7 @@ export default function ThreadScreen() {
       const url = `${THREADS_ENDPOINT}?book_id=${BOOK_ID}`;
       const res = await authFetch(url);
       const data = await res.json();
-      
+
       if (!res.ok) return;
 
       if (Array.isArray(data)) {
@@ -99,7 +101,7 @@ export default function ThreadScreen() {
         body: JSON.stringify({
           user_id: USER_ID,
           book_id: BOOK_ID,
-          group_id: null,
+          group_id: GROUP_ID,
           content,
           current_page: parseInt(page, 10),
           is_public: true,
@@ -214,7 +216,7 @@ export default function ThreadScreen() {
         body: JSON.stringify({
           user_id: USER_ID,
           book_id: BOOK_ID,
-          group_id: null,
+          group_id: GROUP_ID,
           content: `${AI_SUMMARY_MARKER}\n${data.summary}`,
           current_page: 0,
           is_public: true,
@@ -331,8 +333,8 @@ export default function ThreadScreen() {
               onChangeText={setContent}
             />
             <View style={styles.modalButtons}>
-              <Pressable 
-                style={styles.modalButton} 
+              <Pressable
+                style={styles.modalButton}
                 onPress={() => editingThreadId ? updateThread() : addThread()}
               >
                 <Text>확인</Text>
