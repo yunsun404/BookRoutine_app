@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
-//const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
-const BASE_URL = "http://172.20.4.29:3000/api/v1"; // 차319 와이파이
+const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
+// const BASE_URL = "http://172.20.4.29:3000/api/v1"; // 차319 와이파이
 
 // 기본 요청 함수
 async function request<T>(
@@ -211,6 +211,7 @@ export const groupApi = {
       group_books: [
         {
           book_id?: string;
+          book: { title: string };
         },
       ];
     }>(`/groups/${group_id}`),
@@ -247,6 +248,8 @@ export const groupApi = {
         likes: number;
         created_at: Date;
         updated_at: Date;
+        user: { nickname: string };
+        book: { title: string };
       }[]
     >(`/groups/${group_id}/threads`),
 
@@ -267,6 +270,7 @@ export const groupApi = {
       group_name?: string;
       people_count?: number;
       book_id?: string;
+      target_date?: Date;
     }>(`/groups/${group_id}/update`, {
       method: "PATCH",
       body: JSON.stringify(body),
