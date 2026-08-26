@@ -14,8 +14,8 @@ import {
 // 🛠️ 에러 수정: ranking 폴더 깊이에 맞게 경로를 ../../로 올바르게 수정했습니다.
 import Header from "../components/Header";
 
-//const BASE_URL = "http://localhost:3000/api/v1";
-const BASE_URL = "http:// 172.20.4.29:3000/api/v1";
+const BASE_URL = "http://localhost:3000/api/v1";
+//const BASE_URL = "http:// 172.20.2.6:3000/api/v1";
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 
 interface RankUser {
