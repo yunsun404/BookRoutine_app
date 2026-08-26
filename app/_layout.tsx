@@ -28,9 +28,6 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  // 새로고침 시 자동 로그인 시도
-  const { restoreToken } = useAuthStore();
-
   useEffect(() => {
     if (loaded) {
       // 자동 로그인 제거 — 토큰 유무만 확인해서 스플래시를 내림.
