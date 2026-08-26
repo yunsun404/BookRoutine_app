@@ -21,7 +21,7 @@ const AI_SUMMARY_ENDPOINT = `${BASE_URL}/threads-ai/summary`;
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 
 // AI 요약 타래를 구분하는 마커 (addSummary에서 저장할 때도 이 문구로 시작함)
-const AI_SUMMARY_MARKER = "✨ [AI 핵심 요약]";
+const AI_SUMMARY_MARKER = "[ AI 요약 ✨]";
 
 type Thread = {
   thread_id: string;
