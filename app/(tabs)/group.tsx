@@ -9,13 +9,11 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
-  //SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Header from "../../components/Header";
 
@@ -141,7 +139,7 @@ export default function GroupScreen() {
     <View style={styles.container}>
       <Header />
 
-      {/* --- [모드 1] 그룹 목록 화면 --- */}
+      {/* --- [모드 1] 그룹 목록 화면 --- 
       {viewMode === "LIST" && (
         <ScrollView contentContainerStyle={styles.centerContent}>
           <Text style={styles.sectionTitle}>내 그룹 목록</Text>
@@ -159,9 +157,9 @@ export default function GroupScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-      )}
+      )}*/}
 
-      {/* --- [모드 2] 그룹 피드 화면 --- */}
+      {/* --- [모드 2] 그룹 피드 화면 --- 
       {viewMode === "FEED" && selectedGroup && (
         <View style={{ flex: 1 }}>
           <View style={styles.titleHeader}>
@@ -169,8 +167,8 @@ export default function GroupScreen() {
               <Ionicons name="chevron-back" size={24} color="#1a1a1a" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{selectedGroup.name}</Text>
-
-            {/* 🔴 새 페이지로 네비게이션 트리거 */}
+*/}
+      {/* 🔴 새 페이지로 네비게이션 트리거 
             <TouchableOpacity style={styles.cameraIconButton} onPress={handleEnterRoom}>
               <Ionicons name="camera" size={20} color="#fff" />
             </TouchableOpacity>
@@ -196,7 +194,7 @@ export default function GroupScreen() {
           </ScrollView>
         </View>
       )}
-
+*/}
       {/* 상단 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>그룹</Text>

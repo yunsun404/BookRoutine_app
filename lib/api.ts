@@ -211,6 +211,7 @@ export const groupApi = {
       group_books: [
         {
           book_id?: string;
+          book: { title: string };
         },
       ];
     }>(`/groups/${group_id}`),
@@ -247,6 +248,8 @@ export const groupApi = {
         likes: number;
         created_at: Date;
         updated_at: Date;
+        user: { nickname: string };
+        book: { title: string };
       }[]
     >(`/groups/${group_id}/threads`),
 
