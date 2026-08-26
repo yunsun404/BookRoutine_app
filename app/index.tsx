@@ -44,6 +44,7 @@ export default function LoginScreen() {
       await setAuth(me, access_token, refresh_token);
 
       router.replace('/(tabs)/homescreen');
+      // router.replace('/store');
     } catch (e: any) {
       Alert.alert('로그인 실패', e.message || '다시 시도해주세요.');
     } finally {
@@ -94,7 +95,7 @@ export default function LoginScreen() {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => router.push('/signup')}>
+      <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
         <Text style={styles.link}>계정이 없으신가요? 회원가입</Text>
       </TouchableOpacity>
     </View>

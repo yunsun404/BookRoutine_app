@@ -20,6 +20,9 @@ const AI_SUMMARY_ENDPOINT = `${BASE_URL}/threads-ai/summary`;
 
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 
+// AI 요약 타래를 구분하는 마커 (addSummary에서 저장할 때도 이 문구로 시작함)
+const AI_SUMMARY_MARKER = "✨ [AI 핵심 요약]";
+
 type Thread = {
   thread_id: string;
   user_id: string;
@@ -33,6 +36,13 @@ type Thread = {
   updated_at: string;
   isAiSummary?: boolean;
 };
+
+// 서버에서 받아온 타래 목록 중, 내용이 AI 요약 마커로 시작하는 걸 isAiSummary로 표시
+const markAiSummaryThreads = (list: Thread[]): Thread[] =>
+  list.map((t) => ({
+    ...t,
+    isAiSummary: t.isAiSummary || t.content?.startsWith(AI_SUMMARY_MARKER),
+  }));
 
 export default function ThreadScreen() {
   // 💡 홈 화면에서 전달받은 파라미터 처리 (배열 형태로 올 경우 첫 번째 값 사용, 없으면 기존 데미안 유지)
@@ -60,11 +70,11 @@ export default function ThreadScreen() {
       if (!res.ok) return;
 
       if (Array.isArray(data)) {
-        setThreads(data);
+        setThreads(markAiSummaryThreads(data));
       } else if (data && Array.isArray(data.threads)) {
-        setThreads(data.threads);
+        setThreads(markAiSummaryThreads(data.threads));
       } else if (data && Array.isArray(data.data)) {
-        setThreads(data.data);
+        setThreads(markAiSummaryThreads(data.data));
       } else {
         setThreads([]);
       }
@@ -198,20 +208,26 @@ export default function ThreadScreen() {
       const data = await res.json();
       if (!res.ok) return;
 
-      const aiSummaryThread: Thread = {
-        thread_id: `ai-summary-${Date.now()}`,
-        user_id: USER_ID,
-        book_id: BOOK_ID,
-        group_id: null,
-        content: `✨ [AI 핵심 요약]\n${data.summary}`,
-        current_page: 0,
-        is_public: true,
-        likes: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        isAiSummary: true,
-      };
-      setThreads((prev) => [aiSummaryThread, ...prev]);
+      // 👇 AI 요약을 실제 타래로 저장 (이걸 안 하면 화면에만 잠깐 보이고 새로고침 시 사라짐)
+      const saveRes = await authFetch(THREADS_ENDPOINT, {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: USER_ID,
+          book_id: BOOK_ID,
+          group_id: null,
+          content: `${AI_SUMMARY_MARKER}\n${data.summary}`,
+          current_page: 0,
+          is_public: true,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        Alert.alert("오류", "AI 요약 저장에 실패했습니다.");
+        return;
+      }
+
+      // 저장된 걸 다시 불러오면 markAiSummaryThreads가 자동으로 보라색 뱃지 처리해줌
+      await fetchThreads();
     } catch (error) {
       Alert.alert("오류", "AI 요약 실패");
     }
@@ -244,27 +260,46 @@ export default function ThreadScreen() {
                 <View style={styles.connectorLine} />
                 <View style={[styles.card, item.isAiSummary && { backgroundColor: "#F3EBF6", borderColor: "#D1C4E9" }]}>
                   <View style={styles.cardTop}>
-                    <Text style={styles.page}>{item.isAiSummary ? "✨ 요약" : `${item.current_page} pg`}</Text>
+                    {item.isAiSummary ? (
+                      <View
+                        style={{
+                          backgroundColor: "#8E6FC9",
+                          borderRadius: 12,
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                          AI 요약
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.page}>{item.current_page} pg</Text>
+                    )}
                     <Text style={styles.date}>{item.created_at?.slice(0, 10)}</Text>
                   </View>
-                  <Text style={styles.content}>{item.content}</Text>
-                  {!item.isAiSummary && (
-                    <View style={styles.cardButtons}>
+                  <Text style={styles.content}>
+                    {item.isAiSummary
+                      ? item.content?.replace(`${AI_SUMMARY_MARKER}\n`, "")
+                      : item.content}
+                  </Text>
+                  <View style={styles.cardButtons}>
+                    {!item.isAiSummary && (
                       <Pressable style={styles.smallButton} onPress={() => startEditThread(item)}>
                         <Text style={styles.smallButtonText}>수정</Text>
                       </Pressable>
-                      {/* 👇 삭제 버튼 클릭 시 확실하게 반응하도록 이벤트 연결 및 로그 추가 */}
-                      <Pressable 
-                        style={styles.smallButton} 
-                        onPress={() => {
-                          console.log("삭제 버튼 클릭됨, ID:", item.thread_id);
-                          deleteThread(item.thread_id);
-                        }}
-                      >
-                        <Text style={styles.smallButtonText}>삭제</Text>
-                      </Pressable>
-                    </View>
-                  )}
+                    )}
+                    {/* 👇 삭제 버튼 클릭 시 확실하게 반응하도록 이벤트 연결 및 로그 추가 */}
+                    <Pressable
+                      style={styles.smallButton}
+                      onPress={() => {
+                        console.log("삭제 버튼 클릭됨, ID:", item.thread_id);
+                        deleteThread(item.thread_id);
+                      }}
+                    >
+                      <Text style={styles.smallButtonText}>삭제</Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             );

@@ -1,6 +1,15 @@
 import { authFetch, BASE_URL } from "@/constants/api";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 interface ProfileData {
   nickname: string;
@@ -15,6 +24,16 @@ interface LevelData {
 
 interface PointData {
   total_point: number;
+}
+
+interface TitleData {
+  title_id: string;
+  name: string;
+  description: string | null;
+  required_level: number;
+  image_url: string | null;
+  is_acquired: boolean;
+  is_representative: boolean;
 }
 
 // bookshelf.tsx에 있던 것과 동일한 규칙 — 컴포넌트가 갈라졌으니 규칙도 여기 옮겨둠
@@ -32,6 +51,11 @@ export default function ProfileCard() {
   const [levelInfo, setLevelInfo] = useState<LevelData | null>(null);
   const [pointInfo, setPointInfo] = useState<PointData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ---- 칭호 모달 관련 상태 (신규 추가) ----
+  const [titleModalVisible, setTitleModalVisible] = useState(false);
+  const [titles, setTitles] = useState<TitleData[]>([]);
+  const [titlesLoading, setTitlesLoading] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -52,6 +76,40 @@ export default function ProfileCard() {
       console.error("프로필 카드 로드 에러:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ---- 칭호 목록 조회 (신규 추가) ----
+  const fetchTitles = async () => {
+    try {
+      setTitlesLoading(true);
+      const res = await authFetch(`${BASE_URL}/titles`);
+      const data = await res.json();
+      setTitles(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("칭호 목록 로드 에러:", error);
+    } finally {
+      setTitlesLoading(false);
+    }
+  };
+
+  // 레벨 배지를 누르면 모달을 열면서 최신 칭호 목록을 같이 불러옴
+  const openTitleModal = () => {
+    setTitleModalVisible(true);
+    fetchTitles();
+  };
+
+  // ---- 대표 칭호 설정 (신규 추가) ----
+  const setRepresentativeTitle = async (titleId: string) => {
+    try {
+      await authFetch(`${BASE_URL}/users/me/titles`, {
+        method: "PATCH",
+        body: JSON.stringify({ title_id: titleId }),
+      });
+      // 서버 반영 후, 화면에 표시된 is_representative도 다시 불러와서 최신화
+      fetchTitles();
+    } catch (error) {
+      console.error("대표 칭호 설정 에러:", error);
     }
   };
 
@@ -85,16 +143,92 @@ export default function ProfileCard() {
       </View>
       <View style={styles.badges}>
         {levelInfo && (
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>
-              Level {levelInfo.level} {levelInfo.level_name ?? ""}
-            </Text>
-          </View>
+          // ---- TouchableOpacity로 감싸서 탭 가능하게 변경 ----
+          <TouchableOpacity onPress={openTitleModal}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>
+                Level {levelInfo.level} {levelInfo.level_name ?? ""}
+              </Text>
+            </View>
+          </TouchableOpacity>
         )}
         {pointInfo && (
           <Text style={styles.pointText}>{pointInfo.total_point} 포인트</Text>
         )}
       </View>
+
+      {/* ---- 칭호 목록 모달 (신규 추가) ---- */}
+      <Modal
+        visible={titleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTitleModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setTitleModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
+            <Text style={styles.modalTitle}>칭호 도감</Text>
+
+            {titlesLoading ? (
+              <ActivityIndicator
+                style={{ paddingVertical: 24 }}
+                color="#8B4513"
+              />
+            ) : (
+              <ScrollView style={styles.titleList}>
+                {titles.map((t) => (
+                  <View
+                    key={t.title_id}
+                    style={[
+                      styles.titleItem,
+                      !t.is_acquired && styles.titleItemLocked,
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.titleName,
+                          !t.is_acquired && styles.titleNameLocked,
+                        ]}
+                      >
+                        {t.is_acquired ? t.name : "???"}
+                      </Text>
+                      <Text style={styles.titleCondition}>
+                        Lv.{t.required_level} 달성 시 획득
+                      </Text>
+                    </View>
+
+                    {t.is_representative && (
+                      <View style={styles.representativeBadge}>
+                        <Text style={styles.representativeBadgeText}>대표</Text>
+                      </View>
+                    )}
+
+                    {t.is_acquired && !t.is_representative && (
+                      <TouchableOpacity
+                        style={styles.setButton}
+                        onPress={() => setRepresentativeTitle(t.title_id)}
+                      >
+                        <Text style={styles.setButtonText}>대표 설정</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setTitleModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -153,5 +287,91 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#C8B84A",
     fontWeight: "600",
+  },
+
+  // ---- 모달 관련 스타일 (신규 추가) ----
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "85%",
+    maxHeight: "70%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  titleList: {
+    maxHeight: 320,
+  },
+  titleItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: "#FAF8F5",
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  titleItemLocked: {
+    backgroundColor: "#F5F5F5",
+    opacity: 0.6,
+  },
+  titleName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#333",
+  },
+  titleNameLocked: {
+    color: "#999",
+  },
+  titleCondition: {
+    fontSize: 11,
+    color: "#999",
+    marginTop: 2,
+  },
+  representativeBadge: {
+    backgroundColor: "#8B4513",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  representativeBadgeText: {
+    fontSize: 11,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  setButton: {
+    borderWidth: 1,
+    borderColor: "#8B4513",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  setButtonText: {
+    fontSize: 11,
+    color: "#8B4513",
+    fontWeight: "600",
+  },
+  closeButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#F0EFED",
+    borderRadius: 12,
+  },
+  closeButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
   },
 });
