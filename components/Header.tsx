@@ -103,6 +103,15 @@ export default function Header() {
                         >
                             <Text style={styles.menuItemText}>내 책장</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/ebook");
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>전자책 보기</Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.menuItem}
