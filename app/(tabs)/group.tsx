@@ -1,5 +1,6 @@
 import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   //router,
   useRouter,
@@ -55,6 +56,10 @@ export default function GroupScreen() {
   // ── 팝업 상태 ────────────────────────────────────────────────────
   const [modalType, setModalType] = useState<"create" | "join" | null>(null);
   const [groupName, setGroupName] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
+  const [maxPeople, setMaxPeople] = useState<number | undefined>(undefined);
+  const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
 
@@ -86,7 +91,13 @@ export default function GroupScreen() {
     if (!groupName.trim()) return;
     try {
       setModalLoading(true);
-      const result = await groupApi.create({ group_name: groupName.trim() });
+      const result = await groupApi.create({
+        group_name: groupName.trim(),
+        people_count: maxPeople ?? undefined,
+        book_id: bookTitle ?? undefined,
+        // book[0].title:bookTitle,
+        target_date: targetDate ?? undefined
+      });
       setModalType(null);
       setGroupName("");
       router.push(`/groupdetail?group_id=${result.new_group_member.group_id}`);
@@ -117,6 +128,9 @@ export default function GroupScreen() {
   const closeModal = () => {
     setModalType(null);
     setGroupName("");
+    setBookTitle("");
+    setMaxPeople(undefined);
+    setTargetDate(undefined);
     setInviteCode("");
   };
 
@@ -312,6 +326,46 @@ export default function GroupScreen() {
               }
               autoFocus
             />
+            {modalType === "create" && (
+              <TextInput
+                style={styles.modalInput}
+                placeholder="목표 도서 (선택)"
+                value={bookTitle}
+                onChangeText={setBookTitle}
+              />
+            )}
+            {modalType === "create" && (
+              <TextInput
+                style={styles.modalInput}
+                placeholder="최대 인원 (선택)"
+                keyboardType="number-pad"
+                value={maxPeople !== undefined ? String(maxPeople) : ""}
+                onChangeText={(v) => setMaxPeople(v ? Number(v) : undefined)}
+              />
+            )}
+            {modalType === "create" && (
+              <>
+                <TouchableOpacity
+                  style={styles.modalInput}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={{ color: targetDate ? "#111" : "#aaa", fontSize: 15 }}>
+                    {targetDate ? targetDate.toISOString().split("T")[0] : "목표 날짜 (선택)"}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={targetDate ?? new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(_, selected) => {
+                      setShowDatePicker(false);
+                      if (selected) setTargetDate(selected);
+                    }}
+                  />
+                )}
+              </>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
