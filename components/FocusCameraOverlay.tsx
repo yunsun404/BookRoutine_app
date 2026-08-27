@@ -42,7 +42,7 @@ export function FocusCameraOverlay({ boxLayout, onFrame }: Props) {
       // @ts-ignore RN FormData는 이 형태의 파일 객체를 허용함
       form.append('image', { uri: photo.uri, name: 'frame.jpg', type: 'image/jpeg' });
 
-      const res = await fetch(`${GAZE_API_URL}/predict`, { method: 'POST', body: form });
+      const res = await fetch(`${GAZE_API_URL}/gaze/predict`, { method: 'POST', body: form });
       const data = await res.json();
       if (data.error) return null; // 얼굴 미검출
       return data;
