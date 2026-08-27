@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import CoverPickerModal from "../../components/bookshelf/CoverPickerModal";
 import Header from "../../components/Header";
 
 interface BookInFolder {
@@ -40,9 +41,10 @@ const COLUMN_COUNT = 3;
 const CARD_WIDTH = (width - 56) / COLUMN_COUNT;
 
 export default function FolderDetailScreen() {
-  const { folder_id, folder_name } = useLocalSearchParams<{
+  const { folder_id, folder_name, folder_image } = useLocalSearchParams<{
     folder_id: string;
     folder_name: string;
+    folder_image?: string;
   }>();
 
   const [folderBooks, setFolderBooks] = useState<BookInFolder[]>([]);
@@ -51,6 +53,10 @@ export default function FolderDetailScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
+  // 목록 화면에서 넘어온 값으로 초기화하고, 표지를 바꾸면 서버 응답을 다시 기다리지 않고
+  // 여기서 바로 갱신합니다(그래야 탭하자마자 바뀐 게 보임 — 낙관적 업데이트).
+  const [coverUrl, setCoverUrl] = useState<string>(folder_image ?? "");
+  const [coverPickerVisible, setCoverPickerVisible] = useState(false);
 
   useEffect(() => {
     fetchFolderBooks();
@@ -149,6 +155,29 @@ export default function FolderDetailScreen() {
     ]);
   };
 
+  const handleCoverChange = async (newImageUrl: string) => {
+    const previousUrl = coverUrl;
+    setCoverUrl(newImageUrl); // 낙관적 업데이트: 서버 응답 기다리지 않고 바로 화면 반영
+
+    try {
+      const response = await authFetch(
+        `${BASE_URL}/bookshelf/folders/${folder_id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ folder_image: newImageUrl }),
+        },
+      );
+      // authFetch는 fetch를 그대로 감싸는 거라 4xx/5xx여도 예외를 던지지 않아요.
+      // 여기서는 실패했을 때 화면이 "바뀐 척"만 하고 서버엔 실제로 안 바뀐 상태로
+      // 남는 걸 막기 위해, 직접 상태코드를 확인해서 실패 시 원래 표지로 되돌립니다.
+      if (!response.ok) throw new Error(`표지 변경 실패 (status: ${response.status})`);
+    } catch (error) {
+      console.error("표지 변경 에러:", error);
+      setCoverUrl(previousUrl);
+      Alert.alert("표지 변경 실패", "잠시 후 다시 시도해주세요.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -160,6 +189,27 @@ export default function FolderDetailScreen() {
   return (
     <View style={styles.container}>
       <Header />
+
+      {/* 표지 배너 — 탭하면 CoverPickerModal이 열려서 언제든 다시 고를 수 있어요.
+          만들 때만 표지를 정할 수 있고 나중엔 못 바꾸면 반쪽짜리 기능이라, 여기서도
+          똑같은 CoverPickerModal을 재사용해 "만들 때"와 "나중에" 경로를 하나로 합쳤습니다. */}
+      <TouchableOpacity
+        style={styles.coverBanner}
+        onPress={() => setCoverPickerVisible(true)}
+        activeOpacity={0.85}
+      >
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.coverBannerImage} />
+        ) : (
+          <View style={styles.coverBannerEmpty}>
+            <Ionicons name="image-outline" size={28} color="#999" />
+            <Text style={styles.coverBannerText}>표지 추가하기</Text>
+          </View>
+        )}
+        <View style={styles.coverBannerEditBadge}>
+          <Ionicons name="pencil" size={14} color="#fff" />
+        </View>
+      </TouchableOpacity>
 
       <View style={styles.titleRow}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -316,6 +366,12 @@ export default function FolderDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <CoverPickerModal
+        visible={coverPickerVisible}
+        onClose={() => setCoverPickerVisible(false)}
+        onSelect={handleCoverChange}
+      />
     </View>
   );
 }
@@ -331,6 +387,33 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 18, fontWeight: "700", color: "#333" },
+  coverBanner: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    height: 140,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#E1D9D1",
+  },
+  coverBannerImage: { width: "100%", height: "100%" },
+  coverBannerEmpty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  coverBannerText: { fontSize: 13, color: "#999" },
+  coverBannerEditBadge: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { fontSize: 16, color: "#999" },
   emptySubText: { fontSize: 13, color: "#bbb", marginTop: 8 },
