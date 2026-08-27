@@ -190,6 +190,11 @@ export const groupApi = {
     group_name: string;
     people_count?: number;
     book_id?: string;
+    isbn?: string;
+    title?: string;
+    author?: string;
+    total_pages?: number;
+    cover_url?: string;
     target_date?: Date;
   }) =>
     request<{
@@ -217,6 +222,15 @@ export const groupApi = {
       body: JSON.stringify(body),
     }),
 
+  // 책 검색
+  searchBooks: (title: string) =>
+    request<{
+      book_id: string;
+      title: string;
+      author?: string;
+      cover_url?: string;
+    }[]>(`/reading-goals/search?title=${encodeURIComponent(title)}`),
+
   // 그룹 목록 조회
   getList: () =>
     request<
@@ -227,11 +241,12 @@ export const groupApi = {
         invite_code?: string;
         created_by: string;
         created_at: Date;
-        group_books: [
-          {
-            book_id?: string;
-          },
-        ];
+        group_books: [{
+          book_id?: string;
+        }],
+        _count: [{
+          group_members?: number;
+        }]
       }[]
     >("/groups"),
 
