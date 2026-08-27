@@ -11,6 +11,7 @@ const MENU_ITEMS: { name: string; title: string; icon: IoniconsName; route: stri
   { name: 'homescreen', title: '홈', icon: 'home-outline', route: '/(tabs)/homescreen' },
   { name: 'group', title: '그룹', icon: 'people-outline', route: '/(tabs)/group' },
   { name: 'recommend', title: '추천', icon: 'sparkles-outline', route: '/(tabs)/recommend' },
+  { name: 'characters', title: '캐릭터', icon: 'paw-outline', route: '/characters' },
 ];
 
 // 이 버튼을 숨겨야 할 화면 경로 (로그인, 회원가입, 로그아웃)
