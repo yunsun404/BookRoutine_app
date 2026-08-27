@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FocusCameraOverlay } from '../../../components/FocusCameraOverlay';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
 import { ReadingSession } from '../../../lib/types/ebook';
@@ -14,6 +15,7 @@ export default function EbookReadingScreen() {
   const [session, setSession] = useState<ReadingSession | null>(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const [boxLayout, setBoxLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   const { pushFrame, flushCurrentBucket, drainCompletedBuckets } = useFocusBucketRecorder();
   const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -80,8 +82,14 @@ export default function EbookReadingScreen() {
       {/*
         팀원 시선추적 컴포넌트 자리:
         <FocusCameraOverlay onFrame={(f) => pushFrame({ timestamp: Date.now(), ...f })} />
-      */}
-      <ScrollView style={styles.textArea} contentContainerStyle={{ padding: 20 }}>
+      */
+      <FocusCameraOverlay boxLayout={boxLayout} onFrame={(f) => pushFrame(f)} />
+      }
+      <ScrollView 
+        style={styles.textArea} 
+        contentContainerStyle={{ padding: 20 }} 
+        onLayout={(e) => setBoxLayout(e.nativeEvent.layout)} 
+      >
         <Text style={styles.bookTitle}>{title}</Text>
         <Text style={styles.content}>{content}</Text>
       </ScrollView>
