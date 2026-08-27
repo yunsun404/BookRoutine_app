@@ -8,6 +8,7 @@ import {
     FlatList,
     StyleSheet,
     Text,
+    ToastAndroid,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -66,6 +67,11 @@ export default function GroupDetailScreen() {
         } catch (error) {
             console.log("leave group 에러: ", error);
         }
+    };
+
+    // 문장 수집 만들기 전 토스트 메세지
+    const showToast = () => {
+        ToastAndroid.show('준비 중입니다.', ToastAndroid.SHORT);
     };
 
     useEffect(() => {
@@ -154,7 +160,10 @@ export default function GroupDetailScreen() {
                     >
                         <Text style={styles.threadBtnText}>타래 등록</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.threadBtn}>
+                    <TouchableOpacity
+                        style={styles.threadBtn}
+                        onPress={showToast}
+                    >
                         <Text style={styles.threadBtnText}>문장 수집</Text>
                     </TouchableOpacity>
                 </View>
