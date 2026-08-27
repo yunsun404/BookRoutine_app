@@ -2,8 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
 //const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
-const BASE_URL = "http://172.20.4.133:3000/api/v1"; // 차319 와이파이
-//const BASE_URL = "http://localhost:3000/api/v1";
+//const BASE_URL = "http://172.20.1.230:3000/api/v1"; // 차319 와이파이
+const BASE_URL = "http://localhost:3000/api/v1";
 
 // 기본 요청 함수
 async function request<T>(

@@ -11,6 +11,7 @@ const MENU_ITEMS: { name: string; title: string; icon: IoniconsName; route: stri
   { name: 'homescreen', title: '홈', icon: 'home-outline', route: '/(tabs)/homescreen' },
   { name: 'group', title: '그룹', icon: 'people-outline', route: '/(tabs)/group' },
   { name: 'recommend', title: '추천', icon: 'sparkles-outline', route: '/(tabs)/recommend' },
+  { name: 'store', title: '상점', icon: 'storefront-sharp', route: '/store' },
   { name: 'characters', title: '캐릭터', icon: 'paw-outline', route: '/characters' },
 ];
 
