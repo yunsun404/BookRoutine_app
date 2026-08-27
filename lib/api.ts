@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
 //const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
-const BASE_URL = "http://172.20.4.29:3000/api/v1"; // 차319 와이파이
+//const BASE_URL = "http://172.20.1.230:3000/api/v1"; // 차319 와이파이
+const BASE_URL = "http://localhost:3000/api/v1";
 
 // 기본 요청 함수
 async function request<T>(
@@ -142,6 +143,41 @@ export const userApi = {
       stats: object;
       favorite_genre?: JSON;
     }>(`/users/${user_id}`),
+
+  // FCM 디바이스 토큰 등록 (알림 권한 승인 직후 / 로그인 직후 호출)
+  updateFcmToken: (fcm_token: string) =>
+    request<{ success: boolean }>("/users/me/fcm-token", {
+      method: "PATCH",
+      body: JSON.stringify({ fcm_token }),
+    }),
+};
+
+// ────────────────────────────────────────
+// 알림 (Notifications)
+// ────────────────────────────────────────
+
+export const notificationApi = {
+  // 알림 목록 조회 (최신순)
+  getList: () =>
+    request<{
+      notifications: {
+        notification_id: string;
+        type: string | null;
+        title: string | null;
+        content: string | null;
+        is_read: boolean;
+        scheduled_at: string | null;
+        sent_at: string | null;
+        created_at: string;
+      }[];
+    }>("/notifications"),
+
+  // 알림 읽음 처리
+  markAsRead: (notification_id: string) =>
+    request<{ success: boolean; is_read: boolean }>(
+      `/notifications/${notification_id}/read`,
+      { method: "PATCH" },
+    ),
 };
 
 // ────────────────────────────────────────
@@ -154,6 +190,11 @@ export const groupApi = {
     group_name: string;
     people_count?: number;
     book_id?: string;
+    isbn?: string;
+    title?: string;
+    author?: string;
+    total_pages?: number;
+    cover_url?: string;
     target_date?: Date;
   }) =>
     request<{
@@ -181,6 +222,15 @@ export const groupApi = {
       body: JSON.stringify(body),
     }),
 
+  // 책 검색
+  searchBooks: (title: string) =>
+    request<{
+      book_id: string;
+      title: string;
+      author?: string;
+      cover_url?: string;
+    }[]>(`/reading-goals/search?title=${encodeURIComponent(title)}`),
+
   // 그룹 목록 조회
   getList: () =>
     request<
@@ -191,11 +241,12 @@ export const groupApi = {
         invite_code?: string;
         created_by: string;
         created_at: Date;
-        group_books: [
-          {
-            book_id?: string;
-          },
-        ];
+        group_books: [{
+          book_id?: string;
+        }],
+        _count: [{
+          group_members?: number;
+        }]
       }[]
     >("/groups"),
 
@@ -211,6 +262,7 @@ export const groupApi = {
       group_books: [
         {
           book_id?: string;
+          book: { title: string };
         },
       ];
     }>(`/groups/${group_id}`),
@@ -247,6 +299,8 @@ export const groupApi = {
         likes: number;
         created_at: Date;
         updated_at: Date;
+        user: { nickname: string };
+        book: { title: string };
       }[]
     >(`/groups/${group_id}/threads`),
 
@@ -267,6 +321,7 @@ export const groupApi = {
       group_name?: string;
       people_count?: number;
       book_id?: string;
+      target_date?: Date;
     }>(`/groups/${group_id}/update`, {
       method: "PATCH",
       body: JSON.stringify(body),

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "210612748832",
+    "project_id": "reading-43cd5",
+    "storage_bucket": "reading-43cd5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:210612748832:android:bebf5a0043c7fc7678f245",
+        "android_client_info": {
+          "package_name": "com.bookroutine.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdeY3rd6G9cmoHiD0-bp9d-IS27-qCZDY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:210612748832:android:07cfbf0a54060b9878f245",
+        "android_client_info": {
+          "package_name": "com.group.reading"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdeY3rd6G9cmoHiD0-bp9d-IS27-qCZDY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

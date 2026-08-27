@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "BookRoutine_app",
-    "slug": "BookRoutine_app",
+    "slug": "bookroutine",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +12,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.bookroutine.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -39,7 +41,8 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -49,6 +52,13 @@
       "ios",
       "android",
       "web"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a9aea19d-8289-4697-89d8-c2579f05a852"
+      }
+    },
+    "owner": "hyongs-team"
   }
 }

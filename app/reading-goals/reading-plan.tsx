@@ -46,6 +46,7 @@ export default function ReadingPlanScreen() {
     author: (params.author as string) || '',
     total_pages: Number(params.total_pages) || 0,
     isbn: (params.isbn as string) || '',
+    cover: (params.cover as string) || '',  // 책표지 
   };
 
   // 현재 날짜를 기준으로 초기 연도와 월 설정
@@ -233,6 +234,7 @@ try {
         author: book.author,
         total_pages: book.total_pages,
         isbn: book.isbn || undefined,
+        cover: book.cover || undefined, 
         start_date: startDate,
         end_date: endDate,
         preferred_days: selectedDays,
@@ -384,17 +386,7 @@ try {
           <Text style={styles.backButtonText}>책 다시 선택하기</Text>
         </Pressable>
       </ScrollView>
-
-      {/* 하단 네비게이션 */}
-      <View style={styles.bottomNav}>
-        <Text style={styles.navItem}>통계</Text>
-        <Text style={styles.navItem}>달력</Text>
-        <Pressable onPress={() => router.push('/homescreen')}>
-          <Text style={styles.navItemActive}>홈</Text>
-        </Pressable>
-        <Text style={styles.navItem}>그룹</Text>
-        <Text style={styles.navItem}>추천</Text>
-      </View>
+      
     </View>
   );
 }

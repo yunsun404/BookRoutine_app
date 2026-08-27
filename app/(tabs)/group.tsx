@@ -1,5 +1,7 @@
+import { Colors } from "@/constants/tokens";
 import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   //router,
   useRouter,
@@ -9,13 +11,12 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
-  //SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Header from "../../components/Header";
 
@@ -35,11 +36,12 @@ interface Post {
   date: string;
   bookTitle: string;
   quote: string;
+  likes: number;
 }
 
 // ── 컴포넌트 ───────────────────────────────────────────────────────
 export default function GroupScreen() {
-  const router = useRouter(); 
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
@@ -56,6 +58,20 @@ export default function GroupScreen() {
   // ── 팝업 상태 ────────────────────────────────────────────────────
   const [modalType, setModalType] = useState<"create" | "join" | null>(null);
   const [groupName, setGroupName] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
+  const [searchTitle, setSearchTitle] = useState('');
+  const [searchResults, setSearchResults] = useState<{
+    book_id: string;
+    isbn?: string;
+    title: string;
+    author?: string;
+    total_pages?: number;
+    cover_url?: string;
+  }[]>([]);
+  const [selectedBook, setSelectedBook] = useState<typeof searchResults[0] | null>(null);
+  const [maxPeople, setMaxPeople] = useState<number | undefined>(undefined);
+  const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
 
@@ -68,7 +84,7 @@ export default function GroupScreen() {
       const formatted = result.map((g: any) => ({
         id: g.group_id,
         name: g.group_name,
-        memberCount: g.people_count ?? 0,
+        memberCount: g._count.group_members ?? 0,
       }));
       setGroups(formatted);
     } catch (e) {
@@ -77,22 +93,30 @@ export default function GroupScreen() {
       setGroupsLoading(false);
     }
   };
- 
+
   useEffect(() => {
     fetchGroups();
   }, []);
-
-  const handleGroupPress = (group: Group) => {
-    setSelectedGroup(group);
-    setViewMode("FEED");
-  };
 
   // 그룹 생성
   const handleCreateGroup = async () => {
     if (!groupName.trim()) return;
     try {
       setModalLoading(true);
-      const result = await groupApi.create({ group_name: groupName.trim() });
+      console.log('searchTitle:', searchTitle);
+      console.log('selectedBookId:', selectedBook);
+      const result = await groupApi.create({
+        group_name: groupName.trim(),
+        people_count: maxPeople ?? undefined,
+        isbn: selectedBook?.isbn ?? undefined,
+        title: selectedBook?.title,
+        author: selectedBook?.author,
+        total_pages: selectedBook?.total_pages,
+        cover_url: selectedBook?.cover_url,
+        target_date: targetDate ?? undefined
+      });
+      console.log('bookTitle: ', bookTitle);
+      console.log('book_id: ', result.new_group_book?.book_id);
       setModalType(null);
       setGroupName("");
       router.push(`/groupdetail?group_id=${result.new_group_member.group_id}`);
@@ -102,6 +126,21 @@ export default function GroupScreen() {
       setModalLoading(false);
     }
   };
+
+  // 책 검색
+  const handleSearch = async (text: string) => {
+    setSearchTitle(text);
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const results = await groupApi.searchBooks(text);
+      setSearchResults(results);
+    } catch (error) {
+      console.error('검색 오류:', error);
+    }
+  }
 
   // 그룹 가입
   const handleJoinGroup = async () => {
@@ -123,6 +162,9 @@ export default function GroupScreen() {
   const closeModal = () => {
     setModalType(null);
     setGroupName("");
+    setBookTitle("");
+    setMaxPeople(undefined);
+    setTargetDate(undefined);
     setInviteCode("");
   };
 
@@ -140,7 +182,7 @@ export default function GroupScreen() {
     <View style={styles.container}>
       <Header />
 
-      {/* --- [모드 1] 그룹 목록 화면 --- */}
+      {/* --- [모드 1] 그룹 목록 화면 --- 
       {viewMode === "LIST" && (
         <ScrollView contentContainerStyle={styles.centerContent}>
           <Text style={styles.sectionTitle}>내 그룹 목록</Text>
@@ -158,9 +200,9 @@ export default function GroupScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-      )}
+      )}*/}
 
-      {/* --- [모드 2] 그룹 피드 화면 --- */}
+      {/* --- [모드 2] 그룹 피드 화면 --- 
       {viewMode === "FEED" && selectedGroup && (
         <View style={{ flex: 1 }}>
           <View style={styles.titleHeader}>
@@ -168,8 +210,8 @@ export default function GroupScreen() {
               <Ionicons name="chevron-back" size={24} color="#1a1a1a" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{selectedGroup.name}</Text>
-            
-            {/* 🔴 새 페이지로 네비게이션 트리거 */}
+*/}
+      {/* 🔴 새 페이지로 네비게이션 트리거 
             <TouchableOpacity style={styles.cameraIconButton} onPress={handleEnterRoom}>
               <Ionicons name="camera" size={20} color="#fff" />
             </TouchableOpacity>
@@ -186,7 +228,8 @@ export default function GroupScreen() {
                       <Text style={styles.bookTag}>“ {post.bookTitle} ”</Text>
                     </View>
                   </View>
-                  <Text style={styles.dateText}>{post.date}</Text>
+                  <Text style={styles.dateText}>{(post.date).toString().split('T')[0]}</Text>
+                  <Text>❤️{post.likes ?? 0}</Text>
                 </View>
                 <Text style={styles.quoteText}>{post.quote}</Text>
               </View>
@@ -194,7 +237,7 @@ export default function GroupScreen() {
           </ScrollView>
         </View>
       )}
-
+*/}
       {/* 상단 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>그룹</Text>
@@ -317,6 +360,76 @@ export default function GroupScreen() {
               }
               autoFocus
             />
+            {/* {modalType === "create" && (
+              <TextInput
+                style={styles.modalInput}
+                placeholder="목표 도서 (선택)"
+                value={bookTitle}
+                onChangeText={setBookTitle}
+              />
+            )} */}
+            {modalType === "create" && (
+              <View>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="목표 도서 (선택)"
+                  value={searchTitle}
+                  onChangeText={handleSearch}
+                />
+                <ScrollView style={{ maxHeight: 130 }} nestedScrollEnabled>
+                  {searchResults.map((book) => {
+                    return (
+                      <TouchableOpacity
+                        style={[styles.searchResult,
+                        selectedBook === book && { backgroundColor: 'gray' }]}
+                        key={book.book_id}
+                        onPress={() => {
+                          console.log('선택한 책:', book);
+                          console.log('선택한 book_id:', book.book_id);
+                          setSelectedBook(book);
+                          setSearchTitle(book.title)
+                        }}
+                      >
+                        <Text style={styles.searchResultTitle}>{book.title}</Text>
+                        <Text style={styles.searchResultAuthor}>{book.author}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+            {modalType === "create" && (
+              <TextInput
+                style={styles.modalInput}
+                placeholder="최대 인원 (선택)"
+                keyboardType="number-pad"
+                value={maxPeople !== undefined ? String(maxPeople) : ""}
+                onChangeText={(v) => setMaxPeople(v ? Number(v) : undefined)}
+              />
+            )}
+            {modalType === "create" && (
+              <>
+                <TouchableOpacity
+                  style={styles.modalInput}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={{ color: targetDate ? "#111" : "#aaa", fontSize: 15 }}>
+                    {targetDate ? targetDate.toISOString().split("T")[0] : "목표 날짜 (선택)"}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={targetDate ?? new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(_, selected) => {
+                      setShowDatePicker(false);
+                      if (selected) setTargetDate(selected);
+                    }}
+                  />
+                )}
+              </>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -546,6 +659,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#fff",
     fontWeight: "600",
+  },
+  searchResult: {
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
+  },
+  searchResultTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  searchResultAuthor: {
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginTop: 2,
   },
 
   centerContent: { padding: 20 },

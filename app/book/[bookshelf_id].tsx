@@ -35,6 +35,13 @@ interface BookDetail {
   }[];
 }
 
+type Thread = {
+  thread_id: string;
+  content: string;
+  current_page: number;
+  created_at: string;
+};
+
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 const formatDate = (dateStr: string) => {
@@ -50,14 +57,20 @@ export default function BookDetailScreen() {
   const { bookshelf_id } = useLocalSearchParams<{ bookshelf_id: string }>();
   const [detail, setDetail] = useState<BookDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [threads, setThreads] = useState<Thread[]>([]);
 
   useEffect(() => {
     fetchDetail();
   }, []);
 
+  useEffect(() => {
+    if (detail?.book.book_id) {
+      fetchThreads();
+    }
+  }, [detail]);
+
   const fetchDetail = async () => {
     try {
-      // ✅ authFetch로 교체 — 토큰 자동 포함
       const response = await authFetch(`${BASE_URL}/bookshelf/${bookshelf_id}`);
       const data = await response.json();
       setDetail(data);
@@ -65,6 +78,22 @@ export default function BookDetailScreen() {
       console.error("책 상세 에러:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchThreads = async () => {
+    try {
+      const url = `${BASE_URL}/threads?book_id=${detail?.book.book_id}`;
+      //console.log("타래 URL:", url);
+      const res = await authFetch(url);
+      //console.log("타래 status:", res.status);
+      const data = await res.json();
+      //console.log("타래 data:", JSON.stringify(data));
+      if (Array.isArray(data)) setThreads(data);
+      else if (data?.threads) setThreads(data.threads);
+      else if (data?.data) setThreads(data.data);
+    } catch (error) {
+      console.error("타래 에러:", error);
     }
   };
 
@@ -95,6 +124,7 @@ export default function BookDetailScreen() {
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 책 정보 */}
         <View style={styles.bookInfoRow}>
           <Image source={{ uri: detail.book.cover_url }} style={styles.cover} />
           <View style={styles.bookInfo}>
@@ -127,6 +157,26 @@ export default function BookDetailScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* 타래 목록 */}
+        <View style={styles.threadSection}>
+          <Text style={styles.threadTitle}>타래</Text>
+          {threads.length === 0 ? (
+            <Text style={styles.threadEmpty}>아직 기록이 없습니다.</Text>
+          ) : (
+            threads.map((item) => (
+              <View key={item.thread_id} style={styles.threadCard}>
+                <View style={styles.threadCardTop}>
+                  <Text style={styles.threadPage}>{item.current_page} pg</Text>
+                  <Text style={styles.threadDate}>
+                    {item.created_at?.slice(0, 10)}
+                  </Text>
+                </View>
+                <Text style={styles.threadContent}>{item.content}</Text>
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </View>
@@ -215,5 +265,51 @@ const styles = StyleSheet.create({
   pageText: {
     fontSize: 11,
     color: "#999",
+  },
+  threadSection: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  threadTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 12,
+  },
+  threadEmpty: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  threadCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  threadCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  threadPage: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4A3B32",
+  },
+  threadDate: {
+    fontSize: 11,
+    color: "#999",
+  },
+  threadContent: {
+    fontSize: 13,
+    color: "#333",
+    lineHeight: 20,
   },
 });

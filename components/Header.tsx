@@ -1,3 +1,6 @@
+import { authFetch, BASE_URL } from "@/constants/api";
+import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -9,7 +12,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
 
 interface UserProfile {
     nickname: string;
@@ -19,25 +21,49 @@ interface UserProfile {
 export default function Header() {
     const [menuVisible, setMenuVisible] = useState(false);
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const { user } = useAuthStore();    // 프로필을 store에서 바로 가져오기
 
     useEffect(() => {
         fetchProfile();
     }, []);
 
+    // ✅ supabase 직접 호출 제거 — user API로 교체(bookshelf.tsx에서 복붙)
     const fetchProfile = async () => {
-        const { data, error } = await supabase
-            .from("users")
-            .select("nickname, profile_image")
-            .eq("user_id", "7ff77428-bdab-4724-9a67-ed5587217978")
-            .single();
-
-        if (!error && data) setProfile(data);
+        try {
+            const response = await authFetch(`${BASE_URL}/users/me`);
+            const data = await response.json();
+            if (data) setProfile(data);
+        } catch (error) {
+            console.error("프로필 에러:", error);
+        }
     };
+
+    // 로그아웃
+    const { clearAuth } = useAuthStore();
+
+    const [refresh_token, setRefreshToken] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleLogout = async () => {
+        try {
+            setLoading(true);
+            // 1. 로그아웃 API 호출 (백엔드에 맞게 body 조정)
+            await authApi.logout({ refresh_token });
+            // 2. 로그인 상태 업데이트
+            clearAuth();
+            // 3. 로그인 화면으로 이동
+            router.replace('/');
+        } catch (error) {
+            console.error('로그아웃 오류:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
 
     return (
         <>
             <View style={styles.topBar}>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push("/(tabs)/notifications")}>
                     <Ionicons name="notifications-outline" size={24} color="#333" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMenuVisible(true)}>
@@ -55,14 +81,14 @@ export default function Header() {
                         <View style={styles.menuProfile}>
                             <Image
                                 source={
-                                    profile?.profile_image
-                                        ? { uri: profile.profile_image }
+                                    user?.profile_image
+                                        ? { uri: user.profile_image }
                                         : { uri: "https://via.placeholder.com/48" }
                                 }
                                 style={styles.menuAvatar}
                             />
                             <Text style={styles.menuNickname}>
-                                {profile?.nickname ?? "닉네임"}
+                                {user?.nickname ?? "닉네임"}
                             </Text>
                         </View>
 
@@ -89,7 +115,10 @@ export default function Header() {
 
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => setMenuVisible(false)}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/(profile)/editprofile");  // 아직 ui가 없음!
+                            }}
                         >
                             <Text style={styles.menuItemText}>내 프로필 수정</Text>
                         </TouchableOpacity>
@@ -109,7 +138,10 @@ export default function Header() {
 
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => setMenuVisible(false)}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                handleLogout();
+                            }}
                         >
                             <Text style={[styles.menuItemText, { color: "#E53935" }]}>
                                 로그아웃
