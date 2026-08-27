@@ -436,30 +436,23 @@ export default function HomeScreen() {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        
 
         <View style={styles.carouselContainer}>
-
           <BookCarousel
-
             books={booksForCarousel}
-
             currentIndex={currentIndex}
-
             onIndexChange={setCurrentIndex}
-
             onPress={() => {
-
               if (isLastEmptyPage) {
-
                 router.push("/reading-goals/book-select");
-
+              } else {
+                router.push({
+                  pathname: "/book-detail",
+                  params: { book_id: activeGroup.book_id },
+                });
               }
-
             }}
-
           />
-
         </View>
 
 

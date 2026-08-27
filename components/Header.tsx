@@ -63,7 +63,7 @@ export default function Header() {
     return (
         <>
             <View style={styles.topBar}>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push("/(tabs)/notifications")}>
                     <Ionicons name="notifications-outline" size={24} color="#333" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMenuVisible(true)}>
