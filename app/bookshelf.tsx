@@ -1,7 +1,8 @@
 import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import CoverPickerModal from "../components/bookshelf/CoverPickerModal";
 import Header from "../components/Header";
 import ProfileCard from "../components/ProfileCard";
 import styles from "./styles/bookshelf.styles";
@@ -30,7 +32,7 @@ interface BookshelfItem {
 interface FolderItem {
   folder_id: string;
   folder_name: string;
-  folder_image?: string;
+  folder_image?: string | null;
   created_at: string;
   folder_books: {
     book: {
@@ -50,11 +52,22 @@ export default function BookshelfScreen() {
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [folderName, setFolderName] = useState("");
+  const [folderImage, setFolderImage] = useState<string>("");
+  const [coverPickerVisible, setCoverPickerVisible] = useState(false);
 
   useEffect(() => {
     fetchBooks();
-    fetchFolders();
   }, []);
+
+  // 폴더 상세 화면에서 표지를 바꾸고 뒤로 돌아왔을 때, 여기 그리드에도 바로
+  // 반영되도록 "화면이 다시 보일 때마다" 폴더 목록을 새로 불러옵니다.
+  // 마운트 시 한 번만 도는 useEffect였다면, 뒤로가기 했을 때 여전히 예전 표지가
+  // 보이다가 앱을 완전히 재시작해야만 바뀐 게 보였을 거예요.
+  useFocusEffect(
+    useCallback(() => {
+      fetchFolders();
+    }, []),
+  );
 
   const fetchBooks = async () => {
     try {
@@ -95,9 +108,16 @@ export default function BookshelfScreen() {
     try {
       await authFetch(`${BASE_URL}/bookshelf/folders`, {
         method: "POST",
-        body: JSON.stringify({ folder_name: folderName }),
+        // folder_image는 GET /bookshelf/folders 응답에 이미 존재하는 필드라
+        // 같은 이름으로 보냅니다. 백엔드 생성 API가 아직 이 필드를 안 받고 있다면
+        // 이 부분만큼은 서버 쪽도 같이 확인해주세요.
+        body: JSON.stringify({
+          folder_name: folderName,
+          folder_image: folderImage || undefined,
+        }),
       });
       setFolderName("");
+      setFolderImage("");
       setModalVisible(false);
       fetchFolders();
     } catch (error) {
@@ -175,7 +195,7 @@ export default function BookshelfScreen() {
                 : styles.tabInactiveText
             }
           >
-            내 잔디 도감
+            내 캐릭터 도감
           </Text>
         </TouchableOpacity>
       </View>
@@ -208,14 +228,40 @@ export default function BookshelfScreen() {
                   style={styles.folderCard}
                   onPress={() =>
                     router.push(
-                      `/folder/${item.data.folder_id}?folder_name=${encodeURIComponent(item.data.folder_name)}` as any,
+                      `/folder/${item.data.folder_id}?folder_name=${encodeURIComponent(item.data.folder_name)}&folder_image=${encodeURIComponent(item.data.folder_image ?? "")}` as any,
                     )
                   }
                 >
-                  <Text style={styles.folderName}>{item.data.folder_name}</Text>
-                  <Text style={styles.folderCount}>
-                    {item.data.folder_books.length}권
-                  </Text>
+                  {item.data.folder_image ? (
+                    <>
+                      <Image
+                        source={{ uri: item.data.folder_image }}
+                        style={styles.folderCoverImage}
+                      />
+                      {/* 표지 사진 위에 이름/권수를 바로 얹으면 텍스트가 사진에 묻히니,
+                          어두운 그라데이션 대신 하단에 반투명 바를 깔아 항상 읽히게 합니다. */}
+                      <View style={styles.folderCoverOverlay}>
+                        <Text
+                          style={styles.folderNameOnCover}
+                          numberOfLines={1}
+                        >
+                          {item.data.folder_name}
+                        </Text>
+                        <Text style={styles.folderCountOnCover}>
+                          {item.data.folder_books.length}권
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.folderName}>
+                        {item.data.folder_name}
+                      </Text>
+                      <Text style={styles.folderCount}>
+                        {item.data.folder_books.length}권
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               );
             }
@@ -235,6 +281,26 @@ export default function BookshelfScreen() {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>폴더 표지</Text>
+            {/* 표지 미리보기를 누르면 CoverPickerModal이 열립니다. 표지 값 자체는
+                여기(folderImage)가 아니라 그 모달이 소유하지 않고, 선택 결과(URL)만
+                onSelect로 받아서 이 컴포넌트 state에 반영합니다. */}
+            <TouchableOpacity
+              style={styles.coverPickerButton}
+              onPress={() => setCoverPickerVisible(true)}
+            >
+              {folderImage ? (
+                <Image
+                  source={{ uri: folderImage }}
+                  style={styles.coverPickerPreview}
+                />
+              ) : (
+                <Text style={styles.coverPickerPlaceholder}>
+                  + 표지{"\n"}선택
+                </Text>
+              )}
+            </TouchableOpacity>
+
             <Text style={styles.modalTitle}>폴더 이름</Text>
             <TextInput
               style={styles.modalInput}
@@ -259,6 +325,12 @@ export default function BookshelfScreen() {
           </View>
         </View>
       </Modal>
+
+      <CoverPickerModal
+        visible={coverPickerVisible}
+        onClose={() => setCoverPickerVisible(false)}
+        onSelect={setFolderImage}
+      />
 
       {/* 잔디 도감 */}
       {activeTab === "garden" && (
