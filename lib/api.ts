@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
 // const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
-const BASE_URL = "http://172.20.4.107:3000/api/v1"; // 차319 와이파이
+export const BASE_URL = "http://172.20.4.107:3000/api/v1"; // 차319 와이파이
 
 // 기본 요청 함수
 async function request<T>(
@@ -154,6 +154,11 @@ export const groupApi = {
     group_name: string;
     people_count?: number;
     book_id?: string;
+    isbn?: string;
+    title?: string;
+    author?: string;
+    total_pages?: number;
+    cover_url?: string;
     target_date?: Date;
   }) =>
     request<{
@@ -180,6 +185,15 @@ export const groupApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // 책 검색
+  searchBooks: (title: string) =>
+    request<{
+      book_id: string;
+      title: string;
+      author?: string;
+      cover_url?: string;
+    }[]>(`/reading-goals/search?title=${encodeURIComponent(title)}`),
 
   // 그룹 목록 조회
   getList: () =>

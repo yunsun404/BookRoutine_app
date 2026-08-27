@@ -1,3 +1,4 @@
+import { Colors } from "@/constants/tokens";
 import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -10,6 +11,7 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -57,6 +59,16 @@ export default function GroupScreen() {
   const [modalType, setModalType] = useState<"create" | "join" | null>(null);
   const [groupName, setGroupName] = useState("");
   const [bookTitle, setBookTitle] = useState("");
+  const [searchTitle, setSearchTitle] = useState('');
+  const [searchResults, setSearchResults] = useState<{
+    book_id: string;
+    isbn?: string;
+    title: string;
+    author?: string;
+    total_pages?: number;
+    cover_url?: string;
+  }[]>([]);
+  const [selectedBook, setSelectedBook] = useState<typeof searchResults[0] | null>(null);
   const [maxPeople, setMaxPeople] = useState<number | undefined>(undefined);
   const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -91,13 +103,20 @@ export default function GroupScreen() {
     if (!groupName.trim()) return;
     try {
       setModalLoading(true);
+      console.log('searchTitle:', searchTitle);
+      console.log('selectedBookId:', selectedBook);
       const result = await groupApi.create({
         group_name: groupName.trim(),
         people_count: maxPeople ?? undefined,
-        book_id: bookTitle ?? undefined,
-        // book[0].title:bookTitle,
+        isbn: selectedBook?.isbn ?? undefined,
+        title: selectedBook?.title,
+        author: selectedBook?.author,
+        total_pages: selectedBook?.total_pages,
+        cover_url: selectedBook?.cover_url,
         target_date: targetDate ?? undefined
       });
+      console.log('bookTitle: ', bookTitle);
+      console.log('book_id: ', result.new_group_book?.book_id);
       setModalType(null);
       setGroupName("");
       router.push(`/groupdetail?group_id=${result.new_group_member.group_id}`);
@@ -107,6 +126,21 @@ export default function GroupScreen() {
       setModalLoading(false);
     }
   };
+
+  // 책 검색
+  const handleSearch = async (text: string) => {
+    setSearchTitle(text);
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const results = await groupApi.searchBooks(text);
+      setSearchResults(results);
+    } catch (error) {
+      console.error('검색 오류:', error);
+    }
+  }
 
   // 그룹 가입
   const handleJoinGroup = async () => {
@@ -326,13 +360,43 @@ export default function GroupScreen() {
               }
               autoFocus
             />
-            {modalType === "create" && (
+            {/* {modalType === "create" && (
               <TextInput
                 style={styles.modalInput}
                 placeholder="목표 도서 (선택)"
                 value={bookTitle}
                 onChangeText={setBookTitle}
               />
+            )} */}
+            {modalType === "create" && (
+              <View>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="목표 도서 (선택)"
+                  value={searchTitle}
+                  onChangeText={handleSearch}
+                />
+                <ScrollView style={{ maxHeight: 130 }} nestedScrollEnabled>
+                  {searchResults.map((book) => {
+                    return (
+                      <TouchableOpacity
+                        style={[styles.searchResult,
+                        selectedBook === book && { backgroundColor: 'gray' }]}
+                        key={book.book_id}
+                        onPress={() => {
+                          console.log('선택한 책:', book);
+                          console.log('선택한 book_id:', book.book_id);
+                          setSelectedBook(book);
+                          setSearchTitle(book.title)
+                        }}
+                      >
+                        <Text style={styles.searchResultTitle}>{book.title}</Text>
+                        <Text style={styles.searchResultAuthor}>{book.author}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
             {modalType === "create" && (
               <TextInput
@@ -595,6 +659,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#fff",
     fontWeight: "600",
+  },
+  searchResult: {
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
+  },
+  searchResultTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  searchResultAuthor: {
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginTop: 2,
   },
 
   centerContent: { padding: 20 },

@@ -32,7 +32,7 @@ export default function BookSelectScreen() {
   const [bookModalVisible, setBookModalVisible] = useState(false);
   const [titleOpen, setTitleOpen] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
-  
+
   const [tempTitle, setTempTitle] = useState('');
   const [tempAuthor, setTempAuthor] = useState('');
   const [tempPages, setTempPages] = useState('');
@@ -146,8 +146,8 @@ export default function BookSelectScreen() {
           </View>
         )}
 
-        <Pressable 
-          style={[styles.mainButton, !book && { backgroundColor: '#d1d5db' }]} 
+        <Pressable
+          style={[styles.mainButton, !book && { backgroundColor: '#d1d5db' }]}
           onPress={goToPlanScreen}
         >
           <Text style={styles.mainButtonText}>계획 생성하기</Text>
@@ -162,7 +162,7 @@ export default function BookSelectScreen() {
 
             {/* 1. 제목 입력 박스 (클릭 시 검색 드롭다운 토글) */}
             <View style={styles.manualInputBox}>
-              <Pressable 
+              <Pressable
                 style={styles.inputRowContainer}
                 onPress={() => setTitleOpen((prev) => !prev)}
               >
@@ -258,8 +258,8 @@ export default function BookSelectScreen() {
                 <Text style={styles.modalCancelText}>취소</Text>
               </Pressable>
 
-              <Pressable 
-                style={styles.modalConfirmButton} 
+              <Pressable
+                style={styles.modalConfirmButton}
                 onPress={applyTempBook}
               >
                 <Text style={styles.modalConfirmText}>확인</Text>
