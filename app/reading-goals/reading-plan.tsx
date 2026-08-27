@@ -46,6 +46,7 @@ export default function ReadingPlanScreen() {
     author: (params.author as string) || '',
     total_pages: Number(params.total_pages) || 0,
     isbn: (params.isbn as string) || '',
+    cover: (params.cover as string) || '',  // 책표지 
   };
 
   // 현재 날짜를 기준으로 초기 연도와 월 설정
@@ -233,6 +234,7 @@ try {
         author: book.author,
         total_pages: book.total_pages,
         isbn: book.isbn || undefined,
+        cover: book.cover || undefined, 
         start_date: startDate,
         end_date: endDate,
         preferred_days: selectedDays,
