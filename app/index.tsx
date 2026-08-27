@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { authApi, userApi } from '../lib/api';
+import { syncPushToken } from '../lib/notifications';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function LoginScreen() {
@@ -42,6 +43,12 @@ export default function LoginScreen() {
 
       const me = await userApi.getMe();
       await setAuth(me, access_token, refresh_token);
+
+      // 로그인 성공 = access_token이 막 생긴 시점. PATCH /users/me/fcm-token은 인증이
+      // 필요해서 이 시점보다 앞에서는 호출할 수 없습니다. 권한 거부/개발 빌드가 아닌
+      // 환경(Expo Go) 등으로 실패해도 syncPushToken 내부에서 조용히 넘어가므로,
+      // 로그인 흐름 자체를 막지 않도록 await만 하고 별도 에러 처리는 안 합니다.
+      await syncPushToken();
 
       router.replace('/(tabs)/homescreen');
       // router.replace('/store');
