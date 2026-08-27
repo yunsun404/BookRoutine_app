@@ -51,7 +51,6 @@ export default function LoginScreen() {
       await syncPushToken();
 
       router.replace('/(tabs)/homescreen');
-      // router.replace('/store');
     } catch (e: any) {
       Alert.alert('로그인 실패', e.message || '다시 시도해주세요.');
     } finally {

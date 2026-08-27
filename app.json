@@ -22,7 +22,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.jy0802.BookRoutine_app"
     },
     "web": {
       "output": "static",
