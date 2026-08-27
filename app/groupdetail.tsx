@@ -1,5 +1,7 @@
 import Header from "@/components/Header";
 import { groupApi } from "@/lib/api";
+import { startReadingRoom } from "@/lib/api/reading-room";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -40,6 +42,7 @@ interface GroupDetail {
 
 export default function GroupDetailScreen() {
     const router = useRouter();
+    const { user } = useAuthStore();
     const { group_id } = useLocalSearchParams<{ group_id: string }>();
 
     const [group, setGroup] = useState<GroupDetail>();
@@ -92,11 +95,18 @@ export default function GroupDetailScreen() {
                 </Text>
                 <TouchableOpacity
                     style={styles.enterBtn}
-                    onPress={() =>
-                        router.push(
-                            `/reading-room?room_name=${group?.group_name}&username=나`
-                        )
-                    }
+                    onPress={async () => {
+                        if (!group) return;
+                        try {
+                            const result = await startReadingRoom(group.group_id, group.group_name);
+                            const myNickname = user?.nickname ?? "익명";
+                            router.push(
+                                `/reading-room?room_id=${result.create.room_id}&room_name=${group.group_name}&username=${myNickname}`
+                            );
+                        } catch (error) {
+                            console.log("독서방 시작 에러:", error);
+                        }
+                    }}
                 >
                     <Ionicons name="camera-outline" size={16} color="#fff" />
                     <Text style={styles.enterBtnText}>독서방</Text>
