@@ -191,11 +191,12 @@ export const groupApi = {
         invite_code?: string;
         created_by: string;
         created_at: Date;
-        group_books: [
-          {
-            book_id?: string;
-          },
-        ];
+        group_books: [{
+          book_id?: string;
+        }],
+        _count: [{
+          group_members?: number;
+        }]
       }[]
     >("/groups"),
 

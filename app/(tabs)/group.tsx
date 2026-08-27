@@ -67,7 +67,7 @@ export default function GroupScreen() {
       const formatted = result.map((g: any) => ({
         id: g.group_id,
         name: g.group_name,
-        memberCount: g.people_count ?? 0,
+        memberCount: g._count.group_members ?? 0,
       }));
       setGroups(formatted);
     } catch (e) {
@@ -80,11 +80,6 @@ export default function GroupScreen() {
   useEffect(() => {
     fetchGroups();
   }, []);
-
-  const handleGroupPress = (group: Group) => {
-    setSelectedGroup(group);
-    setViewMode("FEED");
-  };
 
   // 그룹 생성
   const handleCreateGroup = async () => {
