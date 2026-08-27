@@ -154,17 +154,6 @@ export default function BookSelectScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* 하단 네비게이션 */}
-      <View style={styles.bottomNav}>
-        <Text style={styles.navItem}>통계</Text>
-        <Text style={styles.navItem}>달력</Text>
-        <Pressable onPress={() => router.push('/home')}>
-          <Text style={styles.navItemActive}>홈</Text>
-        </Pressable>
-        <Text style={styles.navItem}>그룹</Text>
-        <Text style={styles.navItem}>추천</Text>
-      </View>
-
       {/* 책 추가 팝업 모달 */}
       <Modal transparent visible={bookModalVisible} animationType="fade">
         <View style={styles.modalBackground}>

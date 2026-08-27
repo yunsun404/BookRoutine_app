@@ -1,4 +1,4 @@
-import { FontSize } from "@/constants/tokens";
+import { authFetch, BASE_URL } from "@/constants/api"; // 👈 authFetch 임포트 추가
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -6,17 +6,13 @@ import {
   ActivityIndicator,
   Image,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 // 🛠️ 에러 수정: ranking 폴더 깊이에 맞게 경로를 ../../로 올바르게 수정했습니다.
 import Header from "../components/Header";
-
-//const BASE_URL = "http://localhost:3000/api/v1";
-const BASE_URL = "http:// 172.20.4.29:3000/api/v1";
-const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
+import { styles } from "./styles/ranking.styles";
 
 interface RankUser {
   rank: number;
@@ -45,9 +41,8 @@ export default function RankingScreen() {
 
   async function fetchRanking() {
     try {
-      // 💡 [오류 수정] 통계 스크린과 마찬가지로 백엔드 주소 꼬임을 방지하기 위해
-      // 중복될 수 있는 '/ranking' 경로 구조를 정리하여 백엔드 라우팅에 정확히 맞췄습니다.
-      const res = await fetch(`${BASE_URL}/age-group?user_id=${USER_ID}`);
+      // ✅ authFetch를 사용하여 토큰 자동 포함 및 백엔드 라우팅에 맞게 호출
+      const res = await authFetch(`${BASE_URL}/ranking/age-group`);
       const data: ApiResponse = await res.json();
       setRankingData(data.ranking || []); // 데이터가 null로 올 경우를 대비해 예외 처리 추가
       setAgeGroup(data.ageGroup || 0);
@@ -211,110 +206,3 @@ export default function RankingScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  backButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignSelf: "flex-start",
-  },
-  scrollContainer: { flex: 1 },
-  content: { paddingHorizontal: 24, paddingBottom: 40 },
-  monthTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginVertical: 16,
-    color: "#222",
-  },
-  monthSub: { fontSize: FontSize.md, fontWeight: "normal", color: "#666" },
-  podiumContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "flex-end",
-    height: 210,
-    marginBottom: 24,
-  },
-  podiumColumn: { flex: 1, alignItems: "center", justifyContent: "flex-end" },
-  crown: { fontSize: 16, marginBottom: 2 },
-  profilePrimary: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 3,
-    borderColor: "#FFD700",
-  },
-  profileSecondary: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: "#E0E0E0",
-  },
-  podiumName: {
-    fontSize: FontSize.xs,
-    color: "#333",
-    marginTop: 6,
-    textAlign: "center",
-    paddingHorizontal: 4,
-  },
-  bar: {
-    width: "85%",
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    marginTop: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  barText: { fontSize: FontSize.md, fontWeight: "bold", color: "#888" },
-  bannerBox: {
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#EBEBEB",
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  bannerText: {
-    fontSize: FontSize.sm,
-    color: "#444",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  listContainer: { gap: 10 },
-  rankItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F2F2F2",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-  },
-  itemLeft: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
-  rankBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#E0E0E0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rankBadgeText: { fontSize: FontSize.sm, fontWeight: "bold", color: "#666" },
-  listProfile: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#ccc",
-  },
-  listNickname: {
-    fontSize: FontSize.sm,
-    fontWeight: "500",
-    color: "#222",
-    flex: 1,
-  },
-  bookCountText: { fontSize: FontSize.xs, color: "#777", fontWeight: "600" },
-});
