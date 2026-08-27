@@ -6,6 +6,7 @@ import { FocusFrameSample } from '../lib/types/ebook';
 const CAPTURE_INTERVAL_MS = 800;   // 0.5~1초 간격 샘플링 (매 프레임 다 볼 필요 없음)
 const BOX_MARGIN_PX = 30;   // 모델 오차를 감안한 여유 범위
 const GAZE_API_URL = process.env.EXPO_PUBLIC_GAZE_API_URL ?? 'http://localhost:8000';
+const isCapturingRef = useRef(false);
 
 interface BoxLayout { x: number; y: number; width: number; height: number; }
 interface CalibrationPoint { cmX: number; cmY: number; }
@@ -84,25 +85,34 @@ export function FocusCameraOverlay({ boxLayout, onFrame }: Props) {
   useEffect(() => {
     if (phase !== 'tracking' || !boxLayout || !calibMapRef.current) return;
 
-    intervalRef.current = setInterval(async () => {
-      const result = await captureAndPredict();
-      const map = calibMapRef.current!;
-      const timestamp = Date.now();
+    intervalRef.current = setInterval(async () => { // 에러 방지 처리 
+        if (isCapturingRef.current) return; // 이전 요청이 아직 안 끝났으면 이번 건 건너뜀
+        isCapturingRef.current = true;
 
-      if (!result) {
-        onFrame({ timestamp, faceDetected: false, isFocused: false });
-        return;
-      }
+        try {
+            const result = await captureAndPredict();
+            const map = calibMapRef.current!;
+            const timestamp = Date.now();
 
-      const px = { x: map.scaleX * result.gaze_x_cm + map.offsetX, y: map.scaleY * result.gaze_y_cm + map.offsetY };
-      const isFocused =
-        px.x >= boxLayout.x - BOX_MARGIN_PX &&
-        px.x <= boxLayout.x + boxLayout.width + BOX_MARGIN_PX &&
-        px.y >= boxLayout.y - BOX_MARGIN_PX &&
-        px.y <= boxLayout.y + boxLayout.height + BOX_MARGIN_PX;
+            if (!result) {
+            onFrame({ timestamp, faceDetected: false, isFocused: false });
+            return;
+            }
 
-      onFrame({ timestamp, faceDetected: true, isFocused });
-    }, CAPTURE_INTERVAL_MS);
+            const px = { x: map.scaleX * result.gaze_x_cm + map.offsetX, y: map.scaleY * result.gaze_y_cm + map.offsetY };
+            const isFocused =
+                px.x >= boxLayout.x - BOX_MARGIN_PX &&
+                px.x <= boxLayout.x + boxLayout.width + BOX_MARGIN_PX &&
+                px.y >= boxLayout.y - BOX_MARGIN_PX &&
+                px.y <= boxLayout.y + boxLayout.height + BOX_MARGIN_PX;
+
+            onFrame({ timestamp, faceDetected: true, isFocused });
+    
+        } finally {
+            isCapturingRef.current = false; // 성공하든 실패하든 다음 요청을 받을 수 있게 풀어줌
+        }
+    }, CAPTURE_INTERVAL_MS);   
+
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
