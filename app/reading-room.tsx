@@ -35,6 +35,7 @@ export default function ReadingRoomScreen() {
     // ↓ current_room_name/my_username이 정의된 "다음"에 와야 해서 여기로 옮김
     const [myStatus, setMyStatus] = useState<'reading' | 'distracted'>('reading');
     const mySessionId = `${room_id ?? current_room_name}_${my_username}`;
+    const SHOW_YOLO_TRACKING = false; // 문제 생기면 이 값만 false로
 
     const [activeUsers] = useState<ActiveUser[]>([
         {
@@ -92,7 +93,7 @@ export default function ReadingRoomScreen() {
                         <View key={user.user_id} style={styles.cardItem}>
                             <View style={[styles.camSurface, { borderColor: meta.border, borderWidth: 4 }]}>
                                 <View style={StyleSheet.absoluteFillObject}>
-                                    {isMe ? (
+                                    {isMe && SHOW_YOLO_TRACKING ? (
                                         <FocusYoloCameraOverlay sessionId={mySessionId} onStatusChange={setMyStatus} />
                                     ) : (
                                         <Video

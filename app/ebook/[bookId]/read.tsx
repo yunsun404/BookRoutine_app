@@ -9,6 +9,8 @@ import { ReadingSession } from '../../../lib/types/ebook';
 const SEND_INTERVAL_MS = 30000;
 
 export default function EbookReadingScreen() {
+  const SEND_INTERVAL_MS = 30000;
+  const SHOW_GAZE_TRACKING = false; // 문제 생기면 이 값만 false로 바꾸면 됨
   const { bookId, title } = useLocalSearchParams<{ bookId: string; title: string }>();
   const router = useRouter();
 
@@ -79,12 +81,9 @@ export default function EbookReadingScreen() {
 
   return (
     <View style={styles.container}>
-      {/*
-        팀원 시선추적 컴포넌트 자리:
-        <FocusCameraOverlay onFrame={(f) => pushFrame({ timestamp: Date.now(), ...f })} />
-      */
-      <FocusCameraOverlay boxLayout={boxLayout} onFrame={(f) => pushFrame(f)} />
-      }
+      {SHOW_GAZE_TRACKING && (
+        <FocusCameraOverlay boxLayout={boxLayout} onFrame={(f) => pushFrame(f)} />
+      )}
       <ScrollView 
         style={styles.textArea} 
         contentContainerStyle={{ padding: 20 }} 
