@@ -1,59 +1,109 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FocusFrameSample } from '../lib/types/ebook';
 
-const CAPTURE_INTERVAL_MS = 800;   // 0.5~1초 간격 샘플링 (매 프레임 다 볼 필요 없음)
-const BOX_MARGIN_PX = 30;   // 모델 오차를 감안한 여유 범위
+const CAPTURE_INTERVAL_MS = 800;
+const BOX_MARGIN_PX = 30;
 const GAZE_API_URL = process.env.EXPO_PUBLIC_GAZE_API_URL ?? 'http://localhost:8000';
-const isCapturingRef = useRef(false);
 
 interface BoxLayout { x: number; y: number; width: number; height: number; }
 interface CalibrationPoint { cmX: number; cmY: number; }
 interface CalibrationMap { scaleX: number; offsetX: number; scaleY: number; offsetY: number; }
 
 interface Props {
-  boxLayout: BoxLayout | null; // read.tsx에서 onLayout으로 구한 읽기 영역 좌표
+  boxLayout: BoxLayout | null;
   onFrame: (frame: FocusFrameSample) => void;
 }
 
 type Phase = 'permission' | 'calib-topleft' | 'calib-bottomright' | 'tracking';
 
 export function FocusCameraOverlay({ boxLayout, onFrame }: Props) {
-  const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<Phase>('permission');
-  const cameraRef = useRef<CameraView>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+
+  // expo-camera(네이티브 전용) 대신, 브라우저 표준 <video>/<canvas>를 직접 다룸
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const calibMapRef = useRef<CalibrationMap | null>(null);
   const topLeftRef = useRef<CalibrationPoint | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isCapturingRef = useRef(false);
 
+  // 웹캠 스트림 시작
   useEffect(() => {
-    if (permission?.granted) setPhase('calib-topleft');
-  }, [permission?.granted]);
+    let cancelled = false;
 
-  // 사진 한 장 찍어서 파이썬 API에 물어보고 cm 좌표를 받아옴
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.playsInline = true;
+        video.muted = true;
+        video.width = 320;
+        video.height = 240;
+        await video.play();
+        videoRef.current = video;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 240;
+        canvasRef.current = canvas;
+
+        setPhase('calib-topleft');
+      } catch {
+        setPermissionError('카메라 권한을 허용해주세요.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  // 현재 비디오 프레임 한 장을 JPEG로 캡처
+  const captureFrameBlob = useCallback((): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) return resolve(null);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(null);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
+    });
+  }, []);
+
   const captureAndPredict = useCallback(async (): Promise<{ gaze_x_cm: number; gaze_y_cm: number } | null> => {
-    if (!cameraRef.current) return null;
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
-      if (!photo?.uri) return null;
+      const blob = await captureFrameBlob();
+      if (!blob) return null;
 
       const form = new FormData();
-      // @ts-ignore RN FormData는 이 형태의 파일 객체를 허용함
-      form.append('image', { uri: photo.uri, name: 'frame.jpg', type: 'image/jpeg' });
+      form.append('image', blob, 'frame.jpg');
 
       const res = await fetch(`${GAZE_API_URL}/gaze/predict`, { method: 'POST', body: form });
       const data = await res.json();
       if (data.error) return null; // 얼굴 미검출
       return data;
     } catch {
-      return null; // 서버 호출 실패 — 이 프레임만 건너뜀 (앱이 죽으면 안 됨)
+      return null; // 서버 호출 실패 — 이 프레임만 건너뜀
     }
-  }, []);
+  }, [captureFrameBlob]);
 
   const handleCalibTopLeft = async () => {
     const result = await captureAndPredict();
-    if (!result) return; // 실패하면 버튼이 그대로 남아있어서 다시 누르면 됨
+    if (!result) return;
     topLeftRef.current = { cmX: result.gaze_x_cm, cmY: result.gaze_y_cm };
     setPhase('calib-bottomright');
   };
@@ -66,8 +116,7 @@ export function FocusCameraOverlay({ boxLayout, onFrame }: Props) {
     const cmDx = result.gaze_x_cm - topLeft.cmX;
     const cmDy = result.gaze_y_cm - topLeft.cmY;
     if (Math.abs(cmDx) < 0.5 || Math.abs(cmDy) < 0.5) {
-      // 두 지점 차이가 너무 작음 — 신뢰할 수 없어서 처음부터 다시
-      setPhase('calib-topleft');
+      setPhase('calib-topleft'); // 두 지점 차이가 너무 작으면 처음부터 다시
       return;
     }
 
@@ -85,56 +134,47 @@ export function FocusCameraOverlay({ boxLayout, onFrame }: Props) {
   useEffect(() => {
     if (phase !== 'tracking' || !boxLayout || !calibMapRef.current) return;
 
-    intervalRef.current = setInterval(async () => { // 에러 방지 처리 
-        if (isCapturingRef.current) return; // 이전 요청이 아직 안 끝났으면 이번 건 건너뜀
-        isCapturingRef.current = true;
+    intervalRef.current = setInterval(async () => {
+      if (isCapturingRef.current) return;
+      isCapturingRef.current = true;
 
-        try {
-            const result = await captureAndPredict();
-            const map = calibMapRef.current!;
-            const timestamp = Date.now();
+      try {
+        const result = await captureAndPredict();
+        const map = calibMapRef.current!;
+        const timestamp = Date.now();
 
-            if (!result) {
-            onFrame({ timestamp, faceDetected: false, isFocused: false });
-            return;
-            }
-
-            const px = { x: map.scaleX * result.gaze_x_cm + map.offsetX, y: map.scaleY * result.gaze_y_cm + map.offsetY };
-            const isFocused =
-                px.x >= boxLayout.x - BOX_MARGIN_PX &&
-                px.x <= boxLayout.x + boxLayout.width + BOX_MARGIN_PX &&
-                px.y >= boxLayout.y - BOX_MARGIN_PX &&
-                px.y <= boxLayout.y + boxLayout.height + BOX_MARGIN_PX;
-
-            onFrame({ timestamp, faceDetected: true, isFocused });
-    
-        } finally {
-            isCapturingRef.current = false; // 성공하든 실패하든 다음 요청을 받을 수 있게 풀어줌
+        if (!result) {
+          onFrame({ timestamp, faceDetected: false, isFocused: false });
+          return;
         }
-    }, CAPTURE_INTERVAL_MS);   
 
+        const px = { x: map.scaleX * result.gaze_x_cm + map.offsetX, y: map.scaleY * result.gaze_y_cm + map.offsetY };
+        const isFocused =
+          px.x >= boxLayout.x - BOX_MARGIN_PX &&
+          px.x <= boxLayout.x + boxLayout.width + BOX_MARGIN_PX &&
+          px.y >= boxLayout.y - BOX_MARGIN_PX &&
+          px.y <= boxLayout.y + boxLayout.height + BOX_MARGIN_PX;
+
+        onFrame({ timestamp, faceDetected: true, isFocused });
+      } finally {
+        isCapturingRef.current = false;
+      }
+    }, CAPTURE_INTERVAL_MS);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [phase, boxLayout, captureAndPredict, onFrame]);
 
-  if (!permission) return <ActivityIndicator style={styles.center} />;
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.overlay}>
-        <Text style={styles.text}>집중도 측정을 위해{'\n'}카메라 권한이 필요해요</Text>
-        <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>권한 허용</Text>
-        </Pressable>
-      </View>
-    );
+  if (permissionError) {
+    return <View style={styles.overlay}><Text style={styles.text}>{permissionError}</Text></View>;
+  }
+  if (phase === 'permission') {
+    return <View style={styles.overlay}><Text style={styles.text}>카메라 준비 중...</Text></View>;
   }
 
   return (
     <>
-      <CameraView ref={cameraRef} style={styles.hiddenCamera} facing="front" />
       {phase === 'calib-topleft' && (
         <View style={styles.overlay}>
           <Text style={styles.text}>읽기 화면의{'\n'}왼쪽 위를 봐주세요</Text>
@@ -156,8 +196,6 @@ export function FocusCameraOverlay({ boxLayout, onFrame }: Props) {
 }
 
 const styles = StyleSheet.create({
-  hiddenCamera: { position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0 },
-  center: { padding: 20 },
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', gap: 16, padding: 24,
@@ -166,4 +204,3 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#fff', borderRadius: 24, paddingVertical: 12, paddingHorizontal: 24 },
   buttonText: { fontWeight: '600' },
 });
-
