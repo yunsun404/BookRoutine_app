@@ -81,3 +81,49 @@ export function FocusYoloCameraOverlay({ sessionId, onStatusChange }: Props) {
 
   useEffect(() => {
     if (!ready) return;
+
+    intervalRef.current = setInterval(async () => {
+      if (isCapturingRef.current) return;
+      isCapturingRef.current = true;
+
+      try {
+        const blob = await captureFrameBlob();
+        if (!blob) return;
+
+        const form = new FormData();
+        form.append('session_id', sessionId);
+        form.append('image', blob, 'frame.jpg');
+
+        const res = await fetch(`${FOCUS_API_URL}/focus/frame`, { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.error) return;
+
+        // alert=true -> 10초 넘게 페이지가 안 넘어감 (책/손이 안 보이는 경우도 결국 이쪽으로 수렴)
+        onStatusChange(data.alert ? 'distracted' : 'reading');
+      } catch {
+        // 네트워크 실패 — 이번 프레임만 건너뜀
+      } finally {
+        isCapturingRef.current = false;
+      }
+    }, CAPTURE_INTERVAL_MS);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [ready, sessionId, onStatusChange]);
+
+  if (permissionError) {
+    return <View style={styles.center}><Text style={styles.errorText}>{permissionError}</Text></View>;
+  }
+  if (!ready) {
+    return <View style={styles.center}><ActivityIndicator color="#fff" /></View>;
+  }
+
+  // 웹캠 화면 자체는 화면에 안 보여줘도 되는 용도(집중도 판정용)라 빈 배경만 표시
+  return <View style={styles.center} />;
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1C252C' },
+  errorText: { color: '#fff', textAlign: 'center', padding: 16 },
+});
