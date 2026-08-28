@@ -1,10 +1,8 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useEffect, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-const CAPTURE_INTERVAL_MS = 1000; // 0.5~1초 간격 샘플링
+const CAPTURE_INTERVAL_MS = 1000;
 const FOCUS_API_URL = process.env.EXPO_PUBLIC_GAZE_API_URL ?? 'http://localhost:8000';
-// 시선추적이랑 같은 서버(포트 8000)를 쓰니 환경변수 이름은 그대로 재사용
 
 interface Props {
   sessionId: string;
@@ -12,63 +10,74 @@ interface Props {
 }
 
 export function FocusYoloCameraOverlay({ sessionId, onStatusChange }: Props) {
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const isCapturingRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const captureFrameBlob = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) return resolve(null);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(null);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
+    });
+  };
+
   useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission();
-      return;
-    }
+    let cancelled = false;
 
-    // 세션 시작 — 이 사람 전용 FocusEngine을 서버에 준비시킴
-    const form = new FormData();
-    form.append('session_id', sessionId);
-    fetch(`${FOCUS_API_URL}/focus/session/start`, { method: 'POST', body: form }).catch(() => {});
-
-    intervalRef.current = setInterval(async () => {
-      if (isCapturingRef.current || !cameraRef.current) return;
-      isCapturingRef.current = true;
-
+    (async () => {
       try {
-        const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
-        if (!photo?.uri) return;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
 
-        const frameForm = new FormData();
-        frameForm.append('session_id', sessionId);
-        // @ts-ignore RN FormData는 이 형태의 파일 객체를 허용함
-        frameForm.append('image', { uri: photo.uri, name: 'frame.jpg', type: 'image/jpeg' });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.playsInline = true;
+        video.muted = true;
+        video.width = 320;
+        video.height = 240;
+        await video.play();
+        videoRef.current = video;
 
-        const res = await fetch(`${FOCUS_API_URL}/focus/frame`, { method: 'POST', body: frameForm });
-        const data = await res.json();
-        if (data.error) return; // 이번 프레임만 건너뜀
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 240;
+        canvasRef.current = canvas;
 
-        // alert=true -> 10초 넘게 페이지가 안 넘어감 (책/손이 안 보이는 경우도 결국 이쪽으로 수렴)
-        onStatusChange(data.alert ? 'distracted' : 'reading');
+        // 세션 시작 — 이 사람 전용 FocusEngine을 서버에 준비시킴
+        const startForm = new FormData();
+        startForm.append('session_id', sessionId);
+        await fetch(`${FOCUS_API_URL}/focus/session/start`, { method: 'POST', body: startForm }).catch(() => {});
+
+        setReady(true);
       } catch {
-        // 네트워크 실패 — 이번 프레임만 건너뜀, 다음 타이머에 재시도
-      } finally {
-        isCapturingRef.current = false;
+        setPermissionError('카메라 권한을 허용해주세요.');
       }
-    }, CAPTURE_INTERVAL_MS);
+    })();
 
     return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       if (intervalRef.current) clearInterval(intervalRef.current);
+
       const endForm = new FormData();
       endForm.append('session_id', sessionId);
       fetch(`${FOCUS_API_URL}/focus/session/end`, { method: 'POST', body: endForm }).catch(() => {});
     };
-  }, [permission?.granted, sessionId]);
+  }, [sessionId]);
 
-  if (!permission?.granted) {
-    return <View style={styles.center}><ActivityIndicator color="#fff" /></View>;
-  }
-
-  return <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />;
-}
-
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1C252C' },
-});
+  useEffect(() => {
+    if (!ready) return;
