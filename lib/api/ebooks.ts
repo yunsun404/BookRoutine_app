@@ -13,7 +13,7 @@ export async function fetchEbookList(params: {
   category?: string;
   search?: string;
 }): Promise<EbookListResponse> {
-  const { data } = await api.get('/api/v1/ebooks', { params });
+  const { data } = await api.get('/ebooks', { params });
   return data;
 }
 
@@ -24,12 +24,12 @@ export interface EbookDetail extends EbookListItem {
 }
 
 export async function fetchBookDetail(bookId: string): Promise<EbookDetail> {
-  const { data } = await api.get(`/api/v1/ebooks/${bookId}`);
+  const { data } = await api.get(`/ebooks/${bookId}`);
   return data;
 }
 
 export async function startReadingSession(bookId: string): Promise<ReadingSession> {
-  const { data } = await api.post('/api/v1/ebooks/reading', { bookId });
+  const { data } = await api.post('/ebooks/reading', { bookId });
   return data;
 }
 
@@ -37,7 +37,7 @@ export async function sendFocusBatch(
   sessionId: string,
   samples: FocusSampleInput[],
 ): Promise<{ accepted: number }> {
-  const { data } = await api.post('/api/v1/ebooks/reading/focus', {
+  const { data } = await api.post('/ebooks/reading/focus', {
     sessionId,
     samples,
   });
@@ -48,7 +48,7 @@ export async function endReadingSession(
   sessionId: string,
   samples?: FocusSampleInput[],
 ): Promise<ReadingSession> {
-  const { data } = await api.patch('/api/v1/ebooks/reading/end', {
+  const { data } = await api.patch('/ebooks/reading/end', {
     sessionId,
     samples,
   });
@@ -56,16 +56,16 @@ export async function endReadingSession(
 }
 
 export async function fetchSessionFocusDetail(sessionId: string) {
-  const { data } = await api.get(`/api/v1/ebooks/sessions/${sessionId}/focus`);
+  const { data } = await api.get(`/ebooks/sessions/${sessionId}/focus`);
   return data as { session: ReadingSession; timeline: any[] };
 }
 
 export async function fetchReadingHistory(params: { page?: number; limit?: number }) {
-  const { data } = await api.get('/api/v1/ebooks/me/history', { params });
+  const { data } = await api.get('/ebooks/me/history', { params });
   return data as EbookListResponse & { items: (ReadingSession & { book: any })[] };
 }
 
 export async function fetchSessionReward(sessionId: string): Promise<SessionReward> {
-  const { data } = await api.get(`/api/v1/ebooks/sessions/${sessionId}/reward`);
+  const { data } = await api.get(`/ebooks/sessions/${sessionId}/reward`);
   return data;
 }
