@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { FocusCameraOverlay } from '../../../components/FocusCameraOverlay';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
 import { ReadingSession } from '../../../lib/types/ebook';
@@ -9,16 +8,13 @@ import { ReadingSession } from '../../../lib/types/ebook';
 const SEND_INTERVAL_MS = 30000;
 
 export default function EbookReadingScreen() {
-  const SEND_INTERVAL_MS = 30000;
-  const SHOW_GAZE_TRACKING = false; // 문제 생기면 이 값만 false로 바꾸면 됨
   const { bookId, title } = useLocalSearchParams<{ bookId: string; title: string }>();
   const router = useRouter();
 
   const [session, setSession] = useState<ReadingSession | null>(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
-  const [boxLayout, setBoxLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-
+  
   const { pushFrame, flushCurrentBucket, drainCompletedBuckets } = useFocusBucketRecorder();
   const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -81,13 +77,9 @@ export default function EbookReadingScreen() {
 
   return (
     <View style={styles.container}>
-      {SHOW_GAZE_TRACKING && (
-        <FocusCameraOverlay boxLayout={boxLayout} onFrame={(f) => pushFrame(f)} />
-      )}
       <ScrollView 
         style={styles.textArea} 
-        contentContainerStyle={{ padding: 20 }} 
-        onLayout={(e) => setBoxLayout(e.nativeEvent.layout)} 
+        contentContainerStyle={{ padding: 20 }}  
       >
         <Text style={styles.bookTitle}>{title}</Text>
         <Text style={styles.content}>{content}</Text>
