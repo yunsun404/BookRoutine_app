@@ -1,8 +1,29 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchSessionFocusDetail, fetchSessionReward } from '../../../lib/api/ebooks';
 import { SessionReward } from '../../../lib/types/ebook';
+
+/* 리디자인 색상 (이 파일 안에서만 사용) */
+const C = {
+  primary: '#6B7BFF',
+  lavender: '#A78BFA',
+  bg: '#F7F7FA',
+  ink: '#1F2233',
+  inkSub: '#6E7191',
+  inkMute: '#A0A3BD',
+  card: '#FFFFFF',
+  line: '#ECECF3',
+  primarySoft: '#EEF0FF',
+  lavenderSoft: '#F3EEFF',
+  peach: '#FF8A7C',
+  peachSoft: '#FFF1EE',
+};
+
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
 export default function ReadingResultScreen() {
   const { sessionId, bookId, title } = useLocalSearchParams<{
@@ -12,155 +33,195 @@ export default function ReadingResultScreen() {
   }>();
   const router = useRouter();
 
-  const [focusModalVisible, setFocusModalVisible] = useState(false);
-  const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [reward, setReward] = useState<SessionReward | null>(null);
   const [goldenTime, setGoldenTime] = useState<{ start: string | null; end: string | null }>({
     start: null,
     end: null,
   });
-  const [loadingFocus, setLoadingFocus] = useState(false);
-  const [loadingReward, setLoadingReward] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const openFocusResult = async () => {
-    setLoadingFocus(true);
+  // 화면에 들어오면 집중 결과와 보상을 함께 불러옴
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
     try {
-      const detailRes = await fetchSessionFocusDetail(sessionId);
-      setGoldenTime({
-        start: detailRes.session.golden_time_start ?? null,
-        end: detailRes.session.golden_time_end ?? null,
-      });
-      setFocusModalVisible(true);
+      const [detailRes, rewardRes] = await Promise.allSettled([
+        fetchSessionFocusDetail(sessionId),
+        fetchSessionReward(sessionId),
+      ]);
+      if (detailRes.status === 'fulfilled') {
+        setGoldenTime({
+          start: detailRes.value.session.golden_time_start ?? null,
+          end: detailRes.value.session.golden_time_end ?? null,
+        });
+      }
+      if (rewardRes.status === 'fulfilled') setReward(rewardRes.value);
+      if (detailRes.status === 'rejected' && rewardRes.status === 'rejected') setError(true);
     } finally {
-      setLoadingFocus(false);
+      setLoading(false);
     }
-  };
+  }, [sessionId]);
 
-  const openRewardResult = async () => {
-    setLoadingReward(true);
-    try {
-      const rewardRes = await fetchSessionReward(sessionId);
-      setReward(rewardRes);
-      setRewardModalVisible(true);
-    } finally {
-      setLoadingReward(false);
-    }
-  };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const score = reward?.avgFocusScore;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>{title ?? '전자책'} - 세션 종료 확인</Text>
-
-      <Pressable style={styles.focusBox} onPress={openFocusResult} disabled={loadingFocus}>
-        <Text style={styles.focusBoxText}>
-          {loadingFocus ? '불러오는 중...' : '집중 세션 결과 조회'}
-        </Text>
-      </Pressable>
-
-      <Pressable onPress={openRewardResult} disabled={loadingReward}>
-        <Text style={styles.rewardLink}>
-          {loadingReward ? '불러오는 중...' : '집중 세션 보상 (포인트, 경험치 조회)'}
-        </Text>
-      </Pressable>
-
-      <View style={styles.bottomButtons}>
-        <Pressable style={styles.bottomButton} onPress={() => router.push('/ebook')}>
-          <Text style={styles.bottomButtonText}>돌아가기</Text>
-        </Pressable>
-        <Text style={styles.divider}>|</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
         <Pressable
-          style={styles.bottomButton}
-          onPress={() =>
-            router.push({
-              pathname: '/ebook/[bookId]/read',
-              params: { bookId, title },
-            })
-          }
+          style={styles.backBtn}
+          onPress={() => router.push('/ebook')}
+          hitSlop={8}
+          accessibilityLabel="전자책 목록으로"
         >
-          <Text style={styles.bottomButtonText}>재개</Text>
+          <Ionicons name="chevron-back" size={22} color={C.ink} />
         </Pressable>
       </View>
 
-      {/* 집중 세션 결과 모달 */}
-      <Modal visible={focusModalVisible} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setFocusModalVisible(false)}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>집중 세션 결과</Text>
-            {goldenTime.start && goldenTime.end ? (
-              <Text style={styles.modalText}>
-                골든타임: {new Date(goldenTime.start).toLocaleTimeString()} ~{' '}
-                {new Date(goldenTime.end).toLocaleTimeString()}
-              </Text>
-            ) : (
-              <Text style={styles.modalText}>골든타임 기록이 없습니다.</Text>
-            )}
-          </View>
-        </Pressable>
-      </Modal>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>독서 세션 결과</Text>
+          {!!title && <Text style={styles.cardSub} numberOfLines={1}>{title}</Text>}
 
-      {/* 보상 결과 모달 */}
-      <Modal visible={rewardModalVisible} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setRewardModalVisible(false)}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>세션 보상</Text>
-            {reward && (
-              <>
-                <Text style={styles.modalText}>집중도 {reward.avgFocusScore}점</Text>
-                <Text style={styles.modalText}>
-                  +{reward.rewardPoints} 포인트 · +{reward.rewardExp} EXP
+          {loading ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator color={C.primary} />
+              <Text style={styles.stateText}>결과를 정리하고 있어요</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.stateBox}>
+              <Text style={styles.stateText}>결과를 불러오지 못했어요</Text>
+              <Pressable style={styles.retryBtn} onPress={load}>
+                <Text style={styles.retryText}>다시 불러오기</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {/* 집중도 점수 */}
+              <View style={styles.scoreBox}>
+                <Text style={styles.scoreLabel}>평균 집중도</Text>
+                <Text style={styles.scoreValue}>
+                  {score != null ? score : '—'}
+                  <Text style={styles.scoreUnit}> 점</Text>
                 </Text>
-              </>
-            )}
+              </View>
+
+              {/* 골든타임 */}
+              <View style={styles.infoRow}>
+                <View style={[styles.infoIcon, { backgroundColor: C.peachSoft }]}>
+                  <Ionicons name="sunny-outline" size={18} color={C.peach} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infoLabel}>가장 집중한 시간</Text>
+                  <Text style={styles.infoValue}>
+                    {goldenTime.start && goldenTime.end
+                      ? `${formatTime(goldenTime.start)} ~ ${formatTime(goldenTime.end)}`
+                      : '기록이 없어요'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 보상 */}
+              {reward && (
+                <View style={styles.infoRow}>
+                  <View style={[styles.infoIcon, { backgroundColor: C.lavenderSoft }]}>
+                    <Ionicons name="gift-outline" size={18} color={C.lavender} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.infoLabel}>이번 세션 보상</Text>
+                    <Text style={styles.infoValue}>
+                      +{reward.rewardPoints} 포인트 · +{reward.rewardExp} EXP
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          <View style={styles.buttonRow}>
+            <Pressable
+              style={({ pressed }) => [styles.ghostBtn, pressed && { backgroundColor: C.bg }]}
+              onPress={() => router.push('/ebook')}
+            >
+              <Text style={styles.ghostText}>목록으로</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
+              onPress={() =>
+                router.push({
+                  pathname: '/ebook/[bookId]/read',
+                  params: { bookId, title },
+                })
+              }
+            >
+              <Text style={styles.primaryText}>이어 읽기</Text>
+            </Pressable>
           </View>
-        </Pressable>
-      </Modal>
-    </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 40, alignItems: 'center' },
-  header: { fontSize: 15, fontWeight: '600', backgroundColor: '#eee', width: '100%', textAlign: 'center', paddingVertical: 8 },
-  focusBox: {
-    marginTop: 40,
-    width: 220,
-    height: 160,
-    borderWidth: 2,
-    borderColor: '#4A90D9',
+  container: { flex: 1, backgroundColor: C.bg },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: C.card,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 4,
+    shadowColor: '#4B55C8',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  focusBoxText: { fontSize: 15, color: '#333' },
-  rewardLink: { marginTop: 24, fontSize: 14, color: '#333' },
-  bottomButtons: {
-    position: 'absolute',
-    bottom: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  bottomButton: {
-    backgroundColor: '#ddd',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  bottomButtonText: { fontSize: 14, color: '#333' },
-  divider: { color: '#999' },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+
+  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 28,
     padding: 24,
-    width: 260,
-    gap: 8,
+    gap: 16,
+    shadowColor: '#4B55C8',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  modalText: { fontSize: 14, color: '#333' },
+  cardTitle: { fontSize: 18, fontWeight: '800', color: C.ink, textAlign: 'center' },
+  cardSub: { fontSize: 13, color: C.inkSub, textAlign: 'center', marginTop: -10 },
+
+  stateBox: { alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 48 },
+  stateText: { fontSize: 14, color: C.inkSub },
+  retryBtn: { backgroundColor: C.primarySoft, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  retryText: { fontSize: 13, fontWeight: '700', color: C.primary },
+
+  scoreBox: {
+    backgroundColor: C.primarySoft,
+    borderRadius: 20,
+    paddingVertical: 28,
+    alignItems: 'center',
+  },
+  scoreLabel: { fontSize: 13, fontWeight: '600', color: C.inkSub },
+  scoreValue: { fontSize: 56, lineHeight: 64, fontWeight: '800', color: C.primary, letterSpacing: -2 },
+  scoreUnit: { fontSize: 16, fontWeight: '700', color: C.primary },
+
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  infoIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  infoLabel: { fontSize: 12, fontWeight: '600', color: C.inkMute },
+  infoValue: { fontSize: 15, fontWeight: '700', color: C.ink, marginTop: 2 },
+
+  buttonRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  ghostBtn: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  ghostText: { fontSize: 15, fontWeight: '600', color: C.inkSub },
+  primaryBtn: { flex: 1, height: 48, borderRadius: 14, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+  primaryText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });

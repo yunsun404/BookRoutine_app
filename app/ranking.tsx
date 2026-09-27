@@ -1,18 +1,8 @@
-import { authFetch, BASE_URL } from "@/constants/api"; // 👈 authFetch 임포트 추가
+import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-// 🛠️ 에러 수정: ranking 폴더 깊이에 맞게 경로를 ../../로 올바르게 수정했습니다.
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Header from "../components/Header";
-import { styles } from "./styles/ranking.styles";
 
 interface RankUser {
   rank: number;
@@ -27,10 +17,46 @@ interface ApiResponse {
   ranking: RankUser[];
 }
 
+/* 리디자인 색상 (이 파일 안에서만 사용) */
+const C = {
+  primary: "#6B7BFF",
+  lavender: "#A78BFA",
+  bg: "#F7F7FA",
+  ink: "#1F2233",
+  inkSub: "#6E7191",
+  inkMute: "#A0A3BD",
+  card: "#FFFFFF",
+  line: "#ECECF3",
+  primarySoft: "#EEF0FF",
+  lavenderSoft: "#F3EEFF",
+  peach: "#FF8A7C",
+  peachSoft: "#FFF1EE",
+};
+
+/* 프로필 사진 (없으면 닉네임 첫 글자) */
+function Avatar({ uri, name, size, ring }: { uri: string | null; name: string; size: number; ring?: string }) {
+  const base = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    borderWidth: ring ? 3 : 0,
+    borderColor: ring ?? "transparent",
+  };
+  if (uri) return <Image source={{ uri }} style={[base, { backgroundColor: C.line }]} />;
+  return (
+    <View style={[base, { backgroundColor: C.primarySoft, alignItems: "center", justifyContent: "center" }]}>
+      <Text style={{ color: C.primary, fontWeight: "800", fontSize: size * 0.38 }}>
+        {(name || "?").slice(0, 1).toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
 export default function RankingScreen() {
   const [rankingData, setRankingData] = useState<RankUser[]>([]);
   const [ageGroup, setAgeGroup] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const myNickname = "데미안";
   const myPercentile = 3;
@@ -40,169 +66,188 @@ export default function RankingScreen() {
   }, []);
 
   async function fetchRanking() {
+    setLoading(true);
+    setError(false);
     try {
-      // ✅ authFetch를 사용하여 토큰 자동 포함 및 백엔드 라우팅에 맞게 호출
       const res = await authFetch(`${BASE_URL}/ranking/age-group`);
       const data: ApiResponse = await res.json();
-      setRankingData(data.ranking || []); // 데이터가 null로 올 경우를 대비해 예외 처리 추가
+      setRankingData(data.ranking || []);
       setAgeGroup(data.ageGroup || 0);
     } catch (e) {
       console.error("랭킹 데이터 불러오기 실패:", e);
+      setError(true);
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) {
-    return <ActivityIndicator style={{ flex: 1, backgroundColor: "#fff" }} />;
-  }
-
   const top1 = rankingData.find((u) => u.rank === 1);
   const top2 = rankingData.find((u) => u.rank === 2);
   const top3 = rankingData.find((u) => u.rank === 3);
-
-  const remainedRankers = rankingData.filter((u) => u.rank >= 4);
+  const maxCount = Math.max(1, ...rankingData.slice(0, 3).map((u) => u.completed_books_count));
   const currentMonth = new Date().getMonth() + 1;
 
+  // 시상대 순서: 2위 - 1위 - 3위
+  const podium: { user?: RankUser; rank: number }[] = [
+    { user: top2, rank: 2 },
+    { user: top1, rank: 1 },
+    { user: top3, rank: 3 },
+  ];
+
   return (
-    <View style={styles.container}>
-      {/* ✅ 책장 스크린과 100% 동일한 배치 순서 */}
+    <View style={s.screen}>
       <Header />
 
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color="#333" />
-      </TouchableOpacity>
-
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.monthTitle}>
-          {currentMonth}
-          <Text style={styles.monthSub}> 월 랭킹</Text>
-        </Text>
-
-        <View style={styles.podiumContainer}>
-          {/* 2등 */}
-          <View style={styles.podiumColumn}>
-            {top2 && (
-              <>
-                <Image
-                  source={
-                    top2.profile_image
-                      ? { uri: top2.profile_image }
-                      : require("@/assets/images/react-logo.png")
-                  }
-                  style={styles.profileSecondary}
-                />
-                <Text style={styles.podiumName} numberOfLines={1}>
-                  {top2.nickname}
-                </Text>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: 75, backgroundColor: "#E6E6E6" },
-                  ]}
-                >
-                  <Text style={styles.barText}>2</Text>
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* 1등 */}
-          <View style={styles.podiumColumn}>
-            {top1 && (
-              <>
-                <Text style={styles.crown}>👑</Text>
-                <Image
-                  source={
-                    top1.profile_image
-                      ? { uri: top1.profile_image }
-                      : require("@/assets/images/react-logo.png")
-                  }
-                  style={styles.profilePrimary}
-                />
-                <Text
-                  style={[styles.podiumName, { fontWeight: "bold" }]}
-                  numberOfLines={1}
-                >
-                  {top1.nickname}
-                </Text>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: 105, backgroundColor: "#D9D9D9" },
-                  ]}
-                >
-                  <Text style={[styles.barText, { color: "#555" }]}>1</Text>
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* 3등 */}
-          <View style={styles.podiumColumn}>
-            {top3 && (
-              <>
-                <Image
-                  source={
-                    top3.profile_image
-                      ? { uri: top3.profile_image }
-                      : require("@/assets/images/react-logo.png")
-                  }
-                  style={styles.profileSecondary}
-                />
-                <Text style={styles.podiumName} numberOfLines={1}>
-                  {top3.nickname}
-                </Text>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: 55, backgroundColor: "#EEEEEE" },
-                  ]}
-                >
-                  <Text style={styles.barText}>3</Text>
-                </View>
-              </>
-            )}
-          </View>
+      <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        <View style={s.titleRow}>
+          <Text style={s.titleNum}>{currentMonth}월</Text>
+          <Text style={s.titleText}>독서 랭킹</Text>
         </View>
 
-        <View style={styles.bannerBox}>
-          <Text style={styles.bannerText}>
-            {myNickname} 님은 같은 연령대 {ageGroup}대에서 상위 {myPercentile}
-            %입니다.
-          </Text>
-        </View>
-
-        <View style={styles.listContainer}>
-          {remainedRankers.map((user) => (
-            <View key={user.rank} style={styles.rankItem}>
-              <View style={styles.itemLeft}>
-                <View style={styles.rankBadge}>
-                  <Text style={styles.rankBadgeText}>{user.rank}</Text>
-                </View>
-                <Image
-                  source={
-                    user.profile_image
-                      ? { uri: user.profile_image }
-                      : require("@/assets/images/react-logo.png")
-                  }
-                  style={styles.listProfile}
-                />
-                <Text style={styles.listNickname} numberOfLines={1}>
-                  {user.nickname}
-                </Text>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 80 }} color={C.primary} />
+        ) : error ? (
+          <View style={s.stateBox}>
+            <Text style={s.stateTitle}>랭킹을 불러오지 못했어요</Text>
+            <Pressable style={s.retryBtn} onPress={fetchRanking}>
+              <Text style={s.retryText}>다시 불러오기</Text>
+            </Pressable>
+          </View>
+        ) : rankingData.length === 0 ? (
+          <View style={s.stateBox}>
+            <Text style={s.stateTitle}>이번 달 랭킹이 아직 없어요</Text>
+            <Text style={s.stateSub}>책을 완독하면 랭킹에 이름이 올라가요</Text>
+          </View>
+        ) : (
+          <>
+            {/* 시상대 */}
+            <View style={[s.card, s.podiumCard]}>
+              <View style={s.podium}>
+                {podium.map(({ user, rank }) => {
+                  const first = rank === 1;
+                  if (!user) return <View key={rank} style={s.podiumCol} />;
+                  const barH = 60 + (user.completed_books_count / maxCount) * 80;
+                  return (
+                    <View key={rank} style={s.podiumCol}>
+                      {first && <Ionicons name="trophy" size={18} color={C.peach} style={{ marginBottom: 4 }} />}
+                      <View style={first ? s.firstRing : undefined}>
+                        <Avatar
+                          uri={user.profile_image}
+                          name={user.nickname}
+                          size={first ? 62 : 50}
+                          ring={first ? undefined : C.card}
+                        />
+                      </View>
+                      <Text style={[s.podiumName, first && { color: C.ink }]} numberOfLines={1}>
+                        {user.nickname}
+                      </Text>
+                      <Text style={s.podiumCount}>{user.completed_books_count}권</Text>
+                      <View style={[s.bar, { height: barH }, first ? s.barFirst : s.barOther]}>
+                        <Text style={[s.barRank, first && { color: "#fff" }]}>{rank}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
-              <Text style={styles.bookCountText}>
-                {user.completed_books_count}권 완독
-              </Text>
             </View>
-          ))}
-        </View>
+
+            {/* 내 위치 + 전체 순위 */}
+            <View style={s.card}>
+              <View style={s.banner}>
+                <Text style={s.bannerText}>
+                  {myNickname} 님은 같은 연령대 {ageGroup}대에서
+                </Text>
+                <Text style={s.bannerStrong}>상위 {myPercentile}%</Text>
+              </View>
+
+              <View style={s.list}>
+                {rankingData.map((user) => {
+                  const mine = user.nickname === myNickname;
+                  const top = user.rank <= 3;
+                  return (
+                    <View key={`${user.rank}-${user.username}`} style={[s.row, mine && s.rowMine]}>
+                      <View style={[s.rankBadge, top && s.rankBadgeTop]}>
+                        <Text style={[s.rankNum, top && { color: C.primary }]}>{user.rank}</Text>
+                      </View>
+                      <Avatar uri={user.profile_image} name={user.nickname} size={34} />
+                      <Text style={s.rowName} numberOfLines={1}>
+                        {user.nickname}
+                        {mine && <Text style={{ color: C.primary }}>  나</Text>}
+                      </Text>
+                      <Text style={s.rowCount}>{user.completed_books_count}권 완독</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.bg },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingBottom: 130, gap: 16 },
+
+  titleRow: { flexDirection: "row", alignItems: "baseline", gap: 6, paddingTop: 8, paddingBottom: 4 },
+  titleNum: { fontSize: 32, fontWeight: "800", color: C.primary, letterSpacing: -1 },
+  titleText: { fontSize: 20, fontWeight: "700", color: C.ink },
+
+  stateBox: { alignItems: "center", gap: 6, paddingVertical: 80 },
+  stateTitle: { fontSize: 15, fontWeight: "700", color: C.ink },
+  stateSub: { fontSize: 13, color: C.inkSub },
+  retryBtn: { marginTop: 10, backgroundColor: C.primarySoft, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  retryText: { fontSize: 13, fontWeight: "700", color: C.primary },
+
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 28,
+    padding: 20,
+    shadowColor: "#4B55C8",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+
+  podiumCard: { paddingTop: 28, paddingBottom: 0, overflow: "hidden" },
+  podium: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
+  podiumCol: { flex: 1, alignItems: "center" },
+  firstRing: { padding: 3, borderRadius: 40, backgroundColor: C.peach },
+  podiumName: { marginTop: 6, fontSize: 12, fontWeight: "700", color: C.inkSub, maxWidth: "100%" },
+  podiumCount: { fontSize: 11, color: C.inkMute, marginTop: 1, marginBottom: 8 },
+  bar: {
+    width: "100%",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    alignItems: "center",
+    paddingTop: 12,
+  },
+  barFirst: { backgroundColor: C.primary },
+  barOther: { backgroundColor: C.primarySoft },
+  barRank: { fontSize: 22, fontWeight: "800", color: C.primary },
+
+  banner: { backgroundColor: C.primarySoft, borderRadius: 16, padding: 16, alignItems: "center" },
+  bannerText: { fontSize: 13, fontWeight: "500", color: C.inkSub },
+  bannerStrong: { fontSize: 20, fontWeight: "800", color: C.primary, marginTop: 2 },
+
+  list: { gap: 8, marginTop: 16 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: C.bg,
+  },
+  rowMine: { backgroundColor: C.card, borderWidth: 1.5, borderColor: C.primary },
+  rankBadge: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  rankBadgeTop: { backgroundColor: C.primarySoft },
+  rankNum: { fontSize: 14, fontWeight: "800", color: C.inkMute },
+  rowName: { flex: 1, fontSize: 15, fontWeight: "700", color: C.ink },
+  rowCount: { fontSize: 12, fontWeight: "600", color: C.inkSub },
+});

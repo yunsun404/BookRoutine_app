@@ -1,11 +1,6 @@
-import {
-  Colors,
-  FontSize,
-  Radius,
-  Spacing,
-} from "@/constants/tokens"; // 프로젝트 경로에 맞게 수정하세요
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export type Task = {
   id: string;
@@ -19,7 +14,20 @@ type Props = {
   tasks: Task[];
   onGoalEdit?: () => void;
   onTaskEdit?: (id: string) => void;
-  onTaskToggle: (taskId: string) => void; // 타입 추가
+  onTaskToggle: (taskId: string) => void;
+};
+
+/* 리디자인 색상 (이 파일 안에서만 사용) */
+const C = {
+  primary: "#6B7BFF",
+  ink: "#1F2233",
+  inkSub: "#6E7191",
+  inkMute: "#A0A3BD",
+  card: "#FFFFFF",
+  line: "#ECECF3",
+  primarySoft: "#EEF0FF",
+  peach: "#FF8A7C",
+  peachSoft: "#FFF1EE",
 };
 
 function getWhenLabel(dueDate: string): string {
@@ -36,35 +44,34 @@ function getWhenLabel(dueDate: string): string {
   return `${diff}일 후`;
 }
 
-export default function GoalSection({
-  goal,
-  tasks,
-  onGoalEdit,
-  onTaskEdit,
-  onTaskToggle, // 추가
-}: Props) {
+export default function GoalSection({ goal, tasks, onGoalEdit, onTaskEdit, onTaskToggle }: Props) {
+  const doneCount = tasks.filter((t) => t.done).length;
+
   return (
-    <View style={styles.section}>
-      <View style={styles.goalRow}>
-        <Text style={styles.goalLabel}>목표</Text>
-        <Text style={styles.goalText}>{goal}</Text>
-        <TouchableOpacity onPress={onGoalEdit}>
-          <Text style={styles.editBtn}>수정</Text>
+    <View style={styles.card}>
+      <View style={styles.head}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headTitle}>목표</Text>
+          <Text style={styles.headBook} numberOfLines={1}>{goal}</Text>
+        </View>
+        <Text style={styles.count}>
+          <Text style={{ color: C.primary, fontWeight: "800" }}>{doneCount}</Text> / {tasks.length}
+        </Text>
+        <TouchableOpacity onPress={onGoalEdit} hitSlop={8} style={styles.editChip}>
+          <Text style={styles.editChipText}>수정</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tasksCard}>
-        {tasks.map((task, idx) => (
-          <TaskItem
-            key={task.id}
-            task={task}
-            isLast={idx === tasks.length - 1}
-            whenLabel={getWhenLabel(task.dueDate)}
-            onEdit={() => onTaskEdit?.(task.id)}
-            onToggle={() => onTaskToggle(task.id)} // 추가
-          />
-        ))}
-      </View>
+      {tasks.map((task, idx) => (
+        <TaskItem
+          key={task.id}
+          task={task}
+          isLast={idx === tasks.length - 1}
+          whenLabel={getWhenLabel(task.dueDate)}
+          onEdit={() => onTaskEdit?.(task.id)}
+          onToggle={() => onTaskToggle(task.id)}
+        />
+      ))}
     </View>
   );
 }
@@ -74,47 +81,98 @@ type TaskItemProps = {
   isLast: boolean;
   whenLabel: string;
   onEdit: () => void;
-  onToggle: () => void; // 추가
+  onToggle: () => void;
 };
 
 function TaskItem({ task, isLast, whenLabel, onEdit, onToggle }: TaskItemProps) {
+  const isToday = whenLabel === "오늘";
+  const isLate = whenLabel === "지남";
+
   return (
     <View style={[styles.taskItem, !isLast && styles.taskBorder]}>
-      {/* 체크박스를 클릭 가능하게 변경 */}
-      <TouchableOpacity onPress={onToggle} style={[styles.checkbox, task.done && styles.checkboxDone]}>
-        {task.done && <Text style={styles.checkmark}>✓</Text>}
-      </TouchableOpacity>
-      
-      <Text
-        style={[styles.taskText, task.done && styles.taskTextDone]}
-        numberOfLines={1}
+      <Pressable
+        onPress={onToggle}
+        hitSlop={8}
+        style={[styles.checkbox, task.done && styles.checkboxDone]}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: task.done }}
       >
+        {task.done && <Ionicons name="checkmark" size={15} color="#fff" />}
+      </Pressable>
+
+      <Text style={[styles.taskText, task.done && styles.taskTextDone]} numberOfLines={1}>
         {task.text}
       </Text>
-      
-      {whenLabel === "오늘" && (
-        <TouchableOpacity onPress={onEdit}>
-          <Text style={styles.editBtn}>수정</Text>
+
+      {isToday && !task.done && (
+        <TouchableOpacity onPress={onEdit} hitSlop={8}>
+          <Text style={styles.editText}>수정</Text>
         </TouchableOpacity>
       )}
-      <Text style={styles.whenLabel}>{whenLabel}</Text>
+
+      <View
+        style={[
+          styles.when,
+          isToday && { backgroundColor: C.primarySoft },
+          isLate && { backgroundColor: C.peachSoft },
+        ]}
+      >
+        <Text
+          style={[
+            styles.whenText,
+            isToday && { color: C.primary },
+            isLate && { color: C.peach },
+          ]}
+        >
+          {whenLabel}
+        </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { paddingHorizontal: Spacing.lg, paddingTop: 10 },
-  goalRow: { flexDirection: "row", alignItems: "center", padding: 10, paddingHorizontal: 14, backgroundColor: Colors.bgSecondary, borderRadius: Radius.md },
-  goalLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, minWidth: 36 },
-  goalText: { flex: 1, fontSize: FontSize.md, fontWeight: "500", color: Colors.textPrimary, textAlign: "center" },
-  editBtn: { fontSize: FontSize.xs, color: Colors.textSecondary },
-  tasksCard: { backgroundColor: Colors.bgSecondary, borderRadius: Radius.lg, marginTop: 10, overflow: "hidden" },
-  taskItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 14 },
-  taskBorder: { borderBottomWidth: 0.5, borderBottomColor: Colors.border },
-  checkbox: { width: 18, height: 18, borderRadius: 4, backgroundColor: Colors.borderStrong, alignItems: "center", justifyContent: "center" },
-  checkboxDone: { backgroundColor: Colors.check },
-  checkmark: { fontSize: 11, color: "#fff", fontWeight: "700" },
-  taskText: { flex: 1, fontSize: FontSize.base, color: Colors.textPrimary },
-  taskTextDone: { textDecorationLine: "line-through", opacity: 0.5 },
-  whenLabel: { fontSize: FontSize.xs, color: Colors.textTertiary, marginLeft: 4 },
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
+    marginTop: 4,
+    shadowColor: "#4B55C8",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  head: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
+  headTitle: { fontSize: 17, fontWeight: "700", color: C.ink, letterSpacing: -0.3 },
+  headBook: { fontSize: 12, fontWeight: "500", color: C.inkSub, marginTop: 2 },
+  count: { fontSize: 13, fontWeight: "600", color: C.inkSub },
+  editChip: {
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  editChipText: { fontSize: 12, fontWeight: "600", color: C.inkSub },
+
+  taskItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14 },
+  taskBorder: { borderBottomWidth: 1, borderBottomColor: C.line },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: C.inkMute,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxDone: { backgroundColor: C.primary, borderColor: C.primary },
+  taskText: { flex: 1, fontSize: 15, fontWeight: "500", color: C.ink },
+  taskTextDone: { color: C.inkMute, textDecorationLine: "line-through" },
+  editText: { fontSize: 12, fontWeight: "600", color: C.inkSub },
+  when: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "#F7F7FA" },
+  whenText: { fontSize: 11, fontWeight: "700", color: C.inkMute },
 });

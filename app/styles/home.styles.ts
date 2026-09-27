@@ -1,148 +1,153 @@
-// src/screens/styles/home.styles.ts
-import { FontSize } from "@/constants/tokens";
-import { Dimensions, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+// 리디자인 색상 (이 파일 안에서만 관리)
+export const colors = {
+  primary: "#6B7BFF",
+  lavender: "#A78BFA",
+  bg: "#F7F7FA",
+  ink: "#1F2233",
+  peach: "#FF8A7C",
+  card: "#FFFFFF",
+  inkSub: "#6E7191",
+  line: "#ECECF3",
+  primarySoft: "#EEF0FF",
+  lavenderSoft: "#F3EEFF",
+};
+
+const radius = { sheet: 28, card: 20, input: 14 };
+const space = { sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 };
+const shadow = {
+  card: {
+    shadowColor: "#4B55C8",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  float: {
+    shadowColor: "#6B7BFF",
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+};
 
 export const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: "#fff" },
-  content: { paddingBottom: 40, paddingHorizontal: 16 },
-  
-  // 📚 책이 있을 때 캐러셀 영역 컨테이너
-  carouselContainer: { 
-    marginVertical: 12,
-    alignItems: "center",
+  /* 레이아웃 */
+  screen: { flex: 1, backgroundColor: colors.bg },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
+  scroll: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingHorizontal: space.xl, paddingBottom: 120 },
+
+  /* 인사 문구 */
+  greeting: { paddingTop: space.sm, paddingBottom: space.xl },
+  greetingSub: { fontSize: 17, fontWeight: "500", color: colors.inkSub, marginBottom: 2 },
+  greetingTitle: { fontSize: 26, fontWeight: "700", color: colors.ink, letterSpacing: -0.6 },
+
+  carouselContainer: { marginBottom: space.lg },
+
+  /* 책이 없을 때 */
+  emptyContainer: { alignItems: "center", paddingTop: space.md, gap: space.sm },
+  emptyTitle: { fontSize: 20, fontWeight: "700", color: colors.ink, letterSpacing: -0.4 },
+  emptySubText: { fontSize: 14, color: colors.inkSub, marginBottom: space.md },
+
+  registerButton: {
+    width: "75%",
+    minWidth: 240,
+    alignSelf: "center",
+    borderRadius: radius.input,
+    ...shadow.float,
   },
-  
-  sectionTitle: { 
-    fontSize: FontSize.md, 
-    fontWeight: "bold", 
-    marginTop: 20,
-    marginBottom: 10,
-    color: "#1a1a1a" 
-  },
-  
-  // 📚 책이 없을 때 전체 컨테이너
-  emptyContainer: {
-    alignItems: "center",
-    paddingTop: 10,
-  },
-  emptyCarouselBox: {
+  registerButtonInner: {
+    height: 52,
+    backgroundColor: colors.primary,
+    borderRadius: radius.input,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginVertical: 10,
+    gap: 6,
   },
-  arrowButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-  },
-  arrowText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  illustrationPlaceholder: {
-    width: 200,
-    height: 200,
-    backgroundColor: "#F2F9F5",
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 16,
-  },
-  illustrationEmoji: {
-    fontSize: 50,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginTop: 12,
-  },
-  emptySubText: {
-    fontSize: 13,
-    color: "#888888",
-    marginTop: 6,
-  },
-  registerButton: {
-    backgroundColor: "#55A36B",
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 28,
-    marginTop: 20,
-  },
-  registerButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 15,
-  },
+  registerButtonText: { color: "#fff", fontSize: 16, fontWeight: "700", textAlign: "center" },
+
   guideBox: {
     width: "100%",
-    backgroundColor: "#F2F7F4",
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 24,
+    backgroundColor: colors.card,
+    borderRadius: radius.sheet,
+    padding: space.xl,
+    marginTop: space.xl,
+    gap: space.md,
+    ...shadow.card,
   },
-  guideTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 12,
-  },
-  guideItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 6,
-  },
-  guideIcon: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  guideText: {
-    fontSize: 13,
-    color: "#555555",
-  },
-  quoteCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#EFEFEF",
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16,
-  },
-  avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFF0E6",
+  guideTitle: { fontSize: 16, fontWeight: "700", color: colors.ink, marginBottom: 2 },
+  guideItem: { flexDirection: "row", alignItems: "center", gap: space.md },
+  guideIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
   },
-  avatarEmoji: {
-    fontSize: 26,
+  // 이전 버전 호환용 (이모지 아이콘)
+  guideIcon: { fontSize: 16 },
+  guideText: { fontSize: 14, color: colors.ink, fontWeight: "500" },
+
+  quoteCard: {
+    width: "100%",
+    flexDirection: "row",
+    gap: space.md,
+    backgroundColor: colors.lavenderSoft,
+    borderRadius: radius.card,
+    padding: space.lg,
+    marginTop: space.md,
   },
-  quoteTextContainer: {
-    flex: 1,
+  quoteBar: { width: 3, borderRadius: 2, backgroundColor: colors.lavender },
+  // 이전 버전 호환용 (아바타)
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  quoteTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 2,
+  avatarEmoji: { fontSize: 22 },
+  quoteTextContainer: { flex: 1, gap: 4 },
+  quoteTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  quoteSubText: { fontSize: 13, lineHeight: 19, color: colors.inkSub },
+
+  /* 최근 타래 */
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginTop: space.xxl,
+    marginBottom: space.md,
   },
-  quoteSubText: {
-    fontSize: 12,
-    color: "#666666",
-    lineHeight: 16,
+  sectionTitle: { fontSize: 17, fontWeight: "700", color: colors.ink, letterSpacing: -0.3 },
+  sectionLink: { fontSize: 13, fontWeight: "600", color: colors.primary },
+
+  feedEmpty: {
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    borderStyle: "dashed",
+    paddingVertical: space.xxl,
+    paddingHorizontal: space.xl,
+    alignItems: "center",
+    gap: 6,
   },
+  feedEmptyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.lavenderSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  feedEmptyTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  feedEmptySub: { fontSize: 13, color: colors.inkSub, textAlign: "center" },
 });
