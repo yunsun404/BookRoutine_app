@@ -3,7 +3,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
 //const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
 //const BASE_URL = "http://172.20.1.230:3000/api/v1"; // 차319 와이파이
-const BASE_URL = "http://localhost:3000/api/v1";
+// EXPO_PUBLIC_API_BASE_URL(.env)이 있으면 그걸 쓰고, 없으면 로컬호스트로 폴백
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
+  ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/v1`
+  : "http://localhost:3000/api/v1";
 
 // 기본 요청 함수
 async function request<T>(
@@ -401,4 +404,25 @@ export const readingroomApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+};
+
+// ────────────────────────────────────────
+// 추천 (Recommendation) - 장르유사도/난이도매칭/완독패턴 기반 추천
+// ────────────────────────────────────────
+
+export const bookApi = {
+  // 추천 도서 목록 조회 (장르/난이도/완독패턴 가중합 정렬된 top-N)
+  getRecommendations: (limit?: number) =>
+    request<
+      {
+        book_id: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        genre_score: number;
+        difficulty_score: number;
+        completion_score: number;
+        my_score: number;
+      }[]
+    >(`/recommendation${limit ? `?limit=${limit}` : ""}`),
 };
