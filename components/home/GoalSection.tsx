@@ -37,10 +37,10 @@ function getWhenLabel(dueDate: string): string {
   due.setHours(0, 0, 0, 0);
   const diff = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diff === 0) return "오늘";
+  // 완료되지 않은 체크리스트는 기한이 지나도 계속 '오늘'로 롤오버해서 보여준다
+  if (diff <= 0) return "오늘";
   if (diff === 1) return "내일";
   if (diff === 2) return "모레";
-  if (diff < 0) return "지남";
   return `${diff}일 후`;
 }
 
@@ -86,7 +86,6 @@ type TaskItemProps = {
 
 function TaskItem({ task, isLast, whenLabel, onEdit, onToggle }: TaskItemProps) {
   const isToday = whenLabel === "오늘";
-  const isLate = whenLabel === "지남";
 
   return (
     <View style={[styles.taskItem, !isLast && styles.taskBorder]}>
@@ -114,14 +113,12 @@ function TaskItem({ task, isLast, whenLabel, onEdit, onToggle }: TaskItemProps) 
         style={[
           styles.when,
           isToday && { backgroundColor: C.primarySoft },
-          isLate && { backgroundColor: C.peachSoft },
         ]}
       >
         <Text
           style={[
             styles.whenText,
             isToday && { color: C.primary },
-            isLate && { color: C.peach },
           ]}
         >
           {whenLabel}
