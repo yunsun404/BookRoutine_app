@@ -10,9 +10,9 @@ import {
   View
 } from "react-native";
 import Header from "../../components/Header";
-// ⭕ 정해진 lib/api 경로에서 userApi와 함께 그룹/독서방 관련 API 객체도 가져옵니다.
+// ⭕ 정해진 lib/api 경로에서 userApi와 함께 그룹/독서방/추천 관련 API 객체도 가져옵니다.
 import { Colors } from "@/constants/tokens";
-import { groupApi, userApi } from "../../lib/api";
+import { bookApi, groupApi, userApi } from "../../lib/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -35,13 +35,13 @@ interface AiSummaryData {
 export default function RecommendScreen() {
   const [loading, setLoading] = useState(true);
   const [favoriteGenre, setFavoriteGenre] = useState<string>("판타지");
-  
+
   // ⭕ 사용자의 최신 독서 활동 기반 AI 요약 상태 관리
   const [aiRecommendation, setAiRecommendation] = useState<AiSummaryData>({
     bookTitle: "데미안",
     summary: "싱클레어의 어두운 세계와 밝은 세계 사이의 방황, 그리고 데미안이라는 수수께끼 같은 인물을 통해 진정한 '나'를 찾아가는 치열한 성장 기록입니다. 내면의 목소리에 귀를 기울이고 싶을 때 강력히 추천하는 작품입니다."
   });
-  
+
   const [recommendedBooks, setRecommendedBooks] = useState<Book[]>([]);
 
   useEffect(() => {
@@ -52,8 +52,8 @@ export default function RecommendScreen() {
         // 1. 사용자 선호 장르 데이터 호출
         const me = await userApi.getMe();
         if (me && me.favorite_genre) {
-          const genreText = typeof me.favorite_genre === 'string' 
-            ? me.favorite_genre 
+          const genreText = typeof me.favorite_genre === 'string'
+            ? me.favorite_genre
             : JSON.stringify(me.favorite_genre);
           setFavoriteGenre(genreText.replace(/"/g, '')); // 따옴표 제거 가공
         }
@@ -64,7 +64,7 @@ export default function RecommendScreen() {
         if (myGroups && myGroups.length > 0) {
           const latestGroupId = myGroups[0].group_id;
           const threads = await groupApi.getGroupThread(latestGroupId);
-          
+
           if (threads && threads.length > 0) {
             // 가장 마지막(최신) 타래 데이터를 AI 요약본 영역에 매핑
             const latestThread = threads[threads.length - 1];
@@ -75,15 +75,23 @@ export default function RecommendScreen() {
           }
         }
 
-        // 3. 선호 장르 기반 추천 도서 목록 세팅 (홈화면 캐러셀 형태로 가공하기 위한 가상 데이터 포함)
-        const mockBooks: Book[] = [
-          { id: "1", title: "해리포터와 마법사의 돌", author: "J.K. 롤링", coverUrl: null }, 
-          { id: "2", title: "해리 포터와 아즈카반의 죄수", author: "J.K. 롤링", coverUrl: null },
-          { id: "3", title: "해리 포터와 비밀의 방", author: "J.K. 롤링", coverUrl: null },
-          { id: "4", title: "반지의 제왕", author: "J.R.R. 톨킨", coverUrl: null },
-          { id: "5", title: "어스시의 마법사", author: "어슐러 K. 르 귄", coverUrl: null },
-        ];
-        setRecommendedBooks(mockBooks);
+        // 3. 추천 알고리즘 연동 — 장르 유사도 + 난이도 매칭 + 완독 패턴 가중합으로
+        //    정렬된 top-N 목록을 백엔드(GET /recommendation)에서 받아온다.
+        try {
+          const recs = await bookApi.getRecommendations(10);
+          setRecommendedBooks(
+            recs.map((r) => ({
+              id: r.book_id,
+              title: r.title,
+              author: r.author ?? undefined,
+              coverUrl: r.cover_url,
+            })),
+          );
+        } catch (recError) {
+          // 추천 목록만 실패해도 화면 전체(AI 요약 등)는 계속 보여준다.
+          console.error("추천 목록 불러오기 실패:", recError);
+          setRecommendedBooks([]);
+        }
 
       } catch (error) {
         console.error("추천 데이터 빌드 실패:", error);
@@ -107,15 +115,15 @@ export default function RecommendScreen() {
     <View style={styles.container}>
       <Header />
 
-      <ScrollView 
-        style={styles.scroll} 
-        contentContainerStyle={styles.content} 
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         {/* 1. 상단 섹션: 홈화면의 카드 레이아웃 톤을 적용한 AI 요약 브리핑 */}
         <View style={styles.aiSection}>
           <Text style={styles.sectionTitle}>“지금 읽어보고 싶은 도서는?”</Text>
-          
+
           <View style={styles.aiCard}>
             <View style={styles.aiBadge}>
               <Text style={styles.aiBadgeText}>AI 맞춤 분석</Text>
