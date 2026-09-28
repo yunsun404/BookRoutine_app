@@ -38,8 +38,6 @@ type Thread = {
   isAiSummary?: boolean;
 };
 
-type Tab = "thread" | "sentence";
-
 /* 리디자인 색상 (이 파일 안에서만 사용) */
 const C = {
   primary: "#6B7BFF",
@@ -80,7 +78,6 @@ export default function ThreadScreen() {
   const BOOK_TITLE = rawBookTitle || "데미안";
   const GROUP_ID = rawGroupId || null;
 
-  const [tab, setTab] = useState<Tab>("thread");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -293,31 +290,8 @@ export default function ThreadScreen() {
         <Text style={s.headerTitle} numberOfLines={1}>{BOOK_TITLE}</Text>
       </View>
 
-      {/* 탭 */}
-      <View style={s.seg}>
-        {(
-          [
-            { key: "thread", label: "타래" },
-            { key: "sentence", label: "문장 수집" },
-          ] as { key: Tab; label: string }[]
-        ).map((t) => {
-          const active = tab === t.key;
-          return (
-            <Pressable key={t.key} onPress={() => setTab(t.key)} style={[s.segItem, active && s.segItemOn]}>
-              <Text style={[s.segText, active && { color: C.primary }]}>{t.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-        {tab === "sentence" ? (
-          <EmptyState
-            icon="chatbox-ellipses-outline"
-            title="문장 수집은 준비 중이에요"
-            sub="마음에 남은 문장을 모아두는 기능이 곧 추가돼요"
-          />
-        ) : loading ? (
+        {loading ? (
           <ActivityIndicator style={{ marginTop: 60 }} color={C.primary} />
         ) : threads.length === 0 ? (
           <EmptyState
@@ -370,43 +344,39 @@ export default function ThreadScreen() {
         </View>
       )}
 
-      {tab === "thread" && (
-        <>
-          {/* 타래 추가 버튼 */}
-          <Pressable
-            style={({ pressed }) => [s.fab, pressed && { transform: [{ scale: 0.95 }] }]}
-            onPress={openAdd}
-            accessibilityLabel="타래 등록"
-          >
-            <Ionicons name="add" size={30} color="#fff" />
-          </Pressable>
+      {/* 타래 추가 버튼 */}
+      <Pressable
+        style={({ pressed }) => [s.fab, pressed && { transform: [{ scale: 0.95 }] }]}
+        onPress={openAdd}
+        accessibilityLabel="타래 등록"
+      >
+        <Ionicons name="add" size={30} color="#fff" />
+      </Pressable>
 
-          {/* AI 요약 버튼 */}
-          <View style={s.footer}>
-            <Pressable
-              style={({ pressed }) => [
-                s.aiButton,
-                (normalThreads.length === 0 || summarizing) && s.aiButtonOff,
-                pressed && { opacity: 0.85 },
-              ]}
-              onPress={addSummary}
-              disabled={normalThreads.length === 0 || summarizing}
-            >
-              {summarizing ? (
-                <>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={s.aiButtonText}>요약하는 중</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="sparkles" size={16} color="#fff" />
-                  <Text style={s.aiButtonText}>AI 요약하기</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-        </>
-      )}
+      {/* AI 요약 버튼 */}
+      <View style={s.footer}>
+        <Pressable
+          style={({ pressed }) => [
+            s.aiButton,
+            (normalThreads.length === 0 || summarizing) && s.aiButtonOff,
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={addSummary}
+          disabled={normalThreads.length === 0 || summarizing}
+        >
+          {summarizing ? (
+            <>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={s.aiButtonText}>요약하는 중</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="sparkles" size={16} color="#fff" />
+              <Text style={s.aiButtonText}>AI 요약하기</Text>
+            </>
+          )}
+        </Pressable>
+      </View>
 
       {/* 등록 / 수정 모달 */}
       <Modal transparent visible={modalVisible} animationType="fade" onRequestClose={resetForm}>
@@ -522,7 +492,7 @@ function EmptyState({
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
 
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   backBtn: {
     width: 42,
     height: 42,
@@ -537,25 +507,6 @@ const s = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: "700", color: C.ink, letterSpacing: -0.4 },
-
-  seg: {
-    flexDirection: "row",
-    alignSelf: "center",
-    backgroundColor: C.primarySoft,
-    borderRadius: 999,
-    padding: 4,
-    marginBottom: 4,
-  },
-  segItem: { paddingVertical: 9, paddingHorizontal: 28, borderRadius: 999 },
-  segItemOn: {
-    backgroundColor: C.card,
-    shadowColor: "#4B55C8",
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  segText: { fontSize: 14, fontWeight: "700", color: C.inkMute },
 
   list: { padding: 20, gap: 12, paddingBottom: 190, flexGrow: 1 },
 

@@ -43,12 +43,25 @@ const C = {
   primarySoft: "#EEF0FF",
 };
 
-/* 진행률에 따라 차가운 색 → 따뜻한 색으로 변하는 게이지 색 */
-const GAUGE_STOPS: [number, string][] = [
+/*
+ * 온도 게이지 색
+ * - 50% 미만: 차가운 파란 계열 (회청 → 파랑)
+ * - 50% 이상: 뜨거운 계열로 전환 (주황 → 다홍 → 빨강)
+ */
+const WARM_THRESHOLD = 0.5;
+
+// 0% ~ 50% 미만 구간 (0~1로 정규화된 위치)
+const COLD_STOPS: [number, string][] = [
   [0, "#9AA8C7"], // 회청
-  [0.4, "#6B7BFF"], // 파랑
-  [0.7, "#A78BFA"], // 보라
-  [1, "#FF8A7C"], // 피치
+  [0.5, "#7F9BE0"], // 하늘빛 파랑
+  [1, "#4F6BFF"], // 진한 파랑
+];
+
+// 50% ~ 100% 구간 (0~1로 정규화된 위치)
+const WARM_STOPS: [number, string][] = [
+  [0, "#FFB35C"], // 주황
+  [0.5, "#FF7A4D"], // 다홍
+  [1, "#F2453D"], // 빨강
 ];
 
 function hexToRgb(hex: string) {
@@ -56,20 +69,28 @@ function hexToRgb(hex: string) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export function gaugeColor(ratio: number) {
-  const r = Math.max(0, Math.min(1, ratio));
-  for (let i = 1; i < GAUGE_STOPS.length; i++) {
-    const [p1, c1] = GAUGE_STOPS[i - 1];
-    const [p2, c2] = GAUGE_STOPS[i];
+function mixStops(stops: [number, string][], t: number) {
+  const r = Math.max(0, Math.min(1, t));
+  for (let i = 1; i < stops.length; i++) {
+    const [p1, c1] = stops[i - 1];
+    const [p2, c2] = stops[i];
     if (r <= p2) {
-      const t = (r - p1) / (p2 - p1);
+      const k = (r - p1) / (p2 - p1);
       const a = hexToRgb(c1);
       const b = hexToRgb(c2);
-      const mix = a.map((v, k) => Math.round(v + (b[k] - v) * t));
+      const mix = a.map((v, j) => Math.round(v + (b[j] - v) * k));
       return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
     }
   }
-  return GAUGE_STOPS[GAUGE_STOPS.length - 1][1];
+  return stops[stops.length - 1][1];
+}
+
+export function gaugeColor(ratio: number) {
+  const r = Math.max(0, Math.min(1, ratio));
+  if (r < WARM_THRESHOLD) {
+    return mixStops(COLD_STOPS, r / WARM_THRESHOLD);
+  }
+  return mixStops(WARM_STOPS, (r - WARM_THRESHOLD) / (1 - WARM_THRESHOLD));
 }
 
 const EMPTY_SLOT_ID = "empty-slot"; // homescreen.tsx의 "책 등록하기" 슬롯
