@@ -161,9 +161,9 @@ export default function GroupDetailScreen() {
                             router.push({
                                 pathname: "/thread",
                                 params: {
-                                    book_id: group?.group_books[0]?.book_id,
-                                    book_title: group?.group_books[0]?.book?.title,
-                                    group_id: group_id,
+                                    bookId: group?.group_books[0]?.book_id,
+                                    bookTitle: group?.group_books[0]?.book?.title,
+                                    groupId: group_id,
                                 },
                             })
                         }
