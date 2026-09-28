@@ -72,15 +72,6 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
 
-      {/* ── 개발용 홈 바로가기 (배포 전 제거) ── */}
-      <TouchableOpacity
-        style={styles.devButton}
-        onPress={() => router.replace('/(tabs)/homescreen')}
-      >
-        <Text style={styles.devButtonText}>dev →</Text>
-      </TouchableOpacity>
-
-
       <Text style={styles.title}>로그인</Text>
 
       <TextInput
