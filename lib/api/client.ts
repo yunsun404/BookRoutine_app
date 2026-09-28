@@ -1,8 +1,8 @@
-import { getToken } from '@/constants/api';
+import { BASE_URL, getToken } from '@/constants/api';
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL,
+  baseURL: BASE_URL,
   timeout: 15000,
 });
 
