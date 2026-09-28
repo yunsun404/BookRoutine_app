@@ -24,10 +24,28 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  // 서버 IP가 바뀌었거나 서버가 꺼져 있으면 fetch는 수십 초~무한히 응답을 기다립니다.
+  // 10초가 지나면 요청을 끊고 에러를 던져서 "무한 로딩" 대신 원인을 보여주게 합니다.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new Error(
+        `서버 응답이 없어요 (${BASE_URL}). 서버 실행 여부와 IP 주소를 확인해주세요.`,
+      );
+    }
+    throw new Error(`서버에 연결할 수 없어요 (${BASE_URL}).`);
+  } finally {
+    clearTimeout(timer);
+  }
   console.log("요청 주소:", `${BASE_URL}${endpoint}`);
   console.log("요청 body:", options.body);
 
@@ -109,6 +127,7 @@ export const userApi = {
       reading_style?: object | null;
       reading_habit?: object | null;
       favorite_genre?: object | null;
+      notifications_enabled?: boolean;
       created_at: Date;
     }>("/users/me"),
 
@@ -153,6 +172,16 @@ export const userApi = {
       method: "PATCH",
       body: JSON.stringify({ fcm_token }),
     }),
+
+  // 마이페이지 > 알림 설정 화면의 켜기/끄기 스위치
+  updateNotificationSettings: (notifications_enabled: boolean) =>
+    request<{ success: boolean; notifications_enabled: boolean }>(
+      "/users/me/notification-settings",
+      {
+        method: "PATCH",
+        body: JSON.stringify({ notifications_enabled }),
+      },
+    ),
 };
 
 // ────────────────────────────────────────
@@ -227,12 +256,14 @@ export const groupApi = {
 
   // 책 검색
   searchBooks: (title: string) =>
-    request<{
-      book_id: string;
-      title: string;
-      author?: string;
-      cover_url?: string;
-    }[]>(`/reading-goals/search?title=${encodeURIComponent(title)}`),
+    request<
+      {
+        book_id: string;
+        title: string;
+        author?: string;
+        cover_url?: string;
+      }[]
+    >(`/reading-goals/search?title=${encodeURIComponent(title)}`),
 
   // 그룹 목록 조회
   getList: () =>
@@ -244,12 +275,16 @@ export const groupApi = {
         invite_code?: string;
         created_by: string;
         created_at: Date;
-        group_books: [{
-          book_id?: string;
-        }],
-        _count: [{
-          group_members?: number;
-        }]
+        group_books: [
+          {
+            book_id?: string;
+          },
+        ];
+        _count: [
+          {
+            group_members?: number;
+          },
+        ];
       }[]
     >("/groups"),
 

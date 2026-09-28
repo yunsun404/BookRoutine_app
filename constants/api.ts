@@ -1,6 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const BASE_URL = "http://10.10.22.120:3000/api/v1";
+// lib/api.ts와 같은 규칙: .env의 EXPO_PUBLIC_API_BASE_URL이 있으면 그걸 쓰고, 없으면 localhost.
+// 각자 와이파이 IP를 코드에 하드코딩해서 커밋하면 팀원끼리 계속 덮어쓰며 충돌이 나므로,
+// 기기별 주소는 .env(깃에 안 올라감)에만 적습니다. 예) EXPO_PUBLIC_API_BASE_URL=http://192.168.0.5:3000
+export const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
+  ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/v1`
+  : "http://localhost:3000/api/v1";
 
 // 임시. 로그인 화면이 있다면 필요 x
 /*
