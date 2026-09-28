@@ -32,6 +32,10 @@ Notifications.setNotificationHandler({
 export async function registerForPushNotificationsAsync(): Promise<
   string | null
 > {
+  // 웹은 FCM 네이티브 토큰 개념이 없고, 브라우저 알림 권한 팝업/서비스워커 대기에서
+  // Promise가 끝나지 않아 로그인 버튼이 "무한 로딩"에 빠질 수 있어 아예 건너뜁니다.
+  if (Platform.OS === "web") return null;
+
   if (Platform.OS === "android") {
     // Android 8(API 26) 이상은 "채널"이 지정 안 된 알림은 아예 표시가 안 됩니다.
     await Notifications.setNotificationChannelAsync("default", {
