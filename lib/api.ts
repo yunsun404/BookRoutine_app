@@ -300,6 +300,7 @@ export const groupApi = {
       group_books: [
         {
           book_id?: string;
+          target_date?: Date;
           book: { title: string };
         },
       ];
@@ -353,6 +354,7 @@ export const groupApi = {
       group_name?: string;
       people_count?: number;
       book_id?: string;
+      target_date?: Date;
     },
   ) =>
     request<{
