@@ -88,6 +88,50 @@ export const styles = StyleSheet.create({
     color: P.inkSoft,
   },
 
+  // ---- 타래 (책 소개 아래) ----
+  threadSection: {
+    marginBottom: 32,
+  },
+  threadTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: P.ink,
+    marginBottom: 12,
+  },
+  threadEmpty: {
+    fontSize: 14,
+    color: P.textTertiary,
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  threadCard: {
+    backgroundColor: P.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: P.border,
+    padding: 14,
+    marginBottom: 10,
+  },
+  threadCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  threadPage: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: P.primary,
+  },
+  threadDate: {
+    fontSize: 11,
+    color: P.textTertiary,
+  },
+  threadContent: {
+    fontSize: 13,
+    color: P.inkSoft,
+    lineHeight: 20,
+  },
+
   // ---- 탭 (책 정보 | 문장 수집) ----
   tabBar: {
     flexDirection: "row",
