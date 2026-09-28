@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +13,16 @@ import {
 import { authApi, userApi } from '../lib/api';
 import { syncPushToken } from '../lib/notifications';
 import { useAuthStore } from '../store/useAuthStore';
+
+// RN의 Alert.alert는 웹에서 아무것도 표시하지 않습니다(no-op).
+// 그래서 웹에서는 로그인 실패 메시지가 안 보여 "그냥 멈춘 것"처럼 느껴지므로 브라우저 alert로 대체합니다.
+function showAlert(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -23,7 +34,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('오류', '아이디와 비밀번호를 입력해주세요.');
+      showAlert('오류', '아이디와 비밀번호를 입력해주세요.');
       return;
     }
 
@@ -52,7 +63,7 @@ export default function LoginScreen() {
 
       router.replace('/(tabs)/homescreen');
     } catch (e: any) {
-      Alert.alert('로그인 실패', e.message || '다시 시도해주세요.');
+      showAlert('로그인 실패', e.message || '다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
