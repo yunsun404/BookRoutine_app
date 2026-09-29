@@ -1,8 +1,10 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -10,7 +12,18 @@ import {
   View,
 } from 'react-native';
 import { authApi, userApi } from '../lib/api';
+import { syncPushToken } from '../lib/notifications';
 import { useAuthStore } from '../store/useAuthStore';
+
+// RN의 Alert.alert는 웹에서 아무것도 표시하지 않습니다(no-op).
+// 그래서 웹에서는 로그인 실패 메시지가 안 보여 "그냥 멈춘 것"처럼 느껴지므로 브라우저 alert로 대체합니다.
+function showAlert(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -22,7 +35,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('오류', '아이디와 비밀번호를 입력해주세요.');
+      showAlert('오류', '아이디와 비밀번호를 입력해주세요.');
       return;
     }
 
@@ -43,9 +56,15 @@ export default function LoginScreen() {
       const me = await userApi.getMe();
       await setAuth(me, access_token, refresh_token);
 
+      // 로그인 성공 = access_token이 막 생긴 시점. PATCH /users/me/fcm-token은 인증이
+      // 필요해서 이 시점보다 앞에서는 호출할 수 없습니다. 권한 거부/개발 빌드가 아닌
+      // 환경(Expo Go) 등으로 실패해도 syncPushToken 내부에서 조용히 넘어가므로,
+      // 로그인 흐름 자체를 막지 않도록 await만 하고 별도 에러 처리는 안 합니다.
+      await syncPushToken();
+
       router.replace('/(tabs)/homescreen');
     } catch (e: any) {
-      Alert.alert('로그인 실패', e.message || '다시 시도해주세요.');
+      showAlert('로그인 실패', e.message || '다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
@@ -54,14 +73,10 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
 
-      {/* ── 개발용 홈 바로가기 (배포 전 제거) ── */}
-      <TouchableOpacity
-        style={styles.devButton}
-        onPress={() => router.replace('/(tabs)/homescreen')}
-      >
-        <Text style={styles.devButtonText}>dev →</Text>
-      </TouchableOpacity>
-
+      <Image
+        source={require('../assets/images/logo.png')}
+        style={styles.logo}
+      ></Image>
 
       <Text style={styles.title}>로그인</Text>
 
@@ -121,10 +136,16 @@ const styles = StyleSheet.create({
   },
 
 
+  logo: {
+    width: 100,
+    height: 100,
+    alignSelf: 'center'
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 32,
+    textAlign: 'center'
   },
   input: {
     borderWidth: 1,
@@ -136,7 +157,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#333',
+    backgroundColor: '#6B7BFF',
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
