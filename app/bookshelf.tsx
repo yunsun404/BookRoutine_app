@@ -1,7 +1,8 @@
 import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import CoverPickerModal from "../components/bookshelf/CoverPickerModal";
 import Header from "../components/Header";
+import ProfileCard from "../components/ProfileCard";
 import styles from "./styles/bookshelf.styles";
 
 interface BookshelfItem {
@@ -26,16 +29,17 @@ interface BookshelfItem {
   };
 }
 
-interface UserProfile {
-  nickname: string;
-  age: number;
-  profile_image: string;
+interface BadgeItem {
+  badge_id: string;
+  badge_name: string;
+  description: string | null;
+  acquired_at: string | null;
 }
 
 interface FolderItem {
   folder_id: string;
   folder_name: string;
-  folder_image?: string;
+  folder_image?: string | null;
   created_at: string;
   folder_books: {
     book: {
@@ -46,46 +50,36 @@ interface FolderItem {
   }[];
 }
 
-const formatAge = (age: number) => {
-  if (age >= 10 && age < 20) return "10대";
-  if (age >= 20 && age < 30) return "20대";
-  if (age >= 30 && age < 40) return "30대";
-  if (age >= 40 && age < 50) return "40대";
-  if (age >= 50 && age < 60) return "50대";
-  return `${age}대`;
-};
-
 export default function BookshelfScreen() {
   const [books, setBooks] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<"bookshelf" | "garden">(
+  const [activeTab, setActiveTab] = useState<"bookshelf" | "badge">(
     "bookshelf",
   );
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [folderName, setFolderName] = useState("");
+  const [folderImage, setFolderImage] = useState<string>("");
+  const [coverPickerVisible, setCoverPickerVisible] = useState(false);
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
+  const [badgesLoading, setBadgesLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchProfile();
     fetchBooks();
-    fetchFolders();
   }, []);
 
-  // ✅ supabase 직접 호출 제거 — user API로 교체
-  const fetchProfile = async () => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users/me`);
-      const data = await response.json();
-      if (data) setProfile(data);
-    } catch (error) {
-      console.error("프로필 에러:", error);
-    }
-  };
+  // 폴더 상세 화면에서 표지를 바꾸고 뒤로 돌아왔을 때, 여기 그리드에도 바로
+  // 반영되도록 "화면이 다시 보일 때마다" 폴더 목록을 새로 불러옵니다.
+  // 마운트 시 한 번만 도는 useEffect였다면, 뒤로가기 했을 때 여전히 예전 표지가
+  // 보이다가 앱을 완전히 재시작해야만 바뀐 게 보였을 거예요.
+  useFocusEffect(
+    useCallback(() => {
+      fetchFolders();
+    }, []),
+  );
 
   const fetchBooks = async () => {
     try {
-      // ✅ authFetch로 교체
       const response = await authFetch(`${BASE_URL}/bookshelf`);
       const data = await response.json();
       setBooks(Array.isArray(data) ? data : []);
@@ -99,7 +93,6 @@ export default function BookshelfScreen() {
 
   const fetchFolders = async () => {
     try {
-      // ✅ authFetch로 교체
       const response = await authFetch(`${BASE_URL}/bookshelf/folders`);
       const data = await response.json();
       setFolders(Array.isArray(data) ? data : []);
@@ -108,6 +101,24 @@ export default function BookshelfScreen() {
       setFolders([]);
     }
   };
+
+  const fetchBadges = async () => {
+    setBadgesLoading(true);
+    try {
+      const response = await authFetch(`${BASE_URL}/badges`);
+      const data = await response.json();
+      setBadges(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("뱃지 에러:", error);
+      setBadges([]);
+    } finally {
+      setBadgesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "badge") fetchBadges();
+  }, [activeTab]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -122,12 +133,18 @@ export default function BookshelfScreen() {
   const createFolder = async () => {
     if (!folderName.trim()) return;
     try {
-      // ✅ authFetch로 교체
       await authFetch(`${BASE_URL}/bookshelf/folders`, {
         method: "POST",
-        body: JSON.stringify({ folder_name: folderName }),
+        // folder_image는 GET /bookshelf/folders 응답에 이미 존재하는 필드라
+        // 같은 이름으로 보냅니다. 백엔드 생성 API가 아직 이 필드를 안 받고 있다면
+        // 이 부분만큼은 서버 쪽도 같이 확인해주세요.
+        body: JSON.stringify({
+          folder_name: folderName,
+          folder_image: folderImage || undefined,
+        }),
       });
       setFolderName("");
+      setFolderImage("");
       setModalVisible(false);
       fetchFolders();
     } catch (error) {
@@ -170,27 +187,11 @@ export default function BookshelfScreen() {
   return (
     <View style={styles.container}>
       <Header />
+      <ProfileCard />
+
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
-
-      {/* 프로필 */}
-      <View style={styles.profileRow}>
-        <Image
-          source={
-            profile?.profile_image
-              ? { uri: profile.profile_image }
-              : { uri: "https://via.placeholder.com/64" }
-          }
-          style={styles.avatar}
-        />
-        <View style={styles.profileInfo}>
-          <Text style={styles.nickname}>{profile?.nickname ?? "닉네임"}</Text>
-          <Text style={styles.ageGroup}>
-            {profile?.age ? formatAge(profile.age) : "-"}
-          </Text>
-        </View>
-      </View>
 
       {/* 탭 */}
       <View style={styles.tabRow}>
@@ -211,17 +212,17 @@ export default function BookshelfScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={activeTab === "garden" ? styles.tabActive : styles.tabInactive}
-          onPress={() => setActiveTab("garden")}
+          style={activeTab === "badge" ? styles.tabActive : styles.tabInactive}
+          onPress={() => setActiveTab("badge")}
         >
           <Text
             style={
-              activeTab === "garden"
+              activeTab === "badge"
                 ? styles.tabActiveText
                 : styles.tabInactiveText
             }
           >
-            내 잔디 도감
+            내 뱃지 보기
           </Text>
         </TouchableOpacity>
       </View>
@@ -254,14 +255,40 @@ export default function BookshelfScreen() {
                   style={styles.folderCard}
                   onPress={() =>
                     router.push(
-                      `/folder/${item.data.folder_id}?folder_name=${encodeURIComponent(item.data.folder_name)}` as any,
+                      `/folder/${item.data.folder_id}?folder_name=${encodeURIComponent(item.data.folder_name)}&folder_image=${encodeURIComponent(item.data.folder_image ?? "")}` as any,
                     )
                   }
                 >
-                  <Text style={styles.folderName}>{item.data.folder_name}</Text>
-                  <Text style={styles.folderCount}>
-                    {item.data.folder_books.length}권
-                  </Text>
+                  {item.data.folder_image ? (
+                    <>
+                      <Image
+                        source={{ uri: item.data.folder_image }}
+                        style={styles.folderCoverImage}
+                      />
+                      {/* 표지 사진 위에 이름/권수를 바로 얹으면 텍스트가 사진에 묻히니,
+                          어두운 그라데이션 대신 하단에 반투명 바를 깔아 항상 읽히게 합니다. */}
+                      <View style={styles.folderCoverOverlay}>
+                        <Text
+                          style={styles.folderNameOnCover}
+                          numberOfLines={1}
+                        >
+                          {item.data.folder_name}
+                        </Text>
+                        <Text style={styles.folderCountOnCover}>
+                          {item.data.folder_books.length}권
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.folderName}>
+                        {item.data.folder_name}
+                      </Text>
+                      <Text style={styles.folderCount}>
+                        {item.data.folder_books.length}권
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               );
             }
@@ -281,6 +308,26 @@ export default function BookshelfScreen() {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>폴더 표지</Text>
+            {/* 표지 미리보기를 누르면 CoverPickerModal이 열립니다. 표지 값 자체는
+                여기(folderImage)가 아니라 그 모달이 소유하지 않고, 선택 결과(URL)만
+                onSelect로 받아서 이 컴포넌트 state에 반영합니다. */}
+            <TouchableOpacity
+              style={styles.coverPickerButton}
+              onPress={() => setCoverPickerVisible(true)}
+            >
+              {folderImage ? (
+                <Image
+                  source={{ uri: folderImage }}
+                  style={styles.coverPickerPreview}
+                />
+              ) : (
+                <Text style={styles.coverPickerPlaceholder}>
+                  + 표지{"\n"}선택
+                </Text>
+              )}
+            </TouchableOpacity>
+
             <Text style={styles.modalTitle}>폴더 이름</Text>
             <TextInput
               style={styles.modalInput}
@@ -306,12 +353,76 @@ export default function BookshelfScreen() {
         </View>
       </Modal>
 
-      {/* 잔디 도감 */}
-      {activeTab === "garden" && (
-        <View style={styles.center}>
-          <Text style={{ color: "#999" }}>잔디 도감 준비 중</Text>
-        </View>
-      )}
+      <CoverPickerModal
+        visible={coverPickerVisible}
+        onClose={() => setCoverPickerVisible(false)}
+        onSelect={setFolderImage}
+      />
+
+      {/* 뱃지 */}
+      {activeTab === "badge" &&
+        (badgesLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#8B4513" />
+          </View>
+        ) : (
+          <FlatList
+            data={[...badges].sort(
+              (a, b) => Number(!!b.acquired_at) - Number(!!a.acquired_at),
+            )}
+            keyExtractor={(item) => item.badge_id}
+            contentContainerStyle={styles.badgeListContent}
+            renderItem={({ item }) => {
+              const acquired = !!item.acquired_at;
+              return (
+                <View
+                  style={[styles.badgeCard, !acquired && styles.badgeCardLocked]}
+                >
+                  <View
+                    style={[
+                      styles.badgeIconCircle,
+                      !acquired && styles.badgeIconCircleLocked,
+                    ]}
+                  >
+                    <Ionicons
+                      name="ribbon"
+                      size={28}
+                      color={acquired ? "#C8B84A" : "#B5B5B5"}
+                    />
+                  </View>
+                  <View style={styles.badgeInfo}>
+                    <Text
+                      style={[styles.badgeName, !acquired && styles.badgeNameLocked]}
+                    >
+                      {item.badge_name}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.badgeDescription,
+                        !acquired && styles.badgeDescriptionLocked,
+                      ]}
+                    >
+                      {item.description ?? ""}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }}
+            ListFooterComponent={
+              <View style={[styles.badgeCard, styles.badgeCardLocked]}>
+                <View style={[styles.badgeIconCircle, styles.badgeIconCircleLocked]}>
+                  <Ionicons name="help" size={28} color="#B5B5B5" />
+                </View>
+                <View style={styles.badgeInfo}>
+                  <Text style={styles.badgeName}>???</Text>
+                  <Text style={styles.badgeDescription}>
+                    (계속 찾아보세요)
+                  </Text>
+                </View>
+              </View>
+            }
+          />
+        ))}
     </View>
   );
 }

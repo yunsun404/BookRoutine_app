@@ -10,6 +10,7 @@ interface User {
   reading_style?: object | null;
   reading_habit?: object | null;
   favorite_genre?: object | null;
+  points?: number | null;
 }
 
 interface AuthState {
@@ -34,6 +35,9 @@ interface AuthState {
 
   // 수정된 프로필 반영
   updateUser: (user: Partial<User>) => Promise<void>;
+
+  // 상품 구매 후 포인트 갱신
+  updatePoints: (points: number) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -83,5 +87,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   updateUser: async (user: Partial<User>) => {
     set((state) => ({ user: { ...state.user, ...user } as User }));
     console.log('updateUser: ', user);
+  },
+
+  updatePoints: async (points: number) => {
+    set((state) => ({
+      user: state.user ? { ...state.user, points } : state.user,
+    }))
   }
 }));

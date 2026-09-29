@@ -149,6 +149,8 @@ export default StyleSheet.create({
     minHeight: 100,
     justifyContent: "center",
     alignItems: "center",
+    // 표지 이미지를 꽉 채워 넣을 때 카드의 둥근 모서리 밖으로 삐져나오지 않도록.
+    overflow: "hidden",
   },
   folderName: {
     fontSize: 14,
@@ -160,6 +162,53 @@ export default StyleSheet.create({
     fontSize: 11,
     color: "#6B5A9B",
     marginTop: 4,
+    textAlign: "center",
+  },
+  folderCoverImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  folderCoverOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  folderNameOnCover: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
+  folderCountOnCover: {
+    fontSize: 10,
+    color: "#EFEFEF",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  coverPickerButton: {
+    alignSelf: "center",
+    width: 90,
+    height: 135,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderStyle: "dashed",
+    backgroundColor: "#FAFAF9",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    marginBottom: 16,
+  },
+  coverPickerPreview: {
+    width: "100%",
+    height: "100%",
+  },
+  coverPickerPlaceholder: {
+    fontSize: 11,
+    color: "#999",
     textAlign: "center",
   },
   addFolderCard: {
@@ -279,5 +328,57 @@ export default StyleSheet.create({
   backButton: {
     paddingHorizontal: 20,
     marginBottom: 8,
+  },
+  badgeListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  badgeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  badgeCardLocked: {
+    backgroundColor: "#D6D6D6",
+  },
+  badgeIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#F3F0E6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  badgeIconCircleLocked: {
+    backgroundColor: "#E4E4E4",
+  },
+  badgeInfo: {
+    flex: 1,
+  },
+  badgeName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
+  badgeNameLocked: {
+    color: "#6B6B6B",
+  },
+  badgeDescription: {
+    fontSize: 14,
+    color: "#333",
+    marginTop: 2,
+  },
+  badgeDescriptionLocked: {
+    color: "#777",
   },
 });

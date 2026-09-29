@@ -63,7 +63,7 @@ export default function Header() {
     return (
         <>
             <View style={styles.topBar}>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push("/(tabs)/notifications")}>
                     <Ionicons name="notifications-outline" size={24} color="#333" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMenuVisible(true)}>
@@ -102,6 +102,15 @@ export default function Header() {
                             }}
                         >
                             <Text style={styles.menuItemText}>내 책장</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/ebook");
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>전자책 보기</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
