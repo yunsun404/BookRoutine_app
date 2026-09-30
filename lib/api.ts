@@ -119,6 +119,7 @@ export const userApi = {
   getMe: () =>
     request<{
       user_id: string;
+      username: string;
       nickname: string;
       age?: number | null;
       email: string;
@@ -133,6 +134,7 @@ export const userApi = {
 
   // 프로필 수정
   updateMe: (body: {
+    username?: string;
     nickname?: string;
     age?: number;
     email?: string;
@@ -144,6 +146,7 @@ export const userApi = {
   }) =>
     request<{
       user_id: string;
+      username: string;
       nickname: string;
       age?: number;
       email?: string;

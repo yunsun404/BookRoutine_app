@@ -117,10 +117,10 @@ export default function Header() {
                             style={styles.menuItem}
                             onPress={() => {
                                 setMenuVisible(false);
-                                router.push("/(profile)/editprofile");  // 아직 ui가 없음!
+                                router.push("/(profile)/myprofile");
                             }}
                         >
-                            <Text style={styles.menuItemText}>내 프로필 수정</Text>
+                            <Text style={styles.menuItemText}>내 프로필</Text>
                         </TouchableOpacity>
 
                         {/* 🛠️ [랭킹 보기] 버튼을 눌렀을 때 메뉴를 닫고 랭킹 페이지로 이동하도록 수정 */}
