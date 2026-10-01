@@ -40,6 +40,13 @@ interface GroupDetail {
     }];
 }
 
+interface UpdateGroupPayload {
+    group_name?: string;
+    people_count?: number;
+    book_id?: string;
+    target_date?: Date;
+}
+
 export default function GroupDetailScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
@@ -48,6 +55,11 @@ export default function GroupDetailScreen() {
     const [group, setGroup] = useState<GroupDetail>();
     const [threads, setThreads] = useState<Thread[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const [groupName, setGroupName] = useState('');
+    const [peopleCount, setPeopleCount] = useState();
+    const [bookId, setBookId] = useState('');
+    const [targetDate, setTargetDate] = useState();
 
     const handleGroupDetail = async () => {
         try {
@@ -60,6 +72,22 @@ export default function GroupDetailScreen() {
             console.log("group detail 에러: ", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleiEditGroup = async () => {
+        try {
+            setLoading(true);
+            const payload: UpdateGroupPayload = {
+                group_name: groupName || undefined,
+                people_count: peopleCount || undefined,
+                book_id: bookId || undefined,
+                target_date: targetDate || undefined
+            }
+            await groupApi.updateGroup(group_id, payload as any);
+            router.push(`/editgroup`);
+        } catch (error) {
+            console.log("edit group 에러: ", error);
         }
     };
 
@@ -108,8 +136,7 @@ export default function GroupDetailScreen() {
                         }
                     }}
                 >
-                    <Ionicons name="camera-outline" size={16} color="#fff" />
-                    <Text style={styles.enterBtnText}>독서방</Text>
+                    <Ionicons name="camera-outline" size={20} color="#6C63FF" />
                 </TouchableOpacity>
             </View>
 
@@ -125,7 +152,7 @@ export default function GroupDetailScreen() {
                 <View style={styles.infoRow}>
                     <Ionicons name="key-outline" size={14} color="#888" />
                     <Text style={styles.infoLabel}>초대 코드</Text>
-                    <Text style={styles.infoValue}>
+                    <Text style={[styles.infoValue, { color: "#6C63FF" }]}>
                         {group?.invite_code ?? "없음"}
                     </Text>
                 </View>
@@ -146,9 +173,14 @@ export default function GroupDetailScreen() {
                     </Text>
                 </View>
 
-                <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveGroup}>
-                    <Text style={styles.leaveBtnText}>그룹 나가기</Text>
-                </TouchableOpacity>
+                <View style={styles.groupActionRow}>
+                    <TouchableOpacity style={styles.editBtn} onPress={handleiEditGroup}>
+                        <Text style={styles.editBtnText}>그룹 수정</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveGroup}>
+                        <Text style={styles.leaveBtnText}>그룹 나가기</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* 타래 섹션 */}
@@ -156,7 +188,7 @@ export default function GroupDetailScreen() {
                 <Text style={styles.sectionTitle}>그룹원 타래</Text>
                 <View style={styles.threadBtnSection}>
                     <TouchableOpacity
-                        style={styles.threadBtn}
+                        style={styles.threadBtnFilled}
                         onPress={() =>
                             router.push({
                                 pathname: "/thread",
@@ -168,13 +200,13 @@ export default function GroupDetailScreen() {
                             })
                         }
                     >
-                        <Text style={styles.threadBtnText}>타래 등록</Text>
+                        <Text style={styles.threadBtnFilledText}>타래 등록</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={styles.threadBtn}
+                        style={styles.threadBtnOutline}
                         onPress={showToast}
                     >
-                        <Text style={styles.threadBtnText}>문장 수집</Text>
+                        <Text style={styles.threadBtnOutlineText}>문장 수집</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -231,7 +263,7 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#fff" },
+    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 60 },
 
     // 헤더
     header: {
@@ -239,11 +271,16 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 16,
         paddingTop: 12,
-        paddingBottom: 12,
-        gap: 8,
+        paddingBottom: 16,
+        gap: 12,
     },
     backBtn: {
-        padding: 4,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center",
     },
     headerTitle: {
         flex: 1,
@@ -252,13 +289,12 @@ const styles = StyleSheet.create({
         color: "#111",
     },
     enterBtn: {
-        flexDirection: "row",
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: "#E8E6F8",
         alignItems: "center",
-        gap: 4,
-        backgroundColor: "#111",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
+        justifyContent: "center",
     },
     enterBtnText: {
         fontSize: 13,
@@ -269,40 +305,54 @@ const styles = StyleSheet.create({
     // 그룹 정보 카드
     infoCard: {
         marginHorizontal: 20,
-        marginBottom: 8,
+        marginBottom: 16,
         padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "#eee",
-        gap: 10,
+        borderRadius: 16,
+        backgroundColor: "#fff",
+        gap: 12,
     },
     infoRow: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 6,
+        justifyContent: "space-between",
     },
     infoLabel: {
         fontSize: 13,
-        color: "#888",
-        width: 60,
+        color: "#aaa",
     },
     infoValue: {
         fontSize: 13,
         color: "#111",
         fontWeight: "500",
-        flex: 1,
     },
-    leaveBtn: {
+    groupActionRow: {
+        flexDirection: "row",
+        gap: 8,
         marginTop: 4,
+    },
+    editBtn: {
+        flex: 1,
         paddingVertical: 8,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: "#eee",
+        borderColor: "#ddd",
+        alignItems: "center",
+    },
+    editBtnText: {
+        fontSize: 13,
+        color: "#888",
+    },
+    leaveBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "#FFE0E0",
         alignItems: "center",
     },
     leaveBtnText: {
         fontSize: 13,
-        color: "#aaa",
+        color: "#FF5252",
     },
 
     // 타래 섹션
@@ -311,13 +361,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
+        paddingVertical: 14,
     },
     sectionTitle: {
-        fontSize: 15,
-        fontWeight: "600",
+        fontSize: 18,
+        fontWeight: "700",
         color: "#111",
     },
     threadBtnSection: {
@@ -340,6 +388,32 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontWeight: "600",
     },
+    threadBtnFilled: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginLeft: 5,
+        borderRadius: 12,
+        backgroundColor: "#6C63FF",
+    },
+    threadBtnOutline: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginLeft: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#ddd",
+        backgroundColor: "#fff",
+    },
+    threadBtnFilledText: {
+        fontSize: 13,
+        color: "#fff",
+        fontWeight: "600",
+    },
+    threadBtnOutlineText: {
+        fontSize: 13,
+        color: "#333",
+        fontWeight: "600",
+    },
 
     listContent: {
         padding: 20,
@@ -349,9 +423,8 @@ const styles = StyleSheet.create({
     // 타래 카드
     threadCard: {
         padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "#eee",
+        borderRadius: 16,
+        backgroundColor: "#fff",
         gap: 10,
     },
     threadTop: {

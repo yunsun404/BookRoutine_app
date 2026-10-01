@@ -54,6 +54,7 @@ const SHOW_ROUTES = [
   "/bookshelf",
   "/calendar",
   "/group",
+  "/groupdetail",
   "/recommend",
   "/notifications",
   "/ranking",

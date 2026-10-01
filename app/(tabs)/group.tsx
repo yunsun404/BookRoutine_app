@@ -250,11 +250,11 @@ export default function GroupScreen() {
             <Text style={styles.headerBtnText}>만들기</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.headerBtn}
+            style={styles.headerBtnFilled}
             onPress={() => setModalType("join")}
           >
             <Ionicons name="enter-outline" size={16} color="#333" />
-            <Text style={styles.headerBtnText}>참여</Text>
+            <Text style={styles.headerBtnFilledText}>참여</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -467,7 +467,7 @@ export default function GroupScreen() {
 
 // ── 스타일 ─────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#F0F0F8" },
   // 헤더
   header: {
     flexDirection: "row",
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 56,
-    paddingBottom: 12,
+    paddingBottom: 20,
   },
   headerTitle: {
     fontSize: 22,
@@ -500,29 +500,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#333",
   },
+  headerBtnFilled: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "#6C63FF",
+  },
+  headerBtnFilledText: {
+    fontSize: 13,
+    color: "#fff",
+    fontWeight: "600",
+  },
 
   // 탭
   tabRow: {
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
     marginHorizontal: 20,
+    marginBottom: 16,
+    gap: 10,
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: "#111",
+    backgroundColor: "#6C63FF",
+    borderColor: "#6C63FF",
   },
   tabText: {
     fontSize: 14,
     color: "#aaa",
+    fontWeight: "600",
   },
   activeTabText: {
-    color: "#111",
+    color: "#fff",
     fontWeight: "600",
   },
 
@@ -535,16 +554,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#eee",
+    borderRadius: 16,
+    borderColor: "#fff",
     gap: 12,
   },
   groupAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#f0f0f0",
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: "#ddd",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -631,6 +649,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+    outlineColor: "#6C63FF",
   },
   modalButtons: {
     flexDirection: "row",
@@ -652,7 +671,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: "#111",
+    backgroundColor: "#6C63FF",
     alignItems: "center",
   },
   modalConfirmText: {
