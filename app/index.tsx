@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -72,6 +73,11 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
 
+      <Image
+        source={require('../assets/images/logo.png')}
+        style={styles.logo}
+      ></Image>
+
       <Text style={styles.title}>로그인</Text>
 
       <TextInput
@@ -130,10 +136,16 @@ const styles = StyleSheet.create({
   },
 
 
+  logo: {
+    width: 100,
+    height: 100,
+    alignSelf: 'center'
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 32,
+    textAlign: 'center'
   },
   input: {
     borderWidth: 1,
@@ -145,7 +157,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#333',
+    backgroundColor: '#6B7BFF',
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',

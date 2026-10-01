@@ -87,6 +87,11 @@ export default function HomeScreen() {
 
   const activeGroup = bookGroups[currentIndex];
 
+  // 책 목록이 줄어들면(완료 등) 범위를 벗어난 인덱스를 첫 번째 책으로 되돌림
+  useEffect(() => {
+    if (currentIndex > bookGroups.length) setCurrentIndex(0);
+  }, [bookGroups.length]);
+
   useEffect(() => {
     if (!activeGroup) {
       setLatestFeed(null);
@@ -255,8 +260,7 @@ export default function HomeScreen() {
           <Text style={styles.greetingTitle}>좋은 책과 함께해요</Text>
         </View>
 
-        <View style={styles.carouselContainer}>
-                  {bookGroups.length > 0 && (
+        {bookGroups.length > 0 && (
           <View style={styles.carouselContainer}>
             <BookCarousel
               books={booksForCarousel}
@@ -275,9 +279,9 @@ export default function HomeScreen() {
             />
           </View>
         )}
-        </View>
 
-        {isLastEmptyPage ? (
+        {/* 책이 한 권도 없을 때만 안내 화면 */}
+        {bookGroups.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>아직 등록된 책이 없어요</Text>
             <Text style={styles.emptySubText}>책을 등록하고 독서 목표를 시작해보세요</Text>
@@ -324,7 +328,7 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-        ) : (
+        ) : isLastEmptyPage ? null : (
           <>
             {activeGroup && (
               <View key={activeGroup.book_id}>
