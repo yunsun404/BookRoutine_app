@@ -467,7 +467,7 @@ export default function GroupScreen() {
 
 // ── 스타일 ─────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F0F8" },
+  container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 50 },
   // 헤더
   header: {
     flexDirection: "row",

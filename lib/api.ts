@@ -307,6 +307,7 @@ export const groupApi = {
           book: { title: string };
         },
       ];
+      creator: { nickname: string; }
     }>(`/groups/${group_id}`),
 
   // 그룹 입장
@@ -355,16 +356,29 @@ export const groupApi = {
     group_id: string,
     body: {
       group_name?: string;
-      people_count?: number;
+      max_people?: number;
       book_id?: string;
+      isbn?: string;
+      title?: string;
+      author?: string;
+      total_pages?: number;
+      cover_url?: string;
       target_date?: Date;
     },
   ) =>
     request<{
-      group_name?: string;
-      people_count?: number;
-      book_id?: string;
-      target_date?: Date;
+      // group_name?: string;
+      // people_count?: number;
+      // book_id?: string;
+      // target_date?: Date;
+      update_group: {
+        group_name: string;
+        people_count: number;
+      };
+      update_group_book: {
+        book_id: string;
+        target_date: Date;
+      }
     }>(`/groups/${group_id}/update`, {
       method: "PATCH",
       body: JSON.stringify(body),

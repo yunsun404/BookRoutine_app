@@ -34,17 +34,14 @@ interface GroupDetail {
     invite_code?: string;
     created_by: string;
     created_at: Date;
-    group_books: [{
+    group_books: {
         book_id?: string;
+        target_date?: Date;
         book: { title: string; }
-    }];
-}
-
-interface UpdateGroupPayload {
-    group_name?: string;
-    people_count?: number;
-    book_id?: string;
-    target_date?: Date;
+    }[];
+    creator: {
+        nickname: string
+    };
 }
 
 export default function GroupDetailScreen() {
@@ -56,38 +53,20 @@ export default function GroupDetailScreen() {
     const [threads, setThreads] = useState<Thread[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const [groupName, setGroupName] = useState('');
-    const [peopleCount, setPeopleCount] = useState();
-    const [bookId, setBookId] = useState('');
-    const [targetDate, setTargetDate] = useState();
-
     const handleGroupDetail = async () => {
         try {
             setLoading(true);
-            const resultG = await groupApi.getDetail(group_id);
+            const [resultG, resultT] = await Promise.all([
+                groupApi.getDetail(group_id),
+                groupApi.getGroupThread(group_id),
+
+            ]);
             setGroup(resultG);
-            const resultT = await groupApi.getGroupThread(group_id);
             setThreads(resultT);
         } catch (error) {
             console.log("group detail 에러: ", error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleiEditGroup = async () => {
-        try {
-            setLoading(true);
-            const payload: UpdateGroupPayload = {
-                group_name: groupName || undefined,
-                people_count: peopleCount || undefined,
-                book_id: bookId || undefined,
-                target_date: targetDate || undefined
-            }
-            await groupApi.updateGroup(group_id, payload as any);
-            router.push(`/editgroup`);
-        } catch (error) {
-            console.log("edit group 에러: ", error);
         }
     };
 
@@ -108,6 +87,7 @@ export default function GroupDetailScreen() {
     useEffect(() => {
         handleGroupDetail();
     }, []);
+    if (!group) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
     return (
         <View style={styles.container}>
@@ -172,9 +152,16 @@ export default function GroupDetailScreen() {
                             : ""}
                     </Text>
                 </View>
+                <View style={styles.infoRow}>
+                    <Ionicons name="people-outline" size={14} color="#888" />
+                    <Text style={styles.infoLabel}>방장</Text>
+                    <Text style={styles.infoValue}>
+                        {group?.creator?.nickname ?? "미설정"}
+                    </Text>
+                </View>
 
                 <View style={styles.groupActionRow}>
-                    <TouchableOpacity style={styles.editBtn} onPress={handleiEditGroup}>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => router.push(`/editgroup?group_id=${group_id}`)}>
                         <Text style={styles.editBtnText}>그룹 수정</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveGroup}>
