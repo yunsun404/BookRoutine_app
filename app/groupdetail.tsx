@@ -153,6 +153,15 @@ export default function GroupDetailScreen() {
                     </Text>
                 </View>
                 <View style={styles.infoRow}>
+                    <Ionicons name="calendar-outline" size={14} color="#888" />
+                    <Text style={styles.infoLabel}>목표 날짜</Text>
+                    <Text style={styles.infoValue}>
+                        {group?.group_books[0].target_date
+                            ? group.group_books[0].target_date.toString().split("T")[0]
+                            : ""}
+                    </Text>
+                </View>
+                <View style={styles.infoRow}>
                     <Ionicons name="people-outline" size={14} color="#888" />
                     <Text style={styles.infoLabel}>방장</Text>
                     <Text style={styles.infoValue}>
