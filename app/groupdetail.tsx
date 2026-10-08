@@ -123,29 +123,37 @@ export default function GroupDetailScreen() {
             {/* 그룹 정보 카드 */}
             <View style={styles.infoCard}>
                 <View style={styles.infoRow}>
-                    <Ionicons name="book-outline" size={14} color="#888" />
-                    <Text style={styles.infoLabel}>목표 도서</Text>
+                    <View style={styles.infoIcon}>
+                        <Ionicons name="book-outline" size={14} color="#888" />
+                        <Text style={styles.infoLabel}>목표 도서</Text>
+                    </View>
                     <Text style={styles.infoValue}>
                         {group?.group_books[0]?.book?.title ?? "미설정"}
                     </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Ionicons name="key-outline" size={14} color="#888" />
-                    <Text style={styles.infoLabel}>초대 코드</Text>
+                    <View style={styles.infoIcon}>
+                        <Ionicons name="key-outline" size={14} color="#888" />
+                        <Text style={styles.infoLabel}>초대 코드</Text>
+                    </View>
                     <Text style={[styles.infoValue, { color: "#6C63FF" }]}>
                         {group?.invite_code ?? "없음"}
                     </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Ionicons name="people-outline" size={14} color="#888" />
-                    <Text style={styles.infoLabel}>최대 인원</Text>
+                    <View style={styles.infoIcon}>
+                        <Ionicons name="people-outline" size={14} color="#888" />
+                        <Text style={styles.infoLabel}>최대 인원</Text>
+                    </View>
                     <Text style={styles.infoValue}>
                         {group?.people_count ? `${group.people_count}명` : "제한 없음"}
                     </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={14} color="#888" />
-                    <Text style={styles.infoLabel}>개설일</Text>
+                    <View style={styles.infoIcon}>
+                        <Ionicons name="calendar-outline" size={14} color="#888" />
+                        <Text style={styles.infoLabel}>개설일</Text>
+                    </View>
                     <Text style={styles.infoValue}>
                         {group?.created_at
                             ? group.created_at.toString().split("T")[0]
@@ -153,8 +161,10 @@ export default function GroupDetailScreen() {
                     </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={14} color="#888" />
-                    <Text style={styles.infoLabel}>목표 날짜</Text>
+                    <View style={styles.infoIcon}>
+                        <Ionicons name="calendar-outline" size={14} color="#888" />
+                        <Text style={styles.infoLabel}>목표 날짜</Text>
+                    </View>
                     <Text style={styles.infoValue}>
                         {group?.group_books[0]?.target_date
                             ? group.group_books[0]?.target_date.toString().split("T")[0]
@@ -162,8 +172,10 @@ export default function GroupDetailScreen() {
                     </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Ionicons name="people-outline" size={14} color="#888" />
-                    <Text style={styles.infoLabel}>방장</Text>
+                    <View style={styles.infoIcon}>
+                        <Ionicons name="people-outline" size={14} color="#888" />
+                        <Text style={styles.infoLabel}>방장</Text>
+                    </View>
                     <Text style={styles.infoValue}>
                         {group?.creator?.nickname ?? "미설정"}
                     </Text>
@@ -312,9 +324,14 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
     },
+    infoIcon: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
     infoLabel: {
         fontSize: 13,
         color: "#aaa",
+        paddingHorizontal: 10,
     },
     infoValue: {
         fontSize: 13,
