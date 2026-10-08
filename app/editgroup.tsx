@@ -12,7 +12,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 
 export default function EditgroupScreen() {
@@ -120,28 +120,28 @@ export default function EditgroupScreen() {
                 <View style={{ width: 44 }} />
             </View>
 
-            {/* 정보 카드 */}
-            <View style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                    <Ionicons name="key-outline" size={14} color="#aaa" />
-                    <Text style={styles.infoLabel}>초대 코드</Text>
-                    <Text style={[styles.infoValue, { color: "#6C63FF" }]}>{inviteCode}</Text>
+            <ScrollView>
+                {/* 정보 카드 */}
+                <View style={styles.infoCard}>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="key-outline" size={14} color="#aaa" />
+                        <Text style={styles.infoLabel}>초대 코드</Text>
+                        <Text style={[styles.infoValue, { color: "#6C63FF" }]}>{inviteCode}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="person-outline" size={14} color="#aaa" />
+                        <Text style={styles.infoLabel}>방장</Text>
+                        <Text style={styles.infoValue}>{created_by}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="calendar-outline" size={14} color="#aaa" />
+                        <Text style={styles.infoLabel}>생성일</Text>
+                        <Text style={styles.infoValue}>{created_at?.toString().split('T')[0]}</Text>
+                    </View>
                 </View>
-                <View style={styles.infoRow}>
-                    <Ionicons name="person-outline" size={14} color="#aaa" />
-                    <Text style={styles.infoLabel}>방장</Text>
-                    <Text style={styles.infoValue}>{created_by}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={14} color="#aaa" />
-                    <Text style={styles.infoLabel}>생성일</Text>
-                    <Text style={styles.infoValue}>{created_at?.toString().split('T')[0]}</Text>
-                </View>
-            </View>
 
-            {/* 입력 폼 카드 */}
-            <View style={styles.formCard}>
-                <ScrollView>
+                {/* 입력 폼 카드 */}
+                <View style={styles.formCard}>
                     <Text style={styles.fieldLabel}>그룹 이름</Text>
                     <TextInput
                         style={styles.input}
@@ -162,7 +162,7 @@ export default function EditgroupScreen() {
 
                     <View>
                         <Text style={styles.fieldLabel}>목표 도서</Text>
-                        <Text style={styles.infoValue}>
+                        <Text style={styles.targetBook}>
                             {bookTitle}
                         </Text>
                         <TextInput
@@ -221,24 +221,24 @@ export default function EditgroupScreen() {
                             )}
                         </>
                     )}
-                </ScrollView>
-            </View>
+                </View>
 
-            {/* 액션 버튼 */}
-            <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGroup} disabled={loading}>
-                    {loading ? <ActivityIndicator color="#FF5252" /> : <Text style={styles.deleteBtnText}>그룹 삭제</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmBtn} onPress={handleUpdateGroup} disabled={loading}>
-                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>수정 완료</Text>}
-                </TouchableOpacity>
-            </View>
+                {/* 액션 버튼 */}
+                <View style={styles.actionRow}>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGroup} disabled={loading}>
+                        {loading ? <ActivityIndicator color="#FF5252" /> : <Text style={styles.deleteBtnText}>그룹 삭제</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.confirmBtn} onPress={handleUpdateGroup} disabled={loading}>
+                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>수정 완료</Text>}
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
         </View >
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F0F0F8" },
+    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 50 },
 
     header: {
         flexDirection: "row",
@@ -301,6 +301,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#aaa",
         marginTop: 4,
+    },
+    targetBook: {
+        color: "#111",
+        fontWeight: "500",
+        paddingVertical: 10,
+        alignSelf: "center",
     },
     input: {
         borderWidth: 1,

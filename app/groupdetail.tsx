@@ -271,7 +271,7 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 60 },
+    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 80 },
 
     // 헤더
     header: {
