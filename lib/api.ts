@@ -356,7 +356,7 @@ export const groupApi = {
     group_id: string,
     body: {
       group_name?: string;
-      max_people?: number;
+      people_count?: number;
       book_id?: string;
       isbn?: string;
       title?: string;
@@ -367,10 +367,6 @@ export const groupApi = {
     },
   ) =>
     request<{
-      // group_name?: string;
-      // people_count?: number;
-      // book_id?: string;
-      // target_date?: Date;
       update_group: {
         group_name: string;
         people_count: number;

@@ -9,6 +9,7 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -101,6 +102,7 @@ export default function GroupScreen() {
   // 그룹 생성
   const handleCreateGroup = async () => {
     if (!groupName.trim()) return;
+    if (!selectedBook) { Alert.alert('목표 도서를 선택해주세요.'); return; }
     try {
       setModalLoading(true);
       console.log('searchTitle:', searchTitle);
@@ -372,7 +374,7 @@ export default function GroupScreen() {
               <View>
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="목표 도서 (선택)"
+                  placeholder="목표 도서 (필수)"
                   value={searchTitle}
                   onChangeText={handleSearch}
                 />
