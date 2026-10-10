@@ -1,7 +1,8 @@
-import { userApi } from "@/lib/api";
+import { authApi, userApi } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Header from "../../components/Header";
 
 export default function MyProfileScreen() {
@@ -19,6 +20,8 @@ export default function MyProfileScreen() {
         favorite_genre?: any | null;
         created_at: Date;
     }>();
+    const [modalVisible, setModalVisible] = useState(false);
+    const { clearAuth } = useAuthStore();
 
     const handleGetProfile = async () => {
         try {
@@ -27,6 +30,23 @@ export default function MyProfileScreen() {
             setProfile(result);
         } catch (error) {
             console.error('프로필 조회 오류:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const handleDeleteAccount = async () => {
+        try {
+            setLoading(true);
+
+            // 1. 탈퇴 API 호출
+            const { success } = await authApi.deleteAccount({});
+            // 2. 로그인 상태 업데이트
+            clearAuth();
+            // 3. 로그인 화면으로 이동
+            router.replace('/');
+        } catch (error) {
+            console.error('탈퇴 오류: ', error);
         } finally {
             setLoading(false);
         }
@@ -46,7 +66,7 @@ export default function MyProfileScreen() {
     return (
 
         <View style={styles.container}>
-            <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={styles.content}>
                 <Header />
                 {/* 프로필 이미지 + 닉네임 */}
                 <View style={styles.profileHeader}>
@@ -92,19 +112,44 @@ export default function MyProfileScreen() {
                     )}
                 </View>
 
-                {/* 계정 삭제 버튼 */}
-                <TouchableOpacity style={styles.deleteButton} onPress={() => router.push('/deleteaccount')}>
+                {/* 계정 삭제 모달 */}
+                <TouchableOpacity style={styles.deleteButton} onPress={() => setModalVisible(true)}>
                     <Text style={styles.deleteButtonText}>계정 삭제</Text>
+                    <Modal visible={modalVisible} transparent animationType="fade">
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalBox}>
+                                <Text style={styles.modalTitle}>계정 삭제</Text>
+                                <Text>정말 삭제하시겠습니까?</Text>
+                                <View style={styles.modalButtons}>
+                                    <TouchableOpacity
+                                        style={styles.modalCancel}
+                                        onPress={() => setModalVisible(false)}
+                                    >
+                                        <Text style={styles.modalCancelText}>취소</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.modalConfirm}
+                                        onPress={handleDeleteAccount}
+                                    >
+                                        <Text style={styles.modalConfirmText}>삭제</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
                 </TouchableOpacity>
             </ScrollView>
         </View>
     );
 }
 
+const { width } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+        paddingBottom: 20
     },
     content: {
         padding: 20,
@@ -166,6 +211,48 @@ const styles = StyleSheet.create({
     },
     habitValue: {
         fontSize: 18,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalBox: {
+        width: width * 0.8,
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        padding: 24,
+    },
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#333",
+        marginBottom: 16,
+    },
+    modalButtons: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        gap: 12,
+    },
+    modalCancel: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    modalCancelText: {
+        fontSize: 14,
+        color: "#999",
+    },
+    modalConfirm: {
+        backgroundColor: "#ff6b6b",
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    modalConfirmText: {
+        fontSize: 14,
+        color: "#fff",
+        fontWeight: "700",
     },
     deleteButton: {
         backgroundColor: '#ff6b6b',
