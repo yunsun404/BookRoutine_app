@@ -352,6 +352,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     infoValue: {
+        flex: 1,
+        textAlign: 'right',
         fontSize: 13,
         color: "#111",
         fontWeight: "500",
