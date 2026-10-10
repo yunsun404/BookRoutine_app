@@ -3,10 +3,12 @@ import { groupApi } from "@/lib/api";
 import { startReadingRoom } from "@/lib/api/reading-room";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     ScrollView,
     StyleSheet,
@@ -54,6 +56,8 @@ export default function GroupDetailScreen() {
     const [threads, setThreads] = useState<Thread[]>([]);
     const [loading, setLoading] = useState(false);
 
+    const [copiedText, setCopiedText] = useState<string>();
+
     const handleGroupDetail = async () => {
         try {
             setLoading(true);
@@ -63,12 +67,19 @@ export default function GroupDetailScreen() {
 
             ]);
             setGroup(resultG);
+            setCopiedText(resultG.invite_code);
             setThreads(resultT);
         } catch (error) {
             console.log("group detail 에러: ", error);
         } finally {
             setLoading(false);
         }
+    };
+
+    // 텍스트 복사하기
+    const copyToClipboard = async () => {
+        await Clipboard.setStringAsync(copiedText ?? '');
+        Alert.alert('복사 완료', copiedText);
     };
 
     const handleLeaveGroup = async () => {
@@ -138,9 +149,11 @@ export default function GroupDetailScreen() {
                             <Ionicons name="key-outline" size={14} color="#888" />
                             <Text style={styles.infoLabel}>초대 코드</Text>
                         </View>
-                        <Text style={[styles.infoValue, { color: "#6C63FF" }]}>
-                            {group?.invite_code ?? "없음"}
-                        </Text>
+                        <TouchableOpacity onPress={copyToClipboard}>
+                            <Text style={[styles.infoValue, { color: "#6C63FF" }]}>
+                                {group?.invite_code ?? "없음"}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                     <View style={styles.infoRow}>
                         <View style={styles.infoIcon}>
@@ -192,10 +205,10 @@ export default function GroupDetailScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
-            </ScrollView>
+            </ScrollView >
 
             {/* 타래 섹션 */}
-            <View style={styles.sectionHeader}>
+            < View style={styles.sectionHeader} >
                 <Text style={styles.sectionTitle}>그룹원 타래</Text>
                 <View style={styles.threadBtnSection}>
                     <TouchableOpacity
@@ -221,55 +234,57 @@ export default function GroupDetailScreen() {
                     </TouchableOpacity>
                 </View>
 
-            </View>
+            </View >
 
-            {loading ? (
-                <ActivityIndicator style={{ marginTop: 40 }} />
-            ) : (
-                <FlatList
-                    data={threads}
-                    keyExtractor={(item) => item.thread_id}
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <Text style={styles.emptyText}>
-                            아직 작성된 타래가 없습니다.{"\n"}첫 번째 타래를 남겨보세요.
-                        </Text>
-                    }
-                    renderItem={({ item }) => (
-                        <View style={styles.threadCard}>
-                            {/* 카드 상단: 아바타 + 닉네임 + 날짜 */}
-                            <View style={styles.threadTop}>
-                                <View style={styles.avatarCircle}>
-                                    <Text style={styles.avatarText}>
-                                        {item.user?.nickname?.charAt(0) ?? "?"}
-                                    </Text>
-                                </View>
-                                <View style={styles.threadMeta}>
-                                    <Text style={styles.threadUser}>
-                                        {item.user?.nickname ?? "알 수 없음"}
-                                    </Text>
-                                    <Text style={styles.threadBook}>
-                                        " {item.book?.title ?? ""} "
-                                    </Text>
-                                </View>
-                                <View style={styles.threadRight}>
-                                    <Text style={styles.threadDate}>
-                                        {item.updated_at?.toString().split("T")[0]}
-                                    </Text>
-                                    <View style={styles.likeRow}>
-                                        <Ionicons name="heart-outline" size={14} color="#aaa" />
-                                        <Text style={styles.likeCount}>{item.likes ?? 0}</Text>
+            {
+                loading ? (
+                    <ActivityIndicator style={{ marginTop: 40 }} />
+                ) : (
+                    <FlatList
+                        data={threads}
+                        keyExtractor={(item) => item.thread_id}
+                        contentContainerStyle={styles.listContent}
+                        ListEmptyComponent={
+                            <Text style={styles.emptyText}>
+                                아직 작성된 타래가 없습니다.{"\n"}첫 번째 타래를 남겨보세요.
+                            </Text>
+                        }
+                        renderItem={({ item }) => (
+                            <View style={styles.threadCard}>
+                                {/* 카드 상단: 아바타 + 닉네임 + 날짜 */}
+                                <View style={styles.threadTop}>
+                                    <View style={styles.avatarCircle}>
+                                        <Text style={styles.avatarText}>
+                                            {item.user?.nickname?.charAt(0) ?? "?"}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.threadMeta}>
+                                        <Text style={styles.threadUser}>
+                                            {item.user?.nickname ?? "알 수 없음"}
+                                        </Text>
+                                        <Text style={styles.threadBook}>
+                                            " {item.book?.title ?? ""} "
+                                        </Text>
+                                    </View>
+                                    <View style={styles.threadRight}>
+                                        <Text style={styles.threadDate}>
+                                            {item.updated_at?.toString().split("T")[0]}
+                                        </Text>
+                                        <View style={styles.likeRow}>
+                                            <Ionicons name="heart-outline" size={14} color="#aaa" />
+                                            <Text style={styles.likeCount}>{item.likes ?? 0}</Text>
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
 
-                            {/* 본문 */}
-                            <Text style={styles.threadContent}>{item.content}</Text>
-                        </View>
-                    )}
-                />
-            )}
-        </View>
+                                {/* 본문 */}
+                                <Text style={styles.threadContent}>{item.content}</Text>
+                            </View>
+                        )}
+                    />
+                )
+            }
+        </View >
     );
 }
 
