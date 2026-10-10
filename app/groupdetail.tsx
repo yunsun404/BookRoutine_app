@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
+    ScrollView,
     StyleSheet,
     Text,
     ToastAndroid,
@@ -120,76 +121,78 @@ export default function GroupDetailScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* 그룹 정보 카드 */}
-            <View style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                    <View style={styles.infoIcon}>
-                        <Ionicons name="book-outline" size={14} color="#888" />
-                        <Text style={styles.infoLabel}>목표 도서</Text>
+            <ScrollView>
+                {/* 그룹 정보 카드 */}
+                <View style={styles.infoCard}>
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons name="book-outline" size={14} color="#888" />
+                            <Text style={styles.infoLabel}>목표 도서</Text>
+                        </View>
+                        <Text style={styles.infoValue}>
+                            {group?.group_books[0]?.book?.title ?? "미설정"}
+                        </Text>
                     </View>
-                    <Text style={styles.infoValue}>
-                        {group?.group_books[0]?.book?.title ?? "미설정"}
-                    </Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <View style={styles.infoIcon}>
-                        <Ionicons name="key-outline" size={14} color="#888" />
-                        <Text style={styles.infoLabel}>초대 코드</Text>
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons name="key-outline" size={14} color="#888" />
+                            <Text style={styles.infoLabel}>초대 코드</Text>
+                        </View>
+                        <Text style={[styles.infoValue, { color: "#6C63FF" }]}>
+                            {group?.invite_code ?? "없음"}
+                        </Text>
                     </View>
-                    <Text style={[styles.infoValue, { color: "#6C63FF" }]}>
-                        {group?.invite_code ?? "없음"}
-                    </Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <View style={styles.infoIcon}>
-                        <Ionicons name="people-outline" size={14} color="#888" />
-                        <Text style={styles.infoLabel}>최대 인원</Text>
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons name="people-outline" size={14} color="#888" />
+                            <Text style={styles.infoLabel}>최대 인원</Text>
+                        </View>
+                        <Text style={styles.infoValue}>
+                            {group?.people_count ? `${group.people_count}명` : "제한 없음"}
+                        </Text>
                     </View>
-                    <Text style={styles.infoValue}>
-                        {group?.people_count ? `${group.people_count}명` : "제한 없음"}
-                    </Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <View style={styles.infoIcon}>
-                        <Ionicons name="calendar-outline" size={14} color="#888" />
-                        <Text style={styles.infoLabel}>개설일</Text>
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons name="calendar-outline" size={14} color="#888" />
+                            <Text style={styles.infoLabel}>개설일</Text>
+                        </View>
+                        <Text style={styles.infoValue}>
+                            {group?.created_at
+                                ? group.created_at.toString().split("T")[0]
+                                : ""}
+                        </Text>
                     </View>
-                    <Text style={styles.infoValue}>
-                        {group?.created_at
-                            ? group.created_at.toString().split("T")[0]
-                            : ""}
-                    </Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <View style={styles.infoIcon}>
-                        <Ionicons name="calendar-outline" size={14} color="#888" />
-                        <Text style={styles.infoLabel}>목표 날짜</Text>
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons name="calendar-outline" size={14} color="#888" />
+                            <Text style={styles.infoLabel}>목표 날짜</Text>
+                        </View>
+                        <Text style={styles.infoValue}>
+                            {group?.group_books[0]?.target_date
+                                ? group.group_books[0]?.target_date.toString().split("T")[0]
+                                : ""}
+                        </Text>
                     </View>
-                    <Text style={styles.infoValue}>
-                        {group?.group_books[0]?.target_date
-                            ? group.group_books[0]?.target_date.toString().split("T")[0]
-                            : ""}
-                    </Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <View style={styles.infoIcon}>
-                        <Ionicons name="people-outline" size={14} color="#888" />
-                        <Text style={styles.infoLabel}>방장</Text>
+                    <View style={styles.infoRow}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons name="people-outline" size={14} color="#888" />
+                            <Text style={styles.infoLabel}>방장</Text>
+                        </View>
+                        <Text style={styles.infoValue}>
+                            {group?.creator?.nickname ?? "미설정"}
+                        </Text>
                     </View>
-                    <Text style={styles.infoValue}>
-                        {group?.creator?.nickname ?? "미설정"}
-                    </Text>
-                </View>
 
-                <View style={styles.groupActionRow}>
-                    <TouchableOpacity style={styles.editBtn} onPress={() => router.push(`/editgroup?group_id=${group_id}`)}>
-                        <Text style={styles.editBtnText}>그룹 수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveGroup}>
-                        <Text style={styles.leaveBtnText}>그룹 나가기</Text>
-                    </TouchableOpacity>
+                    <View style={styles.groupActionRow}>
+                        <TouchableOpacity style={styles.editBtn} onPress={() => router.push(`/editgroup?group_id=${group_id}`)}>
+                            <Text style={styles.editBtnText}>그룹 수정</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveGroup}>
+                            <Text style={styles.leaveBtnText}>그룹 나가기</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
 
             {/* 타래 섹션 */}
             <View style={styles.sectionHeader}>
@@ -271,7 +274,7 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 80 },
+    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 100 },
 
     // 헤더
     header: {
