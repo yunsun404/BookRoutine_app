@@ -88,10 +88,34 @@ export default function GroupScreen() {
         memberCount: g._count.group_members ?? 0,
       }));
       setGroups(formatted);
+      await fetchFeeds(formatted); // groups state 말고 formatted 직접 넘기기
     } catch (e) {
       console.error("그룹 목록 조회 실패:", e);
     } finally {
       setGroupsLoading(false);
+    }
+  };
+
+  const fetchFeeds = async (groupList: typeof groups) => {
+    try {
+      const results = await Promise.all(
+        groupList.map((g) => groupApi.getGroupThread(g.id))
+      );
+      const allThreads = results.flat(); // 여러 그룹 타래를 하나로 합치기
+      const formatted = allThreads.map((t: any) => ({
+        id: t.thread_id,  // tread_id 오타 수정
+        username: t.user.nickname,
+        date: t.updated_at,
+        bookTitle: t.book?.title ?? '',
+        quote: t.content,
+        likes: t.likes
+      }));
+      // likes 많은 순으로 정렬
+      formatted.sort((a, b) => b.likes - a.likes);
+      setPosts(formatted);
+    } catch (e) {
+      console.error("그룹 피드 조회 실패: ", e);
+    } finally {
     }
   };
 
@@ -331,7 +355,7 @@ export default function GroupScreen() {
               <Text style={styles.postUser}>{item.username}</Text>
               <Text style={styles.postBook}>📖 {item.bookTitle}</Text>
               <Text style={styles.postQuote}>{item.quote}</Text>
-              <Text style={styles.postDate}>{item.date}</Text>
+              <Text style={styles.postDate}>{(item.date).toString().split('T')[0]}</Text>
             </View>
           )}
         />
