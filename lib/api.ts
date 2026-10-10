@@ -288,6 +288,11 @@ export const groupApi = {
             group_members?: number;
           },
         ];
+        group_members: [
+          {
+            joined_at: Date;
+          }
+        ];
       }[]
     >("/groups"),
 

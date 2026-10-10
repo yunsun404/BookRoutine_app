@@ -6,7 +6,7 @@ import {
   //router,
   useRouter,
 } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { Dropdown } from 'react-native-element-dropdown';
 import Header from "../../components/Header";
 
 
@@ -29,16 +30,26 @@ interface Group {
   id: string;
   name: string;
   memberCount: number;
+  joined_at: Date;
 }
 
 interface Post {
   id: string;
   username: string;
-  date: string;
+  date: Date;
   bookTitle: string;
   quote: string;
   likes: number;
 }
+
+const sortOptionsList = [
+  { label: '최신 가입순', value: 'JOIN_DESC' },
+  { label: '이름 오름차순', value: 'NAME_ASC' }
+];
+const sortOptionsFeed = [
+  { label: '최신순', value: 'UPDATE_DESC' },
+  { label: '좋아요순', value: 'LIKES_DESC' }
+];
 
 // ── 컴포넌트 ───────────────────────────────────────────────────────
 export default function GroupScreen() {
@@ -55,6 +66,8 @@ export default function GroupScreen() {
 
   // 그룹 피드 (API 연동 전 임시 빈 배열)
   const [posts, setPosts] = useState<Post[]>([]);
+  // 정렬 기준
+  const [sortKey, setSortKey] = useState("JOIN_DESC");
 
   // ── 팝업 상태 ────────────────────────────────────────────────────
   const [modalType, setModalType] = useState<"create" | "join" | null>(null);
@@ -86,6 +99,7 @@ export default function GroupScreen() {
         id: g.group_id,
         name: g.group_name,
         memberCount: g._count.group_members ?? 0,
+        joined_at: g.group_members[0].joined_at,
       }));
       setGroups(formatted);
       await fetchFeeds(formatted); // groups state 말고 formatted 직접 넘기기
@@ -118,6 +132,46 @@ export default function GroupScreen() {
     } finally {
     }
   };
+
+  // 정렬 함수
+  const sortGroups = useMemo(() => {
+    if (sortKey === "JOIN_DESC") {
+      // shallow copy 후 정렬 수행
+      return [...groups].sort((a, b) => {
+        const dateA = new Date(a.joined_at).getTime();
+        const dateB = new Date(b.joined_at).getTime();
+        return dateB - dateA
+      });
+    }
+    if (sortKey === "NAME_ASC") {
+      return [...groups].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return groups;
+  }, [sortKey, groups]); // sortKey 상태가 변경될 때마다 다시 실행
+  const sortPosts = useMemo(() => {
+    if (sortKey === "UPDATE_DESC") {
+      return [...posts].sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateB - dateA;
+      })
+    }
+    if (sortKey === "LIKES_DESC") {
+      return [...posts].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+    }
+    return posts;
+  }, [sortKey, posts]);
+
+  // 드롭박스 너비 조절
+  const dropdownWidth = useMemo(() => {
+    const selectedLabel = (activeTab === "LIST" ? sortOptionsList : sortOptionsFeed)
+      .find(o => o.value === sortKey)?.label ?? "";
+    if (selectedLabel.length <= 0) {
+      const plaseholder = "정렬 기준 선택";
+      return plaseholder.length * 13 + 48;
+    }
+    return selectedLabel.length * 15 + 48; // 글자당 15px + 패딩/아이콘 여유
+  }, [sortKey, activeTab]);
 
   useEffect(() => {
     fetchGroups();
@@ -305,13 +359,25 @@ export default function GroupScreen() {
         ))}
       </View>
 
+      <View style={styles.dropBox}>
+        <Dropdown
+          style={[styles.dropdown, { width: dropdownWidth }]}
+          data={activeTab === "LIST" ? sortOptionsList : sortOptionsFeed}
+          labelField={"label"}
+          valueField={"value"}
+          placeholder="정렬 기준 선택"
+          value={sortKey}
+          onChange={item => setSortKey(item.value)}
+        />
+      </View>
+
       {/* 탭 콘텐츠 */}
       {activeTab === "LIST" ? (
         groupsLoading ? (
           <ActivityIndicator style={{ marginTop: 40 }} />
         ) : (
           <FlatList
-            data={groups}
+            data={sortGroups}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
@@ -344,7 +410,7 @@ export default function GroupScreen() {
         )
       ) : (
         <FlatList
-          data={posts}
+          data={sortPosts}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
@@ -493,7 +559,7 @@ export default function GroupScreen() {
 
 // ── 스타일 ─────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 10 },
+  container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 50 },
   // 헤더
   header: {
     flexDirection: "row",
@@ -569,6 +635,17 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  dropBox: {
+    alignSelf: "flex-end",
+  },
+  dropdown: {
+    paddingHorizontal: 12,
+    marginRight: 5,
+    borderWidth: 1,
+    borderColor: "#fff",
+    borderRadius: 8,
+    backgroundColor: "#fff",
   },
 
   // 리스트
