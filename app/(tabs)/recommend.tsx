@@ -90,7 +90,7 @@ export default function RecommendScreen() {
               title: r.title,
               author: r.author,
               coverUrl: r.cover_url,
-              onPress: () => router.push({ pathname: "/book-detail", params: { book_id: r.book_id } }),
+              onPress: () => router.push({ pathname: "/book-detail", params: { book_id: r.book_id, infoOnly: "1" } }),
             })),
           );
         } catch (recError) {
