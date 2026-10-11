@@ -37,7 +37,8 @@ export default function BookDetailScreen() {
   // 예) router.push({ pathname: "/book-detail", params: { book_id, tab: "sentences" } })
   // 추천 화면의 장르 추천 책은 DB에 없어서 book_id 대신 isbn으로 열립니다.
   // 예) router.push({ pathname: "/book-detail", params: { isbn } })
-  const params = useLocalSearchParams<{ book_id?: string; isbn?: string; tab?: string }>();
+  // infoOnly=1이면 책 정보만 보여줌 (추천 화면처럼 아직 읽지 않은 책을 볼 때는 문장 수집이 필요 없음)
+  const params = useLocalSearchParams<{ book_id?: string; isbn?: string; tab?: string; infoOnly?: string }>();
   const bookId = (params.book_id as string) || "";
   const isbn = (params.isbn as string) || "";
 
@@ -87,6 +88,9 @@ export default function BookDetailScreen() {
     );
   }
 
+  // 문장 수집은 DB에 있는 책(book_id)이면서 infoOnly가 아닐 때만
+  const showSentences = !!book.book_id && params.infoOnly !== "1";
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -122,8 +126,8 @@ export default function BookDetailScreen() {
           )}
         </View>
 
-        {/* 탭 바: 책 정보 | 문장 수집 (DB에 없는 추천 책은 문장 수집이 불가해서 탭을 숨김) */}
-        {!!book.book_id && (
+        {/* 탭 바: 책 정보 | 문장 수집 (DB에 없는 책이나 infoOnly일 때는 탭을 숨김) */}
+        {showSentences && (
         <View style={styles.tabBar}>
           {TABS.map((t) => {
             const active = tab === t.key;
@@ -140,7 +144,7 @@ export default function BookDetailScreen() {
         </View>
         )}
 
-        {tab === "info" || !book.book_id ? (
+        {tab === "info" || !showSentences ? (
           <View style={styles.introBox}>
             <Text style={styles.introLabel}>책 소개</Text>
             <Text style={styles.introText}>
@@ -159,7 +163,7 @@ export default function BookDetailScreen() {
 
       {/* 문장 추가 버튼: ScrollView 바깥에 둬야 스크롤해도 화면에 고정됩니다.
           전역 FloatingTabMenu 버튼(bottom 24)과 겹치지 않게 그 위에 배치 */}
-      {tab === "sentences" && !!book.book_id && (
+      {tab === "sentences" && showSentences && (
         <TouchableOpacity
           style={styles.addFab}
           onPress={() => setAddSheetOpen(true)}
