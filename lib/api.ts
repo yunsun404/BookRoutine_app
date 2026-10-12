@@ -481,16 +481,31 @@ export const bookApi = {
       }[]
     >(`/recommendation${limit ? `?limit=${limit}` : ""}`),
 
-  // 장르 기반 추천 — 알라딘에서 해당 장르 책을 판매량순으로 (내 책장에 있는 책 제외)
-  getGenreRecommendations: (genre: string, limit = 10) =>
+  // 국립중앙도서관 사서 추천 — 4개 분류 합쳐서 최근 추천순 (내 책장에 있는 책 제외)
+  getLibrarianRecommendations: (limit = 10) =>
     request<{
-      genre: string;
       items: {
         isbn: string;
         title: string;
         author: string | null;
         cover_url: string | null;
         publisher: string | null;
+        category: string; // 문학 / 인문과학 / 사회과학 / 자연과학
+        recommended_at: string; // "2026.10"
       }[];
-    }>(`/recommendation/genre?genre=${encodeURIComponent(genre)}&limit=${limit}`),
+    }>(`/recommendation/librarian?limit=${limit}`),
+
+  // 또래가 읽고 있는 책 — 같은 연령대 사용자 책장 기준, 부족하면 전체 사용자 인기 책 (scope: "all")
+  getPeerRecommendations: (limit = 10) =>
+    request<{
+      scope: "peer" | "all";
+      age_group: number | null; // 20 → 20대
+      items: {
+        book_id: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        reader_count: number;
+      }[];
+    }>(`/recommendation/peers?limit=${limit}`),
 };
