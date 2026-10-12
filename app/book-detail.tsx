@@ -16,7 +16,7 @@ import { styles } from "./styles/book-detail.styles";
 import { P } from "@/constants/palette";
 
 type BookDetail = {
-  book_id: string;
+  book_id: string | null; // 추천 화면의 알라딘 책은 DB에 없어서 null
   title: string;
   author: string | null;
   cover_url: string | null;
@@ -35,8 +35,12 @@ const TABS: { key: TabKey; label: string }[] = [
 export default function BookDetailScreen() {
   // tab 파라미터를 받으면 처음부터 해당 탭으로 열 수 있습니다.
   // 예) router.push({ pathname: "/book-detail", params: { book_id, tab: "sentences" } })
-  const params = useLocalSearchParams<{ book_id: string; tab?: string }>();
-  const bookId = params.book_id as string;
+  // 추천 화면의 장르 추천 책은 DB에 없어서 book_id 대신 isbn으로 열립니다.
+  // 예) router.push({ pathname: "/book-detail", params: { isbn } })
+  // infoOnly=1이면 책 정보만 보여줌 (추천 화면처럼 아직 읽지 않은 책을 볼 때는 문장 수집이 필요 없음)
+  const params = useLocalSearchParams<{ book_id?: string; isbn?: string; tab?: string; infoOnly?: string }>();
+  const bookId = (params.book_id as string) || "";
+  const isbn = (params.isbn as string) || "";
 
   const [book, setBook] = useState<BookDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,12 +49,15 @@ export default function BookDetailScreen() {
 
   useEffect(() => {
     fetchBookDetail();
-  }, [bookId]);
+  }, [bookId, isbn]);
 
   const fetchBookDetail = async () => {
     try {
       setLoading(true);
-      const res = await authFetch(`${BASE_URL}/reading-goals/books/${bookId}`);
+      const url = bookId
+        ? `${BASE_URL}/reading-goals/books/${bookId}`
+        : `${BASE_URL}/recommendation/books/${encodeURIComponent(isbn)}`;
+      const res = await authFetch(url);
       // 404 같은 에러 응답({ message, statusCode })을 책 정보로 착각해 그리지 않도록 방어
       if (!res.ok) {
         setBook(null);
@@ -80,6 +87,9 @@ export default function BookDetailScreen() {
       </View>
     );
   }
+
+  // 문장 수집은 DB에 있는 책(book_id)이면서 infoOnly가 아닐 때만
+  const showSentences = !!book.book_id && params.infoOnly !== "1";
 
   return (
     <View style={styles.screen}>
@@ -116,7 +126,8 @@ export default function BookDetailScreen() {
           )}
         </View>
 
-        {/* 탭 바: 책 정보 | 문장 수집 */}
+        {/* 탭 바: 책 정보 | 문장 수집 (DB에 없는 책이나 infoOnly일 때는 탭을 숨김) */}
+        {showSentences && (
         <View style={styles.tabBar}>
           {TABS.map((t) => {
             const active = tab === t.key;
@@ -131,8 +142,9 @@ export default function BookDetailScreen() {
             );
           })}
         </View>
+        )}
 
-        {tab === "info" ? (
+        {tab === "info" || !showSentences ? (
           <View style={styles.introBox}>
             <Text style={styles.introLabel}>책 소개</Text>
             <Text style={styles.introText}>
@@ -151,7 +163,7 @@ export default function BookDetailScreen() {
 
       {/* 문장 추가 버튼: ScrollView 바깥에 둬야 스크롤해도 화면에 고정됩니다.
           전역 FloatingTabMenu 버튼(bottom 24)과 겹치지 않게 그 위에 배치 */}
-      {tab === "sentences" && (
+      {tab === "sentences" && showSentences && (
         <TouchableOpacity
           style={styles.addFab}
           onPress={() => setAddSheetOpen(true)}
