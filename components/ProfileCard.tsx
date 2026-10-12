@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { P } from "@/constants/palette";
 
 interface ProfileData {
   nickname: string;
@@ -35,6 +36,11 @@ interface TitleData {
   is_acquired: boolean;
   is_representative: boolean;
 }
+
+// 칭호(레벨 배지 + 칭호 도감 모달)와 포인트 표시 여부.
+// false면 화면에 안 보이고, /level/me · /points/me 요청도 보내지 않는다.
+// 다시 보이게 하려면 true로 바꾸기만 하면 된다.
+const SHOW_LEVEL_AND_POINTS = false;
 
 // bookshelf.tsx에 있던 것과 동일한 규칙 — 컴포넌트가 갈라졌으니 규칙도 여기 옮겨둠
 const formatAge = (age: number) => {
@@ -63,13 +69,16 @@ export default function ProfileCard() {
 
   const fetchAll = async () => {
     try {
-      const [profileRes, levelRes, pointRes] = await Promise.all([
-        authFetch(`${BASE_URL}/users/me`),
+      // 프로필(닉네임·사진)만 먼저 반영 — 레벨/포인트 요청이 실패해도 카드는 뜨도록 분리
+      const profileRes = await authFetch(`${BASE_URL}/users/me`);
+      setProfile(await profileRes.json());
+
+      if (!SHOW_LEVEL_AND_POINTS) return; // finally에서 로딩은 정상 종료됨
+
+      const [levelRes, pointRes] = await Promise.all([
         authFetch(`${BASE_URL}/level/me`),
         authFetch(`${BASE_URL}/points/me`),
       ]);
-
-      setProfile(await profileRes.json());
       setLevelInfo(await levelRes.json());
       setPointInfo(await pointRes.json());
     } catch (error) {
@@ -116,7 +125,7 @@ export default function ProfileCard() {
   if (loading) {
     return (
       <View style={styles.card}>
-        <ActivityIndicator size="small" color="#8B4513" />
+        <ActivityIndicator size="small" color={P.primary} />
       </View>
     );
   }
@@ -175,7 +184,7 @@ export default function ProfileCard() {
             {titlesLoading ? (
               <ActivityIndicator
                 style={{ paddingVertical: 24 }}
-                color="#8B4513"
+                color={P.primary}
               />
             ) : (
               <ScrollView style={styles.titleList}>
@@ -242,7 +251,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 16,
     borderRadius: 16,
-    shadowColor: "#000",
+    shadowColor: P.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -252,7 +261,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#E1D9D1",
+    backgroundColor: P.coverPlaceholder,
     marginRight: 12,
   },
   info: {
@@ -261,11 +270,11 @@ const styles = StyleSheet.create({
   nickname: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
   },
   age: {
     fontSize: 12,
-    color: "#999",
+    color: P.textTertiary,
     marginTop: 2,
   },
   badges: {
@@ -273,7 +282,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   levelBadge: {
-    backgroundColor: "#F0EFED",
+    backgroundColor: P.bg,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -281,11 +290,11 @@ const styles = StyleSheet.create({
   levelText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#8B4513",
+    color: P.primary,
   },
   pointText: {
     fontSize: 12,
-    color: "#C8B84A",
+    color: P.primary,
     fontWeight: "600",
   },
 
@@ -306,7 +315,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
     marginBottom: 16,
     textAlign: "center",
   },
@@ -318,29 +327,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: "#FAF8F5",
+    backgroundColor: P.bg,
     borderRadius: 12,
     marginBottom: 8,
   },
   titleItemLocked: {
-    backgroundColor: "#F5F5F5",
+    backgroundColor: P.bg,
     opacity: 0.6,
   },
   titleName: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
   },
   titleNameLocked: {
-    color: "#999",
+    color: P.textTertiary,
   },
   titleCondition: {
     fontSize: 11,
-    color: "#999",
+    color: P.textTertiary,
     marginTop: 2,
   },
   representativeBadge: {
-    backgroundColor: "#8B4513",
+    backgroundColor: P.primary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
@@ -352,26 +361,26 @@ const styles = StyleSheet.create({
   },
   setButton: {
     borderWidth: 1,
-    borderColor: "#8B4513",
+    borderColor: P.primary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
   setButtonText: {
     fontSize: 11,
-    color: "#8B4513",
+    color: P.primary,
     fontWeight: "600",
   },
   closeButton: {
     marginTop: 16,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#F0EFED",
+    backgroundColor: P.bg,
     borderRadius: 12,
   },
   closeButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: P.ink,
   },
 });

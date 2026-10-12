@@ -17,6 +17,7 @@ import CoverPickerModal from "../components/bookshelf/CoverPickerModal";
 import Header from "../components/Header";
 import ProfileCard from "../components/ProfileCard";
 import styles from "./styles/bookshelf.styles";
+import { P } from "@/constants/palette";
 
 interface BookshelfItem {
   bookshelf_id: string;
@@ -179,7 +180,7 @@ export default function BookshelfScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#8B4513" />
+        <ActivityIndicator size="large" color={P.primary} />
       </View>
     );
   }
@@ -188,10 +189,6 @@ export default function BookshelfScreen() {
     <View style={styles.container}>
       <Header />
       <ProfileCard />
-
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color="#333" />
-      </TouchableOpacity>
 
       {/* 탭 */}
       <View style={styles.tabRow}>
@@ -228,81 +225,76 @@ export default function BookshelfScreen() {
       </View>
 
       {/* 책장 */}
-      {activeTab === "bookshelf" && (
-        <FlatList
-          data={[
-            ...books.map((b) => ({ type: "book" as const, data: b })),
-            ...folders.map((f) => ({ type: "folder" as const, data: f })),
-            { type: "add" as const, data: null },
-          ]}
-          keyExtractor={(item) =>
-            item.type === "book"
-              ? item.data.bookshelf_id
-              : item.type === "folder"
-                ? item.data.folder_id
-                : "add"
+      <FlatList
+        data={[
+          ...books.map((b) => ({ type: "book" as const, data: b })),
+          ...folders.map((f) => ({ type: "folder" as const, data: f })),
+          { type: "add" as const, data: null },
+        ]}
+        keyExtractor={(item) =>
+          item.type === "book"
+            ? item.data.bookshelf_id
+            : item.type === "folder"
+              ? item.data.folder_id
+              : "add"
+        }
+        numColumns={3}
+        contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.columnWrapper}
+        renderItem={({ item }) => {
+          if (item.type === "book") {
+            return renderBookItem({ item: item.data });
           }
-          numColumns={3}
-          contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.columnWrapper}
-          renderItem={({ item }) => {
-            if (item.type === "book") {
-              return renderBookItem({ item: item.data });
-            }
-            if (item.type === "folder") {
-              return (
-                <TouchableOpacity
-                  style={styles.folderCard}
-                  onPress={() =>
-                    router.push(
-                      `/folder/${item.data.folder_id}?folder_name=${encodeURIComponent(item.data.folder_name)}&folder_image=${encodeURIComponent(item.data.folder_image ?? "")}` as any,
-                    )
-                  }
-                >
-                  {item.data.folder_image ? (
-                    <>
-                      <Image
-                        source={{ uri: item.data.folder_image }}
-                        style={styles.folderCoverImage}
-                      />
-                      {/* 표지 사진 위에 이름/권수를 바로 얹으면 텍스트가 사진에 묻히니,
-                          어두운 그라데이션 대신 하단에 반투명 바를 깔아 항상 읽히게 합니다. */}
-                      <View style={styles.folderCoverOverlay}>
-                        <Text
-                          style={styles.folderNameOnCover}
-                          numberOfLines={1}
-                        >
-                          {item.data.folder_name}
-                        </Text>
-                        <Text style={styles.folderCountOnCover}>
-                          {item.data.folder_books.length}권
-                        </Text>
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.folderName}>
-                        {item.data.folder_name}
-                      </Text>
-                      <Text style={styles.folderCount}>
-                        {item.data.folder_books.length}권
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              );
-            }
+          if (item.type === "folder") {
             return (
               <TouchableOpacity
-                style={styles.addFolderCard}
-                onPress={() => setModalVisible(true)}
+                style={styles.folderCard}
+                onPress={() =>
+                  router.push(
+                    `/folder/${item.data.folder_id}?folder_name=${encodeURIComponent(item.data.folder_name)}&folder_image=${encodeURIComponent(item.data.folder_image ?? "")}` as any,
+                  )
+                }
               >
-                <Text style={styles.addFolderText}>+</Text>
+                {item.data.folder_image ? (
+                  <>
+                    <Image
+                      source={{ uri: item.data.folder_image }}
+                      style={styles.folderCoverImage}
+                    />
+                    {/* 표지 사진 위에 이름/권수를 바로 얹으면 텍스트가 사진에 묻히니,
+                          어두운 그라데이션 대신 하단에 반투명 바를 깔아 항상 읽히게 합니다. */}
+                    <View style={styles.folderCoverOverlay}>
+                      <Text style={styles.folderNameOnCover} numberOfLines={1}>
+                        {item.data.folder_name}
+                      </Text>
+                      <Text style={styles.folderCountOnCover}>
+                        {item.data.folder_books.length}권
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.folderName}>
+                      {item.data.folder_name}
+                    </Text>
+                    <Text style={styles.folderCount}>
+                      {item.data.folder_books.length}권
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             );
-          }}
-        />
-      )}
+          }
+          return (
+            <TouchableOpacity
+              style={styles.addFolderCard}
+              onPress={() => setModalVisible(true)}
+            >
+              <Text style={styles.addFolderText}>+</Text>
+            </TouchableOpacity>
+          );
+        }}
+      />
 
       {/* 폴더 생성 모달 */}
       <Modal visible={modalVisible} transparent animationType="fade">

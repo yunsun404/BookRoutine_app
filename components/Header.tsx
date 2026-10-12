@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { P } from "@/constants/palette";
 
 interface UserProfile {
     nickname: string;
@@ -64,10 +65,10 @@ export default function Header() {
         <>
             <View style={styles.topBar}>
                 <TouchableOpacity onPress={() => router.push("/(tabs)/notifications")}>
-                    <Ionicons name="notifications-outline" size={24} color="#333" />
+                    <Ionicons name="notifications-outline" size={24} color={P.ink} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMenuVisible(true)}>
-                    <Ionicons name="menu-outline" size={28} color="#333" />
+                    <Ionicons name="menu-outline" size={28} color={P.ink} />
                 </TouchableOpacity>
             </View>
 
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 16,
         paddingVertical: 16,
         marginTop: 56,
-        shadowColor: "#000",
+        shadowColor: P.shadow,
         shadowOffset: { width: -2, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
@@ -189,17 +190,17 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: "#E1D9D1",
+        backgroundColor: P.coverPlaceholder,
         marginBottom: 8,
     },
     menuNickname: {
         fontSize: 15,
         fontWeight: "700",
-        color: "#333",
+        color: P.ink,
     },
     menuDivider: {
         height: 1,
-        backgroundColor: "#F0EFED",
+        backgroundColor: P.bg,
         marginVertical: 8,
     },
     menuItem: {
@@ -208,6 +209,6 @@ const styles = StyleSheet.create({
     },
     menuItemText: {
         fontSize: 14,
-        color: "#333",
+        color: P.ink,
     },
 });

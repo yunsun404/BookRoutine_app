@@ -25,6 +25,14 @@ type BookDetail = {
   rating: number | null; // 알라딘 평점 (0~5 또는 0~10)
 };
 
+// GET /threads?book_id= 응답 (threads.service.ts findAll: 로그인 유저가 이 책에 남긴 타래)
+type Thread = {
+  thread_id: string;
+  content: string;
+  current_page: number | null;
+  created_at: string;
+};
+
 type TabKey = "info" | "sentences";
 
 const TABS: { key: TabKey; label: string }[] = [
@@ -46,9 +54,13 @@ export default function BookDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>(params.tab === "sentences" ? "sentences" : "info");
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [threads, setThreads] = useState<Thread[]>([]);
 
+  // 책 정보와 타래는 서로 의존하지 않으므로(둘 다 bookId만 필요) 동시에 요청합니다.
   useEffect(() => {
+    if (!bookId) return;
     fetchBookDetail();
+    fetchThreads();
   }, [bookId, isbn]);
 
   const fetchBookDetail = async () => {
@@ -69,6 +81,20 @@ export default function BookDetailScreen() {
       console.error("책 상세 조회 실패:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchThreads = async () => {
+    try {
+      const res = await authFetch(`${BASE_URL}/threads?book_id=${bookId}`);
+      if (!res.ok) return; // 타래 실패가 책 상세 전체를 막지 않도록 조용히 무시
+      const data = await res.json();
+      // 응답 모양이 배열 / { threads } / { data } 어느 쪽이어도 받도록 방어
+      if (Array.isArray(data)) setThreads(data);
+      else if (Array.isArray(data?.threads)) setThreads(data.threads);
+      else if (Array.isArray(data?.data)) setThreads(data.data);
+    } catch (e) {
+      console.error("타래 조회 실패:", e);
     }
   };
 
@@ -145,15 +171,41 @@ export default function BookDetailScreen() {
         )}
 
         {tab === "info" || !showSentences ? (
-          <View style={styles.introBox}>
-            <Text style={styles.introLabel}>책 소개</Text>
-            <Text style={styles.introText}>
-              {book.book_intro || "책 소개 정보가 없습니다."}
-            </Text>
-          </View>
+          <>
+            <View style={styles.introBox}>
+              <Text style={styles.introLabel}>책 소개</Text>
+              <Text style={styles.introText}>
+                {book.book_intro || "책 소개 정보가 없습니다."}
+              </Text>
+            </View>
+
+            {/* 타래: 책 소개 바로 아래 (DB에 있는 책일 때만) */}
+            {!!book.book_id && (
+              <View style={styles.threadSection}>
+                <Text style={styles.threadTitle}>타래</Text>
+                {threads.length === 0 ? (
+                  <Text style={styles.threadEmpty}>아직 기록이 없습니다.</Text>
+                ) : (
+                  threads.map((item) => (
+                    <View key={item.thread_id} style={styles.threadCard}>
+                      <View style={styles.threadCardTop}>
+                        <Text style={styles.threadPage}>
+                          {item.current_page != null ? `${item.current_page} pg` : ""}
+                        </Text>
+                        <Text style={styles.threadDate}>{item.created_at?.slice(0, 10)}</Text>
+                      </View>
+                      <Text style={styles.threadContent}>{item.content}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+          </>
         ) : (
           <SentenceTab
             bookId={book.book_id ?? bookId}
+            bookTitle={book.title}
+            bookAuthor={book.author}
             totalPages={book.total_pages}
             addSheetVisible={addSheetOpen}
             onCloseAddSheet={() => setAddSheetOpen(false)}
