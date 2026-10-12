@@ -288,6 +288,11 @@ export const groupApi = {
             group_members?: number;
           },
         ];
+        group_members: [
+          {
+            joined_at: Date;
+          }
+        ];
       }[]
     >("/groups"),
 
@@ -356,7 +361,7 @@ export const groupApi = {
     group_id: string,
     body: {
       group_name?: string;
-      max_people?: number;
+      people_count?: number;
       book_id?: string;
       isbn?: string;
       title?: string;
@@ -367,10 +372,6 @@ export const groupApi = {
     },
   ) =>
     request<{
-      // group_name?: string;
-      // people_count?: number;
-      // book_id?: string;
-      // target_date?: Date;
       update_group: {
         group_name: string;
         people_count: number;
@@ -479,4 +480,17 @@ export const bookApi = {
         my_score: number;
       }[]
     >(`/recommendation${limit ? `?limit=${limit}` : ""}`),
+
+  // 장르 기반 추천 — 알라딘에서 해당 장르 책을 판매량순으로 (내 책장에 있는 책 제외)
+  getGenreRecommendations: (genre: string, limit = 10) =>
+    request<{
+      genre: string;
+      items: {
+        isbn: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        publisher: string | null;
+      }[];
+    }>(`/recommendation/genre?genre=${encodeURIComponent(genre)}&limit=${limit}`),
 };

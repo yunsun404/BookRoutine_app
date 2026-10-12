@@ -2,7 +2,7 @@
 import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -45,15 +45,19 @@ export default function ReadingPlanScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // 이전 화면에서 전달받은 책 정보
-  const book = {
+  // goal_id가 넘어오면 기존 목표 수정 모드 (홈 → 목표 "수정" 버튼)
+  const goalId = (params.goal_id as string) || "";
+  const isEdit = !!goalId;
+
+  // 이전 화면에서 전달받은 책 정보 (수정 모드에서는 목표 조회 후 채움)
+  const [book, setBook] = useState({
     book_id: (params.book_id as string) || "",
     title: (params.title as string) || "",
     author: (params.author as string) || "",
     total_pages: Number(params.total_pages) || 0,
     isbn: (params.isbn as string) || "",
     cover: (params.cover as string) || "",
-  };
+  });
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -64,12 +68,74 @@ export default function ReadingPlanScreen() {
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 3, 5]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [loadingGoal, setLoadingGoal] = useState(isEdit);
+  // 수정 모드: 이미 완료한 마지막 쪽 (남은 분량 계산용)
+  const [lastReadPage, setLastReadPage] = useState(0);
+  // 기존 목표를 불러와 채울 때는 요일 자동 선택이 저장된 요일을 덮어쓰지 않게 한 번 건너뜀
+  const skipAutoDays = useRef(false);
 
   const todayString = formatDate(today);
+
+  useEffect(() => {
+    if (!isEdit) return;
+
+    (async () => {
+      try {
+        const res = await authFetch(`${API_URL}/${goalId}`);
+        if (!res.ok) {
+          setError("목표를 불러오지 못했어요.");
+          return;
+        }
+        const goal = await res.json();
+
+        setBook({
+          book_id: goal.book_id,
+          title: goal.book?.title ?? "",
+          author: goal.book?.author ?? "",
+          total_pages: goal.book?.total_pages ?? 0,
+          isbn: goal.book?.isbn ?? "",
+          cover: goal.book?.cover_url ?? "",
+        });
+
+        const done = (goal.checklists ?? [])
+          .filter((c: any) => c.check_box)
+          .reduce((max: number, c: any) => {
+            const match = c.goal_content?.match(/~\s*([\d,]+)\s*쪽/);
+            return Math.max(max, match ? Number(match[1].replace(/,/g, "")) : 0);
+          }, 0);
+        setLastReadPage(done);
+
+        // 지난 날짜는 고를 수 없으므로 시작일은 오늘 이후로 맞춤
+        const start = goal.start_date ? goal.start_date.slice(0, 10) : "";
+        const end = goal.end_date ? goal.end_date.slice(0, 10) : "";
+        const nextStart = start && start < todayString ? todayString : start;
+        const nextEnd = end && end >= nextStart ? end : "";
+        if (Array.isArray(goal.preferred_days)) {
+          if (nextStart && nextEnd) skipAutoDays.current = true;
+          setSelectedDays(goal.preferred_days);
+        }
+        setStartDate(nextStart);
+        setEndDate(nextEnd);
+        if (nextStart) {
+          setCurrentYear(Number(nextStart.slice(0, 4)));
+          setCurrentMonth(Number(nextStart.slice(5, 7)) - 1);
+        }
+      } catch (e) {
+        console.error(e);
+        setError("서버에 연결할 수 없어요. 백엔드 서버가 켜져 있는지 확인해주세요.");
+      } finally {
+        setLoadingGoal(false);
+      }
+    })();
+  }, [goalId]);
 
   // 시작일과 종료일이 모두 선택되면, 그 기간에 포함되는 요일 자동 선택
   useEffect(() => {
     if (!startDate || !endDate) return;
+    if (skipAutoDays.current) {
+      skipAutoDays.current = false;
+      return;
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -101,7 +167,8 @@ export default function ReadingPlanScreen() {
     return result;
   }, [startDate, endDate, selectedDays]);
 
-  const dailyPages = readingDates.length > 0 ? Math.ceil(book.total_pages / readingDates.length) : 0;
+  const remainingPages = Math.max(book.total_pages - lastReadPage, 0);
+  const dailyPages = readingDates.length > 0 ? Math.ceil(remainingPages / readingDates.length) : 0;
 
   const calendarDays = useMemo(() => {
     const firstDate = new Date(currentYear, currentMonth, 1);
@@ -186,6 +253,32 @@ export default function ReadingPlanScreen() {
       return;
     }
 
+    if (isEdit) {
+      try {
+        setSubmitting(true);
+        const res = await authFetch(`${API_URL}/${goalId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            start_date: startDate,
+            end_date: endDate,
+            preferred_days: selectedDays,
+          }),
+        });
+        if (!res.ok) {
+          setError("목표를 수정하지 못했어요. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+        router.back();
+      } catch (e) {
+        console.error(e);
+        setError("서버에 연결할 수 없어요. 백엔드 서버가 켜져 있는지 확인해주세요.");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     try {
       setSubmitting(true);
       const requestBody: any = {
@@ -229,7 +322,7 @@ export default function ReadingPlanScreen() {
           <Ionicons name="chevron-back" size={22} color={C.ink} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>목표 생성</Text>
+          <Text style={s.headerTitle}>{isEdit ? "목표 수정" : "목표 생성"}</Text>
           {!!book.title && (
             <Text style={s.headerSub} numberOfLines={1}>
               {book.title} · {book.total_pages}쪽
@@ -366,12 +459,12 @@ export default function ReadingPlanScreen() {
         <Pressable
           style={({ pressed }) => [s.mainButton, pressed && { opacity: 0.85 }, submitting && { opacity: 0.6 }]}
           onPress={createGoal}
-          disabled={submitting}
+          disabled={submitting || loadingGoal}
         >
-          {submitting ? (
+          {submitting || loadingGoal ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={s.mainButtonText}>계획 생성하기</Text>
+            <Text style={s.mainButtonText}>{isEdit ? "목표 수정하기" : "계획 생성하기"}</Text>
           )}
         </Pressable>
       </View>
