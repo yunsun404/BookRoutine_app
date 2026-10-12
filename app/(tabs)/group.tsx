@@ -6,9 +6,10 @@ import {
   //router,
   useRouter,
 } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -18,6 +19,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { Dropdown } from 'react-native-element-dropdown';
 import Header from "../../components/Header";
 
 
@@ -28,16 +30,26 @@ interface Group {
   id: string;
   name: string;
   memberCount: number;
+  joined_at: Date;
 }
 
 interface Post {
   id: string;
   username: string;
-  date: string;
+  date: Date;
   bookTitle: string;
   quote: string;
   likes: number;
 }
+
+const sortOptionsList = [
+  { label: '최신 가입순', value: 'JOIN_DESC' },
+  { label: '이름 오름차순', value: 'NAME_ASC' }
+];
+const sortOptionsFeed = [
+  { label: '최신순', value: 'UPDATE_DESC' },
+  { label: '좋아요순', value: 'LIKES_DESC' }
+];
 
 // ── 컴포넌트 ───────────────────────────────────────────────────────
 export default function GroupScreen() {
@@ -54,6 +66,8 @@ export default function GroupScreen() {
 
   // 그룹 피드 (API 연동 전 임시 빈 배열)
   const [posts, setPosts] = useState<Post[]>([]);
+  // 정렬 기준
+  const [sortKey, setSortKey] = useState("JOIN_DESC");
 
   // ── 팝업 상태 ────────────────────────────────────────────────────
   const [modalType, setModalType] = useState<"create" | "join" | null>(null);
@@ -85,14 +99,79 @@ export default function GroupScreen() {
         id: g.group_id,
         name: g.group_name,
         memberCount: g._count.group_members ?? 0,
+        joined_at: g.group_members[0].joined_at,
       }));
       setGroups(formatted);
+      await fetchFeeds(formatted); // groups state 말고 formatted 직접 넘기기
     } catch (e) {
       console.error("그룹 목록 조회 실패:", e);
     } finally {
       setGroupsLoading(false);
     }
   };
+
+  const fetchFeeds = async (groupList: typeof groups) => {
+    try {
+      const results = await Promise.all(
+        groupList.map((g) => groupApi.getGroupThread(g.id))
+      );
+      const allThreads = results.flat(); // 여러 그룹 타래를 하나로 합치기
+      const formatted = allThreads.map((t: any) => ({
+        id: t.thread_id,  // tread_id 오타 수정
+        username: t.user.nickname,
+        date: t.updated_at,
+        bookTitle: t.book?.title ?? '',
+        quote: t.content,
+        likes: t.likes
+      }));
+      // likes 많은 순으로 정렬
+      formatted.sort((a, b) => b.likes - a.likes);
+      setPosts(formatted);
+    } catch (e) {
+      console.error("그룹 피드 조회 실패: ", e);
+    } finally {
+    }
+  };
+
+  // 정렬 함수
+  const sortGroups = useMemo(() => {
+    if (sortKey === "JOIN_DESC") {
+      // shallow copy 후 정렬 수행
+      return [...groups].sort((a, b) => {
+        const dateA = new Date(a.joined_at).getTime();
+        const dateB = new Date(b.joined_at).getTime();
+        return dateB - dateA
+      });
+    }
+    if (sortKey === "NAME_ASC") {
+      return [...groups].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return groups;
+  }, [sortKey, groups]); // sortKey 상태가 변경될 때마다 다시 실행
+  const sortPosts = useMemo(() => {
+    if (sortKey === "UPDATE_DESC") {
+      return [...posts].sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateB - dateA;
+      })
+    }
+    if (sortKey === "LIKES_DESC") {
+      return [...posts].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+    }
+    return posts;
+  }, [sortKey, posts]);
+
+  // 드롭박스 너비 조절
+  const dropdownWidth = useMemo(() => {
+    const selectedLabel = (activeTab === "LIST" ? sortOptionsList : sortOptionsFeed)
+      .find(o => o.value === sortKey)?.label ?? "";
+    if (selectedLabel.length <= 0) {
+      const plaseholder = "정렬 기준 선택";
+      return plaseholder.length * 13 + 48;
+    }
+    return selectedLabel.length * 15 + 48; // 글자당 15px + 패딩/아이콘 여유
+  }, [sortKey, activeTab]);
 
   useEffect(() => {
     fetchGroups();
@@ -101,6 +180,7 @@ export default function GroupScreen() {
   // 그룹 생성
   const handleCreateGroup = async () => {
     if (!groupName.trim()) return;
+    if (!selectedBook) { Alert.alert('목표 도서를 선택해주세요.'); return; }
     try {
       setModalLoading(true);
       console.log('searchTitle:', searchTitle);
@@ -279,13 +359,25 @@ export default function GroupScreen() {
         ))}
       </View>
 
+      <View style={styles.dropBox}>
+        <Dropdown
+          style={[styles.dropdown, { width: dropdownWidth }]}
+          data={activeTab === "LIST" ? sortOptionsList : sortOptionsFeed}
+          labelField={"label"}
+          valueField={"value"}
+          placeholder="정렬 기준 선택"
+          value={sortKey}
+          onChange={item => setSortKey(item.value)}
+        />
+      </View>
+
       {/* 탭 콘텐츠 */}
       {activeTab === "LIST" ? (
         groupsLoading ? (
           <ActivityIndicator style={{ marginTop: 40 }} />
         ) : (
           <FlatList
-            data={groups}
+            data={sortGroups}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
@@ -318,7 +410,7 @@ export default function GroupScreen() {
         )
       ) : (
         <FlatList
-          data={posts}
+          data={sortPosts}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
@@ -329,7 +421,7 @@ export default function GroupScreen() {
               <Text style={styles.postUser}>{item.username}</Text>
               <Text style={styles.postBook}>📖 {item.bookTitle}</Text>
               <Text style={styles.postQuote}>{item.quote}</Text>
-              <Text style={styles.postDate}>{item.date}</Text>
+              <Text style={styles.postDate}>{(item.date).toString().split('T')[0]}</Text>
             </View>
           )}
         />
@@ -372,7 +464,7 @@ export default function GroupScreen() {
               <View>
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="목표 도서 (선택)"
+                  placeholder="목표 도서 (필수)"
                   value={searchTitle}
                   onChangeText={handleSearch}
                 />
@@ -474,7 +566,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 56,
+    paddingTop: 5,
     paddingBottom: 20,
   },
   headerTitle: {
@@ -543,6 +635,17 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  dropBox: {
+    alignSelf: "flex-end",
+  },
+  dropdown: {
+    paddingHorizontal: 12,
+    marginRight: 5,
+    borderWidth: 1,
+    borderColor: "#fff",
+    borderRadius: 8,
+    backgroundColor: "#fff",
   },
 
   // 리스트

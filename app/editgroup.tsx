@@ -12,7 +12,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 
 export default function EditgroupScreen() {
@@ -20,13 +20,12 @@ export default function EditgroupScreen() {
     const { group_id } = useLocalSearchParams<{ group_id: string }>();
 
     // ── 기존 정보 ────────────────────────────────────────────────────
-    const [people_count, setPeopleCount] = useState<number | undefined>();
+    const [people_count, setPeopleCount] = useState<string>('');
     const [created_by, setCreatedBy] = useState('');
     const [created_at, setCreatedAt] = useState<Date>();
     const [showPicker, setShowPicker] = useState(false);
 
     // ── 변경 내용 ────────────────────────────────────────────────────
-    const [modalType, setModalType] = useState<"create" | "join" | null>(null);
     const [groupName, setGroupName] = useState("");
     const [bookTitle, setBookTitle] = useState("");
     const [searchTitle, setSearchTitle] = useState('');
@@ -39,9 +38,7 @@ export default function EditgroupScreen() {
         cover_url?: string;
     }[]>([]);
     const [selectedBook, setSelectedBook] = useState<typeof searchResults[0] | null>(null);
-    const [maxPeople, setMaxPeople] = useState<number | undefined>(undefined);
     const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
-    const [showDatePicker, setShowDatePicker] = useState(false);
     const [inviteCode, setInviteCode] = useState("");
 
 
@@ -50,9 +47,9 @@ export default function EditgroupScreen() {
             try {
                 const result = await groupApi.getDetail(group_id);
                 setGroupName(result.group_name ?? '');
-                setPeopleCount(result.people_count);
+                setPeopleCount(result.people_count ? String(result.people_count) : '');
                 setInviteCode(result.invite_code ?? '');
-                setCreatedBy(result.created_by ?? '');
+                setCreatedBy(result.creator.nickname ?? '');
                 setCreatedAt(result.created_at);
                 setBookTitle(result.group_books[0]?.book.title ?? '');
                 setTargetDate(result.group_books[0]?.target_date ? new Date(result.group_books[0].target_date) : undefined);
@@ -83,9 +80,12 @@ export default function EditgroupScreen() {
             setLoading(true);
             await groupApi.updateGroup(group_id, {
                 group_name: groupName || undefined,
-                max_people: maxPeople || undefined,
-                isbn: selectedBook?.isbn || undefined,
-                title: selectedBook?.title || undefined,
+                people_count: people_count ? Number(people_count) : undefined,
+                isbn: selectedBook?.isbn,
+                title: selectedBook?.title,
+                author: selectedBook?.author,
+                total_pages: selectedBook?.total_pages,
+                cover_url: selectedBook?.cover_url,
                 target_date: targetDate || undefined,
             });
             router.back();
@@ -120,122 +120,125 @@ export default function EditgroupScreen() {
                 <View style={{ width: 44 }} />
             </View>
 
-            {/* 정보 카드 */}
-            <View style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                    <Ionicons name="key-outline" size={14} color="#aaa" />
-                    <Text style={styles.infoLabel}>초대 코드</Text>
-                    <Text style={[styles.infoValue, { color: "#6C63FF" }]}>{inviteCode}</Text>
+            <ScrollView>
+                {/* 정보 카드 */}
+                <View style={styles.infoCard}>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="key-outline" size={14} color="#aaa" />
+                        <Text style={styles.infoLabel}>초대 코드</Text>
+                        <Text style={[styles.infoValue, { color: "#6C63FF" }]}>{inviteCode}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="person-outline" size={14} color="#aaa" />
+                        <Text style={styles.infoLabel}>방장</Text>
+                        <Text style={styles.infoValue}>{created_by}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="calendar-outline" size={14} color="#aaa" />
+                        <Text style={styles.infoLabel}>생성일</Text>
+                        <Text style={styles.infoValue}>{created_at?.toString().split('T')[0]}</Text>
+                    </View>
                 </View>
-                <View style={styles.infoRow}>
-                    <Ionicons name="person-outline" size={14} color="#aaa" />
-                    <Text style={styles.infoLabel}>방장</Text>
-                    <Text style={styles.infoValue}>{created_by}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={14} color="#aaa" />
-                    <Text style={styles.infoLabel}>생성일</Text>
-                    <Text style={styles.infoValue}>{created_at?.toString().split('T')[0]}</Text>
-                </View>
-            </View>
 
-            {/* 입력 폼 카드 */}
-            <View style={styles.formCard}>
-                <Text style={styles.fieldLabel}>그룹 이름</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="그룹 이름"
-                    value={groupName}
-                    onChangeText={setGroupName}
-                    autoCapitalize="none"
-                />
-
-                <Text style={styles.fieldLabel}>최대 인원</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="최대 인원수"
-                    value={people_count ? String(people_count) : ''}
-                    onChangeText={(text) => setMaxPeople(text ? Number(text) : undefined)}
-                    keyboardType="numeric"
-                />
-
-                <View>
-                    <Text style={styles.fieldLabel}>목표 도서</Text>
-                    <Text style={styles.infoValue}>
-                        {bookTitle}
-                    </Text>
+                {/* 입력 폼 카드 */}
+                <View style={styles.formCard}>
+                    <Text style={styles.fieldLabel}>그룹 이름</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="목표 도서 (선택)"
-                        value={searchTitle}
-                        onChangeText={handleSearch}
+                        placeholder="그룹 이름"
+                        value={groupName}
+                        onChangeText={setGroupName}
+                        autoCapitalize="none"
                     />
-                    <ScrollView style={{ maxHeight: 130 }} nestedScrollEnabled>
-                        {searchResults.map((book) => {
-                            return (
-                                <TouchableOpacity
-                                    style={[styles.searchResult,
-                                    selectedBook === book && { backgroundColor: 'gray' }]}
-                                    key={book.book_id}
-                                    onPress={() => {
-                                        console.log('선택한 책:', book);
-                                        console.log('선택한 book_id:', book.book_id);
-                                        setSelectedBook(book);
-                                        setSearchTitle(book.title)
+
+                    <Text style={styles.fieldLabel}>최대 인원</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="최대 인원수"
+                        value={people_count}
+                        onChangeText={setPeopleCount}
+                        keyboardType="numeric"
+                    />
+
+                    <View>
+                        <Text style={styles.fieldLabel}>목표 도서</Text>
+                        <Text style={styles.targetBook}>
+                            {bookTitle}
+                        </Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="목표 도서 (선택)"
+                            value={searchTitle}
+                            onChangeText={handleSearch}
+                        />
+                        <ScrollView style={{ maxHeight: 130 }} nestedScrollEnabled>
+                            {searchResults.map((book) => {
+                                return (
+                                    <TouchableOpacity
+                                        style={[styles.searchResult,
+                                        selectedBook === book && { backgroundColor: 'gray' }]}
+                                        key={book.book_id}
+                                        onPress={() => {
+                                            console.log('선택한 책:', book);
+                                            console.log('선택한 book_id:', book.book_id);
+                                            console.log('선택한 책 isbn: ', book.isbn);
+                                            setSelectedBook(book);
+                                            setSearchTitle(book.title)
+                                        }}
+                                    >
+                                        <Text style={styles.searchResultTitle}>{book.title}</Text>
+                                        <Text style={styles.searchResultAuthor}>{book.author}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+
+                    <Text style={styles.fieldLabel}>목표 날짜</Text>
+                    {Platform.OS === 'web' ? (
+                        <input
+                            type="date"
+                            value={targetDate ? targetDate.toISOString().split('T')[0] : ''}
+                            onChange={(e) => setTargetDate(e.target.value ? new Date(e.target.value) : undefined)}
+                            style={{ padding: 12, fontSize: 15, borderRadius: 10, borderColor: '#ddd', borderWidth: 1 }}
+                        />
+                    ) : (
+                        <>
+                            <TouchableOpacity style={styles.input} onPress={() => setShowPicker(true)}>
+                                <Text style={{ color: targetDate ? "#111" : "#aaa", fontSize: 15 }}>
+                                    {targetDate ? targetDate.toISOString().split('T')[0] : '목표 날짜 선택'}
+                                </Text>
+                            </TouchableOpacity>
+                            {showPicker && (
+                                <DateTimePicker
+                                    value={targetDate ?? new Date()}
+                                    mode="date"
+                                    onChange={(event, selectedDate) => {
+                                        setShowPicker(false);
+                                        if (selectedDate) setTargetDate(selectedDate);
                                     }}
-                                >
-                                    <Text style={styles.searchResultTitle}>{book.title}</Text>
-                                    <Text style={styles.searchResultAuthor}>{book.author}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
+                                />
+                            )}
+                        </>
+                    )}
                 </View>
 
-                <Text style={styles.fieldLabel}>목표 날짜</Text>
-                {Platform.OS === 'web' ? (
-                    <input
-                        type="date"
-                        value={targetDate ? targetDate.toISOString().split('T')[0] : ''}
-                        onChange={(e) => setTargetDate(e.target.value ? new Date(e.target.value) : undefined)}
-                        style={{ padding: 12, fontSize: 15, borderRadius: 10, borderColor: '#ddd', borderWidth: 1 }}
-                    />
-                ) : (
-                    <>
-                        <TouchableOpacity style={styles.input} onPress={() => setShowPicker(true)}>
-                            <Text style={{ color: targetDate ? "#111" : "#aaa", fontSize: 15 }}>
-                                {targetDate ? targetDate.toISOString().split('T')[0] : '목표 날짜 선택'}
-                            </Text>
-                        </TouchableOpacity>
-                        {showPicker && (
-                            <DateTimePicker
-                                value={targetDate ?? new Date()}
-                                mode="date"
-                                onChange={(event, selectedDate) => {
-                                    setShowPicker(false);
-                                    if (selectedDate) setTargetDate(selectedDate);
-                                }}
-                            />
-                        )}
-                    </>
-                )}
-            </View>
-
-            {/* 액션 버튼 */}
-            <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGroup} disabled={loading}>
-                    {loading ? <ActivityIndicator color="#FF5252" /> : <Text style={styles.deleteBtnText}>그룹 삭제</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmBtn} onPress={handleUpdateGroup} disabled={loading}>
-                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>수정 완료</Text>}
-                </TouchableOpacity>
-            </View>
-        </View>
+                {/* 액션 버튼 */}
+                <View style={styles.actionRow}>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGroup} disabled={loading}>
+                        {loading ? <ActivityIndicator color="#FF5252" /> : <Text style={styles.deleteBtnText}>그룹 삭제</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.confirmBtn} onPress={handleUpdateGroup} disabled={loading}>
+                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>수정 완료</Text>}
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
+        </View >
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F0F0F8" },
+    container: { flex: 1, backgroundColor: "#F0F0F8", paddingBottom: 50 },
 
     header: {
         flexDirection: "row",
@@ -298,6 +301,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#aaa",
         marginTop: 4,
+    },
+    targetBook: {
+        color: "#111",
+        fontWeight: "500",
+        paddingVertical: 10,
+        alignSelf: "center",
     },
     input: {
         borderWidth: 1,
