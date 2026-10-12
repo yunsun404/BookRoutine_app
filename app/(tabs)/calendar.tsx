@@ -5,6 +5,7 @@ import {
   Radius,
   Spacing,
 } from "@/constants/tokens";
+import { fetchJournalDates } from "@/lib/api/journal"; // 🆕
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import JournalEntryButton from "../../components/calendar/JournalEntryButton"; // 🆕
 import Header from "../../components/Header";
 
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -54,12 +56,14 @@ export default function CalendarScreen() {
     {},
   );
   const [pawData, setPawData] = useState<Record<string, boolean>>({});
+  const [journalDates, setJournalDates] = useState<Set<string>>(new Set()); // 🆕 일지 있는 날짜
   const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [loadingChecklist, setLoadingChecklist] = useState(false);
 
   useEffect(() => {
     fetchMonthly();
+    fetchJournalMonth(); // 🆕
     setSelectedDate(null);
     setChecklists([]);
   }, [year, month]);
@@ -92,6 +96,17 @@ export default function CalendarScreen() {
       console.error("월별 데이터 불러오기 실패:", e);
     } finally {
       setLoadingCalendar(false);
+    }
+  }
+
+  // 🆕 일지 날짜는 따로 불러옴 (실패해도 달력·발자국은 그대로 뜨게)
+  async function fetchJournalMonth() {
+    try {
+      const m = `${year}-${String(month).padStart(2, "0")}`;
+      setJournalDates(new Set(await fetchJournalDates(m)));
+    } catch (e) {
+      console.error("일지 날짜 불러오기 실패:", e);
+      setJournalDates(new Set());
     }
   }
 
@@ -185,6 +200,7 @@ export default function CalendarScreen() {
                   const isToday = dateStr === todayStr;
                   const isSelected = dateStr === selectedDate;
                   const hasPaw = pawData[dateStr] ?? false; // ✅ 발자국 여부
+                  const hasJournal = journalDates.has(dateStr); // 🆕 일지 여부
 
                   // 날짜 셀 부분 교체
                   return (
@@ -222,6 +238,8 @@ export default function CalendarScreen() {
                           {day}
                         </Text>
                       </View>
+                      {/* 🆕 일지 있는 날 작은 점 */}
+                      {hasJournal && <View style={styles.journalDot} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -238,38 +256,52 @@ export default function CalendarScreen() {
 
         {/* 선택한 날짜의 체크리스트 */}
         {selectedDate && (
-          <View style={styles.checklistBox}>
-            <Text style={styles.checklistTitle}>
-              {Number(selectedDate.split("-")[2])}일 체크리스트
-            </Text>
+          <>
+            <View style={styles.checklistBox}>
+              <Text style={styles.checklistTitle}>
+                {Number(selectedDate.split("-")[2])}일 체크리스트
+              </Text>
 
-            {loadingChecklist ? (
-              <ActivityIndicator style={{ marginVertical: 16 }} />
-            ) : checklists.length === 0 ? (
-              <Text style={styles.emptyText}>이날은 체크리스트가 없어요</Text>
-            ) : (
-              checklists.map((item) => (
-                <View key={item.checklist_id} style={styles.checkItem}>
-                  <View
-                    style={[
-                      styles.checkbox,
-                      item.check_box && styles.checkboxDone,
-                    ]}
-                  >
-                    {item.check_box && <Text style={styles.checkmark}>✓</Text>}
+              {loadingChecklist ? (
+                <ActivityIndicator style={{ marginVertical: 16 }} />
+              ) : checklists.length === 0 ? (
+                <Text style={styles.emptyText}>이날은 체크리스트가 없어요</Text>
+              ) : (
+                checklists.map((item) => (
+                  <View key={item.checklist_id} style={styles.checkItem}>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        item.check_box && styles.checkboxDone,
+                      ]}
+                    >
+                      {item.check_box && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text
+                      style={[
+                        styles.checkText,
+                        item.check_box && styles.checkTextDone,
+                      ]}
+                    >
+                      {item.goal_content}
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.checkText,
-                      item.check_box && styles.checkTextDone,
-                    ]}
-                  >
-                    {item.goal_content}
-                  </Text>
-                </View>
-              ))
-            )}
-          </View>
+                ))
+              )}
+            </View>
+
+            {/* 🆕 체크리스트 아래 일지 버튼 */}
+            <View style={styles.journalBtnWrap}>
+              <JournalEntryButton
+                date={selectedDate}
+                hasJournal={journalDates.has(selectedDate)}
+                isFuture={selectedDate > todayStr}
+                onCreated={(d: string) =>
+                  setJournalDates((prev) => new Set(prev).add(d))
+                }
+              />
+            </View>
+          </>
         )}
       </ScrollView>
     </>
@@ -356,12 +388,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     zIndex: 1,
   },
+  // 🆕 일지 점 (셀 아래쪽 가운데)
+  journalDot: {
+    position: "absolute",
+    bottom: -1,
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#A78BFA",
+  },
   checklistBox: {
     marginHorizontal: Spacing.lg,
     marginTop: 16,
     backgroundColor: Colors.bgSecondary,
     borderRadius: Radius.lg,
     padding: 16,
+  },
+  // 🆕
+  journalBtnWrap: {
+    marginHorizontal: Spacing.lg,
   },
   checklistTitle: {
     fontSize: FontSize.md,
