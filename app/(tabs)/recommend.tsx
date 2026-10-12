@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,7 +31,41 @@ export default function RecommendScreen() {
   const [nickname, setNickname] = useState("");
 
   // 국립중앙도서관 사서 추천 (최근 추천순, DB에 없는 책이라 isbn으로 책 소개를 연다)
+  // 선호 장르 중 사서 추천이 있는 장르면 장르별(칩으로 전환), 없으면 전체 최신 추천
   const [librarianBooks, setLibrarianBooks] = useState<RowBook[]>([]);
+  const [librarianGenres, setLibrarianGenres] = useState<string[]>([]);
+  const [librarianGenre, setLibrarianGenre] = useState<string | null>(null);
+  const [librarianLoading, setLibrarianLoading] = useState(false);
+
+  const applyLibrarian = (res: Awaited<ReturnType<typeof bookApi.getLibrarianRecommendations>>) => {
+    setLibrarianGenres(res.genres);
+    setLibrarianGenre(res.genre);
+    setLibrarianBooks(
+      res.items.map((b) => ({
+        key: b.isbn,
+        title: b.title,
+        author: b.author,
+        coverUrl: b.cover_url,
+        caption: `${b.recommended_at} · ${b.category}`,
+        onPress: () => router.push({ pathname: "/book-detail", params: { isbn: b.isbn } }),
+      })),
+    );
+  };
+
+  // 장르 칩을 누르면 그 장르의 사서 추천으로 다시 불러옴
+  const selectLibrarianGenre = async (genre: string) => {
+    if (genre === librarianGenre) return;
+    setLibrarianGenre(genre);
+    setLibrarianLoading(true);
+    try {
+      applyLibrarian(await bookApi.getLibrarianRecommendations(genre, 10));
+    } catch (e) {
+      console.error("사서 추천 불러오기 실패:", e);
+      setLibrarianBooks([]);
+    } finally {
+      setLibrarianLoading(false);
+    }
+  };
 
   // 또래가 읽고 있는 책 — scope가 all이면 전체 사용자 인기 책
   const [peerBooks, setPeerBooks] = useState<RowBook[]>([]);
@@ -53,21 +88,12 @@ export default function RecommendScreen() {
 
         // 사서 추천 / 또래 추천은 서로 기다릴 필요 없어서 동시에 요청 (하나 실패해도 나머지는 표시)
         const [librarianRes, peerRes] = await Promise.allSettled([
-          bookApi.getLibrarianRecommendations(10),
+          bookApi.getLibrarianRecommendations(undefined, 10),
           bookApi.getPeerRecommendations(10),
         ]);
 
         if (librarianRes.status === "fulfilled") {
-          setLibrarianBooks(
-            librarianRes.value.items.map((b) => ({
-              key: b.isbn,
-              title: b.title,
-              author: b.author,
-              coverUrl: b.cover_url,
-              caption: `${b.recommended_at} · ${b.category}`,
-              onPress: () => router.push({ pathname: "/book-detail", params: { isbn: b.isbn } }),
-            })),
-          );
+          applyLibrarian(librarianRes.value);
         } else {
           console.error("사서 추천 불러오기 실패:", librarianRes.reason);
         }
@@ -198,15 +224,51 @@ export default function RecommendScreen() {
           )}
         </View>
 
-        {/* 2. 국립중앙도서관 사서 추천: 4개 분류 합쳐서 최근 추천순 10권 */}
+        {/* 2. 국립중앙도서관 사서 추천
+              선호 장르 중 사서 추천이 있는 장르(철학/역사/인문학/경제/과학/외국도서)면 장르별 + 칩,
+              없으면(판타지/로맨스/추리/요리만 골랐거나 선호 장르 없음) 전체 최신 사서 추천 */}
         <View style={styles.genreSection}>
           <Text style={[styles.sectionTitle, styles.sectionTitleTight]}>
-            <Text style={styles.genreHighlight}>사서</Text>가 추천한 책
+            {librarianGenre ? (
+              <>
+                이런 <Text style={styles.genreHighlight}>{librarianGenre}</Text> 책은 어떤가요?
+              </>
+            ) : (
+              <>
+                <Text style={styles.genreHighlight}>사서</Text>가 추천한 책
+              </>
+            )}
           </Text>
           <View style={styles.sourceBadge}>
             <Text style={styles.sourceBadgeText}>국립중앙도서관 사서 추천 · 최근 추천순</Text>
           </View>
-          {librarianBooks.length > 0 ? (
+
+          {librarianGenres.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+            >
+              {librarianGenres.map((g) => {
+                const active = g === librarianGenre;
+                return (
+                  <Pressable
+                    key={g}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => selectLibrarianGenre(g)}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{g}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {librarianLoading ? (
+            <View style={styles.rowLoading}>
+              <ActivityIndicator color={Colors.textSecondary || "#333"} />
+            </View>
+          ) : librarianBooks.length > 0 ? (
             <BookRow books={librarianBooks} />
           ) : (
             <Text style={styles.rowEmpty}>추천할 책을 불러오지 못했어요.</Text>
@@ -291,6 +353,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#667085",
     fontWeight: "600",
+  },
+  // 사서 추천 장르 칩 (선호 장르 중 사서 추천이 있는 장르가 여러 개일 때)
+  chipRow: {
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border || "#E0E0E0",
+    backgroundColor: "#fff",
+  },
+  chipActive: {
+    backgroundColor: "#222",
+    borderColor: "#222",
+  },
+  chipText: {
+    fontSize: 13,
+    color: "#555",
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: "#fff",
+  },
+  rowLoading: {
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
   },
   // 💡 홈화면 피드/체크리스트 카드 구조를 이식한 AI 요약 블록 스타일
   aiSection: {
