@@ -191,6 +191,7 @@ export default function BookDetailScreen() {
           <SentenceTab
             bookId={book.book_id ?? bookId}
             bookTitle={book.title}
+            bookAuthor={book.author}
             totalPages={book.total_pages}
             addSheetVisible={addSheetOpen}
             onCloseAddSheet={() => setAddSheetOpen(false)}

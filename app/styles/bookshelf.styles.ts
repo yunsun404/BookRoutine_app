@@ -1,4 +1,5 @@
 import { Dimensions, StyleSheet } from "react-native";
+import { P } from "@/constants/palette";
 
 const { width } = Dimensions.get("window");
 const COLUMN_COUNT = 3;
@@ -9,7 +10,7 @@ export { CARD_WIDTH, COLUMN_COUNT };
 export default StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0EFED",
+    backgroundColor: P.bg,
   },
   center: {
     flex: 1,
@@ -26,7 +27,7 @@ export default StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E1D9D1",
+    backgroundColor: P.coverPlaceholder,
     marginRight: 16,
   },
   profileInfo: {
@@ -35,11 +36,11 @@ export default StyleSheet.create({
   nickname: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
   },
   ageGroup: {
     fontSize: 13,
-    color: "#999",
+    color: P.textTertiary,
     marginTop: 2,
   },
   tabRow: {
@@ -55,12 +56,12 @@ export default StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
     borderBottomWidth: 2,
-    borderBottomColor: "#333",
+    borderBottomColor: P.ink,
   },
   tabActiveText: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
   },
   tabInactive: {
     flex: 1,
@@ -69,7 +70,7 @@ export default StyleSheet.create({
   },
   tabInactiveText: {
     fontSize: 14,
-    color: "#999",
+    color: P.textTertiary,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -86,7 +87,7 @@ export default StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: P.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -96,39 +97,39 @@ export default StyleSheet.create({
     width: CARD_WIDTH - 24,
     height: (CARD_WIDTH - 24) * 1.45,
     borderRadius: 8,
-    backgroundColor: "#E1D9D1",
+    backgroundColor: P.coverPlaceholder,
   },
   bookTitle: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#333",
+    color: P.ink,
     marginTop: 10,
     textAlign: "center",
     width: "100%",
   },
   dateText: {
     fontSize: 10,
-    color: "#999",
+    color: P.textTertiary,
     marginTop: 2,
     marginBottom: 8,
   },
   progressBarBackground: {
     width: "100%",
     height: 5,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: P.border,
     borderRadius: 3,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#C8B84A",
+    backgroundColor: P.primary,
     borderRadius: 3,
   },
   badge: {
     position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: "#4A3B32",
+    backgroundColor: P.primary,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -194,9 +195,9 @@ export default StyleSheet.create({
     height: 135,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: P.border,
     borderStyle: "dashed",
-    backgroundColor: "#FAFAF9",
+    backgroundColor: P.bg,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -208,16 +209,16 @@ export default StyleSheet.create({
   },
   coverPickerPlaceholder: {
     fontSize: 11,
-    color: "#999",
+    color: P.textTertiary,
     textAlign: "center",
   },
   addFolderCard: {
     width: CARD_WIDTH,
     height: (CARD_WIDTH - 24) * 1.45 + 70,
-    backgroundColor: "#F0EFED",
+    backgroundColor: P.bg,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: "#DDD",
+    borderColor: P.borderStrong,
     borderStyle: "dashed",
     minHeight: 100,
     justifyContent: "center",
@@ -226,7 +227,7 @@ export default StyleSheet.create({
   },
   addFolderText: {
     fontSize: 28,
-    color: "#999",
+    color: P.textTertiary,
   },
   modalOverlay: {
     flex: 1,
@@ -243,12 +244,12 @@ export default StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
     marginBottom: 16,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: P.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
@@ -265,10 +266,10 @@ export default StyleSheet.create({
   },
   modalCancelText: {
     fontSize: 14,
-    color: "#999",
+    color: P.textTertiary,
   },
   modalConfirm: {
-    backgroundColor: "#4A3B32",
+    backgroundColor: P.primary,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -289,7 +290,7 @@ export default StyleSheet.create({
     borderBottomLeftRadius: 16,
     paddingVertical: 16,
     marginTop: 56,
-    shadowColor: "#000",
+    shadowColor: P.shadow,
     shadowOffset: { width: -2, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -304,17 +305,17 @@ export default StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#E1D9D1",
+    backgroundColor: P.coverPlaceholder,
     marginBottom: 8,
   },
   menuNickname: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: "#F0EFED",
+    backgroundColor: P.bg,
     marginVertical: 8,
   },
   menuItem: {
@@ -323,10 +324,6 @@ export default StyleSheet.create({
   },
   menuItemText: {
     fontSize: 14,
-    color: "#333",
-  },
-  backButton: {
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    color: P.ink,
   },
 });
