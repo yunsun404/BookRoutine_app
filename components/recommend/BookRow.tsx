@@ -18,6 +18,7 @@ export type RowBook = {
   title: string;
   author?: string | null;
   coverUrl: string | null;
+  caption?: string; // 저자 아래 작은 설명 한 줄 (예: "2026.10 · 인문과학", "3명이 담았어요")
   onPress: () => void;
 };
 
@@ -76,6 +77,7 @@ export default function BookRow({ books }: Props) {
             <View style={styles.bookInfo}>
               <Text style={styles.bookTitle} numberOfLines={1}>{book.title}</Text>
               {!!book.author && <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>}
+              {!!book.caption && <Text style={styles.bookCaption} numberOfLines={1}>{book.caption}</Text>}
             </View>
           </Pressable>
         ))}
@@ -150,6 +152,11 @@ const styles = StyleSheet.create({
   bookAuthor: {
     fontSize: 11,
     color: "#777",
+  },
+  bookCaption: {
+    marginTop: 2,
+    fontSize: 10,
+    color: "#9AA0AE",
   },
   // 웹 전용 좌우 화살표 (표지 높이 가운데)
   arrow: {
