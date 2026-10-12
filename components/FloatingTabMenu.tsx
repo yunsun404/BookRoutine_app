@@ -39,6 +39,7 @@ const RIGHT_TABS: Tab[] = [
 
 /* 하단바에서 빠진 메뉴들 → '내 서재'를 누르면 시트로 열림 */
 const MORE_ITEMS: { title: string; icon: IoniconsName; route: string }[] = [
+  { title: "달력", icon: "calendar-outline", route: "/(tabs)/calendar" },
   { title: "랭킹", icon: "trophy-outline", route: "/ranking" },
   { title: "그룹", icon: "people-outline", route: "/(tabs)/group" },
   { title: "추천", icon: "sparkles-outline", route: "/(tabs)/recommend" },
