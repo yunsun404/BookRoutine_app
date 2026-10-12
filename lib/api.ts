@@ -119,6 +119,7 @@ export const userApi = {
   getMe: () =>
     request<{
       user_id: string;
+      username: string;
       nickname: string;
       age?: number | null;
       email: string;
@@ -133,6 +134,7 @@ export const userApi = {
 
   // 프로필 수정
   updateMe: (body: {
+    username?: string;
     nickname?: string;
     age?: number;
     email?: string;
@@ -144,6 +146,7 @@ export const userApi = {
   }) =>
     request<{
       user_id: string;
+      username: string;
       nickname: string;
       age?: number;
       email?: string;
@@ -285,6 +288,11 @@ export const groupApi = {
             group_members?: number;
           },
         ];
+        group_members: [
+          {
+            joined_at: Date;
+          }
+        ];
       }[]
     >("/groups"),
 
@@ -300,9 +308,11 @@ export const groupApi = {
       group_books: [
         {
           book_id?: string;
+          target_date?: Date;
           book: { title: string };
         },
       ];
+      creator: { nickname: string; }
     }>(`/groups/${group_id}`),
 
   // 그룹 입장
@@ -353,13 +363,23 @@ export const groupApi = {
       group_name?: string;
       people_count?: number;
       book_id?: string;
+      isbn?: string;
+      title?: string;
+      author?: string;
+      total_pages?: number;
+      cover_url?: string;
+      target_date?: Date;
     },
   ) =>
     request<{
-      group_name?: string;
-      people_count?: number;
-      book_id?: string;
-      target_date?: Date;
+      update_group: {
+        group_name: string;
+        people_count: number;
+      };
+      update_group_book: {
+        book_id: string;
+        target_date: Date;
+      }
     }>(`/groups/${group_id}/update`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -460,4 +480,17 @@ export const bookApi = {
         my_score: number;
       }[]
     >(`/recommendation${limit ? `?limit=${limit}` : ""}`),
+
+  // 장르 기반 추천 — 알라딘에서 해당 장르 책을 판매량순으로 (내 책장에 있는 책 제외)
+  getGenreRecommendations: (genre: string, limit = 10) =>
+    request<{
+      genre: string;
+      items: {
+        isbn: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        publisher: string | null;
+      }[];
+    }>(`/recommendation/genre?genre=${encodeURIComponent(genre)}&limit=${limit}`),
 };

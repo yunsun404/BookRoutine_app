@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface UpdateProfilePayload {
+    username?: string;
     nickname?: string;
     age?: number;
     email?: string;
@@ -18,11 +19,13 @@ interface UpdateProfilePayload {
 const speedOptions = ['빠름', '보통', '느림'];
 const frequencyOptions = ['매일', '주 2-3회', '주 1회', '가끔'];
 const genreOptions = ['판타지', '로맨스', '인문학', '철학', '추리', '요리', '역사', '경제', '과학', '외국도서'];
+const ageOptions = ['10대', '20대', '30대', '40대', '50대 이상'];
 
 export default function EditProfileScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const { updateUser } = useAuthStore();
+    const [username, setUsername] = useState('');
     const [nickname, setNickname] = useState('');
     const [age, setAge] = useState<number | undefined | null>();
     const [email, setEmail] = useState('');
@@ -32,11 +35,16 @@ export default function EditProfileScreen() {
     const [reading_habit, setReadingHabit] = useState('');
     const [favorite_genre, setFavoriteGenre] = useState<string[]>([]);
 
+    const [showSpeedOptions, setShowSpeedOptions] = useState(false);
+    const [showFrequencyOptions, setShowFrequencyOptions] = useState(false);
+    const [showGenreOptions, setShowGenreOptions] = useState(false);
+    const [showAgeOptions, setShowAgeOptions] = useState(false);
+
     useEffect(() => {
         const loadProfile = async () => {
             try {
-                // [수정됨] API 반환 타입에 없는 속성(email, age) 접근을 위해 as any 단언 추가
                 const result = await userApi.getMe() as any;
+                setUsername(result.username);
                 setNickname(result.nickname ?? '');
                 setAge(result.age);
                 setEmail(result.email ?? '');
@@ -45,7 +53,6 @@ export default function EditProfileScreen() {
                 setReadingStyle(result.reading_style?.reading_style ?? '');
                 setReadingHabit(result.reading_habit?.reading_habit ?? '');
                 setFavoriteGenre(result.favorite_genre?.favorite_genre ?? []);
-                console.log("result: ", result)
             } catch (error) {
                 console.error('프로필 불러오기 오류:', error);
             }
@@ -64,8 +71,8 @@ export default function EditProfileScreen() {
     const handleUpdateProfile = async () => {
         try {
             setLoading(true);
-
             const payload: UpdateProfilePayload = {
+                username: username || undefined,
                 nickname: nickname || undefined,
                 age: age || undefined,
                 email: email || undefined,
@@ -75,7 +82,6 @@ export default function EditProfileScreen() {
                 reading_habit: reading_habit ? { reading_habit } : undefined,
                 favorite_genre: favorite_genre.length > 0 ? { favorite_genre } : undefined,
             };
-
             await userApi.updateMe(payload as any);
             updateUser({ nickname, profile_image, age });
             router.back();
@@ -86,115 +92,192 @@ export default function EditProfileScreen() {
         }
     };
 
+    const ageLabel = age ? `${Math.floor(age / 10) * 10}대` : '선택';
+
     return (
-        <ScrollView>
-            <View style={styles.container}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+            {/* 상단 헤더 */}
+            <View style={styles.header}>
+                <Text style={styles.title}>프로필 편집</Text>
+                <View style={styles.headerButtons}>
+                    <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={handleUpdateProfile}
+                        disabled={loading}
+                    >
+                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>저장</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
+                        <Text style={styles.cancelButtonText}>취소</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
-                <Text style={styles.title}>프로필 수정</Text>
-
-                <Text style={styles.text}>내 정보</Text>
-                <Image
-                    source={
-                        profile_image ? { uri: profile_image } : { uri: "https://via.placeholder.com/48" }
-                    }
-                    style={styles.menuAvatar}
-                />
+            {/* 프로필 이미지 + 닉네임 카드 */}
+            <View style={styles.card}>
+                <View style={styles.profileRow}>
+                    <Image
+                        source={profile_image ? { uri: profile_image } : { uri: "https://via.placeholder.com/64" }}
+                        style={styles.avatar}
+                    />
+                    <TextInput
+                        style={styles.nicknameInput}
+                        placeholder="닉네임"
+                        value={nickname}
+                        onChangeText={setNickname}
+                        autoCapitalize="none"
+                    />
+                </View>
                 <TextInput
-                    style={styles.input}
+                    style={styles.imageUrlInput}
                     placeholder="프로필 이미지 URL"
                     value={profile_image}
                     onChangeText={setProfileImage}
                     autoCapitalize="none"
                 />
+            </View>
 
-                <TextInput
-                    style={styles.input}
-                    placeholder="닉네임"
-                    value={nickname}
-                    onChangeText={setNickname}
-                    autoCapitalize="none"
-                />
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="나이"
-                    value={age ? String(age) : ''}
-                    onChangeText={(text) => setAge(text ? Number(text) : undefined)}
-                    keyboardType="numeric"
-                />
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="이메일"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                />
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="비밀번호"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                />
-
-                <Text style={styles.text}>독서 속도</Text>
-                <View style={styles.options}>
-                    {speedOptions.map((option) => (
-                        <TouchableOpacity
-                            key={option}
-                            onPress={() => setReadingStyle(option)}
-                            style={[{ backgroundColor: reading_style === option ? 'gray' : 'white' }, styles.option]}
-                        >
-                            <Text>{option}</Text>
-                        </TouchableOpacity>
-                    ))}
+            {/* 내 정보 카드 */}
+            <View style={styles.card}>
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>아이디</Text>
+                    <TextInput
+                        style={styles.fieldInput}
+                        placeholder="아이디"
+                        value={username}
+                        onChangeText={setUsername}
+                        autoCapitalize="none"
+                    />
                 </View>
-
-                <Text style={styles.text}>독서 빈도</Text>
-                <View style={styles.options}>
-                    {frequencyOptions.map((option) => (
-                        <TouchableOpacity
-                            key={option}
-                            onPress={() => setReadingHabit(option)}
-                            style={[{ backgroundColor: reading_habit === option ? 'gray' : 'white' }, styles.option]}
-                        >
-                            <Text>{option}</Text>
-                        </TouchableOpacity>
-                    ))}
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>이메일</Text>
+                    <TextInput
+                        style={styles.fieldInput}
+                        placeholder="이메일"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
                 </View>
-
-                <Text style={styles.text}>선호 장르</Text>
-                <View style={styles.options}>
-                    {genreOptions.map((option) => (
-                        <TouchableOpacity
-                            key={option}
-                            onPress={() => toggleGenre(option)}
-                            style={[{ backgroundColor: favorite_genre.includes(option) ? 'gray' : 'white' }, styles.option]}
-                        >
-                            <Text>{option}</Text>
-                        </TouchableOpacity>
-                    ))}
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>비밀번호</Text>
+                    <TextInput
+                        style={styles.fieldInput}
+                        placeholder="비밀번호"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
                 </View>
-
-                <View style={styles.buttons}>
-                    <TouchableOpacity onPress={handleUpdateProfile} disabled={loading}
-                        style={[styles.button, loading && styles.disabledButton]}>
-                        {loading ? (
-                            <ActivityIndicator />
-                        ) : (
-                            <Text style={styles.buttonText}>수정 완료</Text>
-                        )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.back()}
-                        style={[styles.button, loading && styles.disabledButton]}>
-                        <Text style={styles.buttonText}>취소</Text>
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>나이대</Text>
+                    <TouchableOpacity
+                        style={styles.dropdown}
+                        onPress={() => setShowAgeOptions(!showAgeOptions)}
+                    >
+                        <Text style={styles.dropdownText}>{ageLabel}</Text>
+                        <Text style={styles.dropdownArrow}>⌄</Text>
                     </TouchableOpacity>
                 </View>
+                {showAgeOptions && (
+                    <View style={styles.dropdownList}>
+                        {ageOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option}
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                    const num = parseInt(option);
+                                    setAge(num);
+                                    setShowAgeOptions(false);
+                                }}
+                            >
+                                <Text>{option}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+            </View>
 
+            {/* 독서 습관 카드 */}
+            <View style={styles.card}>
+                <Text style={styles.cardTitle}>독서 습관</Text>
+
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>속도</Text>
+                    <TouchableOpacity
+                        style={styles.dropdown}
+                        onPress={() => setShowSpeedOptions(!showSpeedOptions)}
+                    >
+                        <Text style={styles.dropdownText}>{reading_style || '선택'}</Text>
+                        <Text style={styles.dropdownArrow}>⌄</Text>
+                    </TouchableOpacity>
+                </View>
+                {showSpeedOptions && (
+                    <View style={styles.dropdownList}>
+                        {speedOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option}
+                                style={styles.dropdownItem}
+                                onPress={() => { setReadingStyle(option); setShowSpeedOptions(false); }}
+                            >
+                                <Text>{option}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>빈도</Text>
+                    <TouchableOpacity
+                        style={styles.dropdown}
+                        onPress={() => setShowFrequencyOptions(!showFrequencyOptions)}
+                    >
+                        <Text style={styles.dropdownText}>{reading_habit || '선택'}</Text>
+                        <Text style={styles.dropdownArrow}>⌄</Text>
+                    </TouchableOpacity>
+                </View>
+                {showFrequencyOptions && (
+                    <View style={styles.dropdownList}>
+                        {frequencyOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option}
+                                style={styles.dropdownItem}
+                                onPress={() => { setReadingHabit(option); setShowFrequencyOptions(false); }}
+                            >
+                                <Text>{option}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
+                <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>선호 장르</Text>
+                    <TouchableOpacity
+                        style={styles.dropdown}
+                        onPress={() => setShowGenreOptions(!showGenreOptions)}
+                    >
+                        <Text style={styles.dropdownText}>
+                            {favorite_genre.length > 0 ? favorite_genre.join(', ') : '선택'}
+                        </Text>
+                        <Text style={styles.dropdownArrow}>⌄</Text>
+                    </TouchableOpacity>
+                </View>
+                {showGenreOptions && (
+                    <View style={styles.dropdownList}>
+                        {genreOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option}
+                                style={[styles.dropdownItem, favorite_genre.includes(option) && styles.selectedItem]}
+                                onPress={() => toggleGenre(option)}
+                            >
+                                <Text style={favorite_genre.includes(option) ? styles.selectedItemText : undefined}>
+                                    {option}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
             </View>
         </ScrollView>
     );
@@ -203,69 +286,145 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        paddingHorizontal: 24,
-        backgroundColor: '#fff',
+        backgroundColor: '#f5f5f5',
+    },
+    content: {
+        padding: 20,
+        paddingBottom: 100,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: 'bold',
-        marginBottom: 32,
     },
-    menuAvatar: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: "#E1D9D1",
-        marginBottom: 8,
+    headerButtons: {
+        flexDirection: 'row',
+        gap: 8,
     },
-    text: {
-        fontSize: 20,
+    saveButton: {
+        backgroundColor: '#7c5cbf',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+    },
+    saveButtonText: {
+        color: '#fff',
         fontWeight: 'bold',
-        marginBottom: 10
+        fontSize: 15,
     },
-    input: {
+    cancelButton: {
+        backgroundColor: '#9b7fd4',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+    },
+    cancelButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 15,
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
+        gap: 12,
+    },
+    profileRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    avatar: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#ddd',
+    },
+    nicknameInput: {
+        flex: 1,
         borderWidth: 1,
         borderColor: '#ccc',
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        marginBottom: 10,
+        fontSize: 20,
     },
-    option: {
+    imageUrlInput: {
+        borderWidth: 1,
+        borderColor: '#eee',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: '#888',
+    },
+    cardTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    fieldRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    fieldLabel: {
+        width: 70,
+        fontSize: 15,
+        color: '#555',
+    },
+    fieldInput: {
+        flex: 1,
         borderWidth: 1,
         borderColor: '#ccc',
         borderRadius: 8,
-        alignItems: "center",
-        margin: 10,
-        width: `${10}%`
+        paddingHorizontal: 16,
+        paddingVertical: 10,
     },
-    options: {
-        // flex: 1,
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: "center"
-    },
-    button: {
-        backgroundColor: '#333',
+    dropdown: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#ccc',
         borderRadius: 8,
-        paddingVertical: 14,
-        alignItems: 'center',
-        marginBottom: 16,
-        marginHorizontal: 16,
-        width: `${40}%`
-    },
-    disabledButton: {
-        opacity: 0.6,
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    buttons: {
-        // flex: 1,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
         flexDirection: 'row',
-        justifyContent: "center"
-    }
-})
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    dropdownText: {
+        fontSize: 15,
+        color: '#333',
+        flex: 1,
+    },
+    dropdownArrow: {
+        fontSize: 16,
+        color: '#888',
+    },
+    dropdownList: {
+        borderWidth: 1,
+        borderColor: '#eee',
+        borderRadius: 8,
+        overflow: 'hidden',
+        marginTop: -8,
+    },
+    dropdownItem: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    selectedItem: {
+        backgroundColor: '#ede8f7',
+    },
+    selectedItemText: {
+        color: '#7c5cbf',
+        fontWeight: 'bold',
+    },
+});
