@@ -11,6 +11,7 @@ export default StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: P.bg,
+    paddingBottom: 80,
   },
   center: {
     flex: 1,
@@ -325,5 +326,57 @@ export default StyleSheet.create({
   menuItemText: {
     fontSize: 14,
     color: P.ink,
+  },
+  badgeListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  badgeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  badgeCardLocked: {
+    backgroundColor: "#D6D6D6",
+  },
+  badgeIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#F3F0E6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  badgeIconCircleLocked: {
+    backgroundColor: "#E4E4E4",
+  },
+  badgeInfo: {
+    flex: 1,
+  },
+  badgeName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
+  badgeNameLocked: {
+    color: "#6B6B6B",
+  },
+  badgeDescription: {
+    fontSize: 14,
+    color: "#333",
+    marginTop: 2,
+  },
+  badgeDescriptionLocked: {
+    color: "#777",
   },
 });

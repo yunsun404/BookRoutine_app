@@ -119,6 +119,7 @@ export const userApi = {
   getMe: () =>
     request<{
       user_id: string;
+      username: string;
       nickname: string;
       age?: number | null;
       email: string;
@@ -133,6 +134,7 @@ export const userApi = {
 
   // 프로필 수정
   updateMe: (body: {
+    username?: string;
     nickname?: string;
     age?: number;
     email?: string;
@@ -144,6 +146,7 @@ export const userApi = {
   }) =>
     request<{
       user_id: string;
+      username: string;
       nickname: string;
       age?: number;
       email?: string;
@@ -285,6 +288,11 @@ export const groupApi = {
             group_members?: number;
           },
         ];
+        group_members: [
+          {
+            joined_at: Date;
+          }
+        ];
       }[]
     >("/groups"),
 
@@ -300,9 +308,11 @@ export const groupApi = {
       group_books: [
         {
           book_id?: string;
+          target_date?: Date;
           book: { title: string };
         },
       ];
+      creator: { nickname: string; }
     }>(`/groups/${group_id}`),
 
   // 그룹 입장
@@ -353,13 +363,23 @@ export const groupApi = {
       group_name?: string;
       people_count?: number;
       book_id?: string;
+      isbn?: string;
+      title?: string;
+      author?: string;
+      total_pages?: number;
+      cover_url?: string;
+      target_date?: Date;
     },
   ) =>
     request<{
-      group_name?: string;
-      people_count?: number;
-      book_id?: string;
-      target_date?: Date;
+      update_group: {
+        group_name: string;
+        people_count: number;
+      };
+      update_group_book: {
+        book_id: string;
+        target_date: Date;
+      }
     }>(`/groups/${group_id}/update`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -460,4 +480,36 @@ export const bookApi = {
         my_score: number;
       }[]
     >(`/recommendation${limit ? `?limit=${limit}` : ""}`),
+
+  // 국립중앙도서관 사서 추천 (최근 추천순, 내 책장에 있는 책 제외)
+  // - 선호 장르 중 사서 추천이 있는 장르(철학/역사/인문학/경제/과학/외국도서)가 있으면 그 장르 (genre 생략 시 첫 번째)
+  // - 없으면 전체 최신 사서 추천 (genre: null)
+  getLibrarianRecommendations: (genre?: string, limit = 10) =>
+    request<{
+      genres: string[]; // 칩으로 보여줄 장르
+      genre: string | null; // 지금 보여주는 장르
+      items: {
+        isbn: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        publisher: string | null;
+        category: string; // 문학 / 인문과학 / 사회과학 / 자연과학
+        recommended_at: string; // "2026.10"
+      }[];
+    }>(`/recommendation/librarian?limit=${limit}${genre ? `&genre=${encodeURIComponent(genre)}` : ""}`),
+
+  // 또래가 읽고 있는 책 — 같은 연령대 사용자 책장 기준, 부족하면 전체 사용자 인기 책 (scope: "all")
+  getPeerRecommendations: (limit = 10) =>
+    request<{
+      scope: "peer" | "all";
+      age_group: number | null; // 20 → 20대
+      items: {
+        book_id: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        reader_count: number;
+      }[];
+    }>(`/recommendation/peers?limit=${limit}`),
 };

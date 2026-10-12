@@ -1,6 +1,7 @@
 import BookCarousel, { type Book } from "@/components/home/BookCarousel";
 import FeedCard, { type FeedItem } from "@/components/home/FeedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
+import ReadPagesModal from "@/components/home/ReadPagesModal";
 import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -11,6 +12,7 @@ import { colors, styles } from "../styles/home.styles";
 
 type ChecklistItem = {
   checklist_id: string;
+  goal_id: string | null;
   goal_content: string;
   check_box: boolean;
   date: string;
@@ -87,6 +89,11 @@ export default function HomeScreen() {
 
   const activeGroup = bookGroups[currentIndex];
 
+  // 책 목록이 줄어들면(완료 등) 범위를 벗어난 인덱스를 첫 번째 책으로 되돌림
+  useEffect(() => {
+    if (currentIndex > bookGroups.length) setCurrentIndex(0);
+  }, [bookGroups.length]);
+
   useEffect(() => {
     if (!activeGroup) {
       setLatestFeed(null);
@@ -128,6 +135,29 @@ export default function HomeScreen() {
   }, [activeGroup]);
 
   // 체크 표시를 먼저 보여준 뒤 0.3초 후 목록에서 제거
+  // 체크리스트 "수정" → 오늘 읽은 쪽수 입력 팝업
+  const [editingTask, setEditingTask] = useState<ChecklistItem | null>(null);
+
+  const submitReadPages = async (readUntil: number): Promise<string | null> => {
+    if (!editingTask) return null;
+    try {
+      const res = await authFetch(`${BASE_URL}/checklists/${editingTask.checklist_id}/progress`, {
+        method: "PATCH",
+        body: JSON.stringify({ read_until: readUntil }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        return data?.message ?? "저장하지 못했어요. 잠시 후 다시 시도해주세요.";
+      }
+      setEditingTask(null);
+      fetchUpcoming();
+      return null;
+    } catch (e) {
+      console.error("읽은 쪽수 저장 실패:", e);
+      return "서버에 연결할 수 없어요.";
+    }
+  };
+
   const handleToggle = async (bookId: string, taskId: string) => {
     setBookGroups((prev) =>
       prev.map((group) => {
@@ -255,8 +285,7 @@ export default function HomeScreen() {
           <Text style={styles.greetingTitle}>좋은 책과 함께해요</Text>
         </View>
 
-        <View style={styles.carouselContainer}>
-                  {bookGroups.length > 0 && (
+        {bookGroups.length > 0 && (
           <View style={styles.carouselContainer}>
             <BookCarousel
               books={booksForCarousel}
@@ -275,9 +304,9 @@ export default function HomeScreen() {
             />
           </View>
         )}
-        </View>
 
-        {isLastEmptyPage ? (
+        {/* 책이 한 권도 없을 때만 안내 화면 */}
+        {bookGroups.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>아직 등록된 책이 없어요</Text>
             <Text style={styles.emptySubText}>책을 등록하고 독서 목표를 시작해보세요</Text>
@@ -324,15 +353,25 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-        ) : (
+        ) : isLastEmptyPage ? null : (
           <>
             {activeGroup && (
               <View key={activeGroup.book_id}>
                 <GoalSection
                   goal={activeGroup.book_title}
                   tasks={activeGroup.tasks.map(toTask)}
-                  onGoalEdit={() => router.push("/reading-goals/book-select")}
+                  onGoalEdit={() => {
+                    const goalId = activeGroup.tasks.find((t) => t.goal_id)?.goal_id;
+                    if (!goalId) return;
+                    router.push({
+                      pathname: "/reading-goals/reading-plan",
+                      params: { goal_id: goalId },
+                    });
+                  }}
                   onTaskToggle={(taskId) => handleToggle(activeGroup.book_id, taskId)}
+                  onTaskEdit={(taskId) =>
+                    setEditingTask(activeGroup.tasks.find((t) => t.checklist_id === taskId) ?? null)
+                  }
                 />
               </View>
             )}
@@ -367,6 +406,13 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      <ReadPagesModal
+        visible={!!editingTask}
+        taskText={editingTask?.goal_content ?? ""}
+        onClose={() => setEditingTask(null)}
+        onSubmit={submitReadPages}
+      />
     </View>
   );
 }

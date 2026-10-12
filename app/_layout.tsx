@@ -56,7 +56,11 @@ function RootLayoutNav() {
             name="index"
             options={{ title: "Login", headerShown: true }}
           />
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(tabs)"
+            options={{
+              headerShown: false,
+              contentStyle: { paddingBottom: 80 } // 탭 화면에 패딩 적용
+            }} />
           <Stack.Screen
             name="modal"
             options={{ presentation: "modal", headerShown: true }}

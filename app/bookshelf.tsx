@@ -1,4 +1,5 @@
 import { authFetch, BASE_URL } from "@/constants/api";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -29,6 +30,13 @@ interface BookshelfItem {
   };
 }
 
+interface BadgeItem {
+  badge_id: string;
+  badge_name: string;
+  description: string | null;
+  acquired_at: string | null;
+}
+
 interface FolderItem {
   folder_id: string;
   folder_name: string;
@@ -46,11 +54,16 @@ interface FolderItem {
 export default function BookshelfScreen() {
   const [books, setBooks] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<"bookshelf" | "badge">(
+    "bookshelf",
+  );
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [folderImage, setFolderImage] = useState<string>("");
   const [coverPickerVisible, setCoverPickerVisible] = useState(false);
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
+  const [badgesLoading, setBadgesLoading] = useState<boolean>(false);
 
   useEffect(() => {
     fetchBooks();
@@ -89,6 +102,24 @@ export default function BookshelfScreen() {
       setFolders([]);
     }
   };
+
+  const fetchBadges = async () => {
+    setBadgesLoading(true);
+    try {
+      const response = await authFetch(`${BASE_URL}/badges`);
+      const data = await response.json();
+      setBadges(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("뱃지 에러:", error);
+      setBadges([]);
+    } finally {
+      setBadgesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "badge") fetchBadges();
+  }, [activeTab]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -158,6 +189,40 @@ export default function BookshelfScreen() {
     <View style={styles.container}>
       <Header />
       <ProfileCard />
+
+      {/* 탭 */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={
+            activeTab === "bookshelf" ? styles.tabActive : styles.tabInactive
+          }
+          onPress={() => setActiveTab("bookshelf")}
+        >
+          <Text
+            style={
+              activeTab === "bookshelf"
+                ? styles.tabActiveText
+                : styles.tabInactiveText
+            }
+          >
+            내 책장 보기
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={activeTab === "badge" ? styles.tabActive : styles.tabInactive}
+          onPress={() => setActiveTab("badge")}
+        >
+          <Text
+            style={
+              activeTab === "badge"
+                ? styles.tabActiveText
+                : styles.tabInactiveText
+            }
+          >
+            내 뱃지 보기
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* 책장 */}
       <FlatList
@@ -285,6 +350,71 @@ export default function BookshelfScreen() {
         onClose={() => setCoverPickerVisible(false)}
         onSelect={setFolderImage}
       />
+
+      {/* 뱃지 */}
+      {activeTab === "badge" &&
+        (badgesLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#8B4513" />
+          </View>
+        ) : (
+          <FlatList
+            data={[...badges].sort(
+              (a, b) => Number(!!b.acquired_at) - Number(!!a.acquired_at),
+            )}
+            keyExtractor={(item) => item.badge_id}
+            contentContainerStyle={styles.badgeListContent}
+            renderItem={({ item }) => {
+              const acquired = !!item.acquired_at;
+              return (
+                <View
+                  style={[styles.badgeCard, !acquired && styles.badgeCardLocked]}
+                >
+                  <View
+                    style={[
+                      styles.badgeIconCircle,
+                      !acquired && styles.badgeIconCircleLocked,
+                    ]}
+                  >
+                    <Ionicons
+                      name="ribbon"
+                      size={28}
+                      color={acquired ? "#C8B84A" : "#B5B5B5"}
+                    />
+                  </View>
+                  <View style={styles.badgeInfo}>
+                    <Text
+                      style={[styles.badgeName, !acquired && styles.badgeNameLocked]}
+                    >
+                      {item.badge_name}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.badgeDescription,
+                        !acquired && styles.badgeDescriptionLocked,
+                      ]}
+                    >
+                      {item.description ?? ""}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }}
+            ListFooterComponent={
+              <View style={[styles.badgeCard, styles.badgeCardLocked]}>
+                <View style={[styles.badgeIconCircle, styles.badgeIconCircleLocked]}>
+                  <Ionicons name="help" size={28} color="#B5B5B5" />
+                </View>
+                <View style={styles.badgeInfo}>
+                  <Text style={styles.badgeName}>???</Text>
+                  <Text style={styles.badgeDescription}>
+                    (계속 찾아보세요)
+                  </Text>
+                </View>
+              </View>
+            }
+          />
+        ))}
     </View>
   );
 }
