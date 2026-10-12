@@ -10,6 +10,7 @@ export default StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0EFED",
+    paddingBottom: 80,
   },
   center: {
     flex: 1,
