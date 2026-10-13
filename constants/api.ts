@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // 기기별 주소는 .env(깃에 안 올라감)에만 적습니다. 예) EXPO_PUBLIC_API_BASE_URL=http://192.168.0.5:3000
 export const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
   ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/v1`
-  : "http://localhost:3000/api/v1";
+  : "http://172.20.27.182:3000/api/v1";
 
 // 임시. 로그인 화면이 있다면 필요 x
 /*

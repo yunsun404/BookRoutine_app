@@ -28,13 +28,41 @@ type Tab = {
 };
 
 const LEFT_TABS: Tab[] = [
-  { key: "home", title: "홈", icon: "home-outline", iconActive: "home", route: "/(tabs)/homescreen", match: ["homescreen"] },
-  { key: "shelf", title: "책장", icon: "book-outline", iconActive: "book", route: "/bookshelf", match: ["bookshelf", "folder"] },
+  {
+    key: "home",
+    title: "홈",
+    icon: "home-outline",
+    iconActive: "home",
+    route: "/(tabs)/homescreen",
+    match: ["homescreen"],
+  },
+  {
+    key: "shelf",
+    title: "책장",
+    icon: "book-outline",
+    iconActive: "book",
+    route: "/bookshelf",
+    match: ["bookshelf", "folder"],
+  },
 ];
 const RIGHT_TABS: Tab[] = [
-  { key: "stats", title: "통계", icon: "stats-chart-outline", iconActive: "stats-chart", route: "/(tabs)/stats", match: ["stats"] },
+  {
+    key: "stats",
+    title: "통계",
+    icon: "stats-chart-outline",
+    iconActive: "stats-chart",
+    route: "/(tabs)/stats",
+    match: ["stats"],
+  },
   // TODO: '내 서재' 전용 화면이 생기면 route를 그 경로로 바꾸면 됨
-  { key: "my", title: "기타", icon: "person-outline", iconActive: "person", route: null, match: [] },
+  {
+    key: "my",
+    title: "기타",
+    icon: "person-outline",
+    iconActive: "person",
+    route: null,
+    match: [],
+  },
 ];
 
 /* 하단바에서 빠진 메뉴들 → '내 서재'를 누르면 시트로 열림 */
@@ -43,7 +71,6 @@ const MORE_ITEMS: { title: string; icon: IoniconsName; route: string }[] = [
   { title: "랭킹", icon: "trophy-outline", route: "/ranking" },
   { title: "그룹", icon: "people-outline", route: "/(tabs)/group" },
   { title: "추천", icon: "sparkles-outline", route: "/(tabs)/recommend" },
-
 ];
 
 const ADD_ROUTE = "/reading-goals/book-select"; // 가운데 + 버튼
@@ -60,11 +87,14 @@ const SHOW_ROUTES = [
   "/notifications",
   "/ranking",
   "/myprofile",
+  "/calendar",
 ];
 
 /* 전자책은 목록·이력·결과 화면에서만 표시 (상세·읽기 화면은 숨김) */
 const isEbookBarRoute = (p: string) =>
-  p === "/ebook" || p === "/ebook/history" || /^\/ebook\/[^/]+\/result$/.test(p);
+  p === "/ebook" ||
+  p === "/ebook/history" ||
+  /^\/ebook\/[^/]+\/result$/.test(p);
 
 export default function FloatingTabMenu() {
   const router = useRouter();
@@ -73,7 +103,8 @@ export default function FloatingTabMenu() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const showBar =
-    SHOW_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/")) || isEbookBarRoute(pathname);
+    SHOW_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/")) ||
+    isEbookBarRoute(pathname);
   if (!showBar) {
     return null;
   }
@@ -84,7 +115,9 @@ export default function FloatingTabMenu() {
   };
 
   const renderTab = (tab: Tab) => {
-    const active = tab.match.some((m) => pathname.includes(m)) || (tab.route === null && moreOpen);
+    const active =
+      tab.match.some((m) => pathname.includes(m)) ||
+      (tab.route === null && moreOpen);
     return (
       <Pressable
         key={tab.key}
@@ -95,23 +128,34 @@ export default function FloatingTabMenu() {
         accessibilityLabel={tab.title}
       >
         <View style={[styles.iconWrap, active && styles.iconWrapActive]}>
-          <Ionicons name={active ? tab.iconActive : tab.icon} size={22} color={active ? C.primary : C.inkMute} />
+          <Ionicons
+            name={active ? tab.iconActive : tab.icon}
+            size={22}
+            color={active ? C.primary : C.inkMute}
+          />
         </View>
-        <Text style={[styles.label, active && styles.labelActive]}>{tab.title}</Text>
+        <Text style={[styles.label, active && styles.labelActive]}>
+          {tab.title}
+        </Text>
       </Pressable>
     );
   };
 
   return (
     <>
-      <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View
+        style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}
+      >
         {LEFT_TABS.map(renderTab)}
 
         {/* 가운데 + 버튼 */}
         <View style={styles.centerSlot}>
           <Pressable
             onPress={() => go(ADD_ROUTE)}
-            style={({ pressed }) => [styles.addBtn, pressed && { transform: [{ scale: 0.95 }] }]}
+            style={({ pressed }) => [
+              styles.addBtn,
+              pressed && { transform: [{ scale: 0.95 }] },
+            ]}
             accessibilityLabel="책 등록하기"
           >
             <Ionicons name="add" size={32} color="#fff" />
@@ -122,14 +166,29 @@ export default function FloatingTabMenu() {
       </View>
 
       {/* 더보기 시트 */}
-      <Modal visible={moreOpen} transparent animationType="fade" onRequestClose={() => setMoreOpen(false)}>
+      <Modal
+        visible={moreOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMoreOpen(false)}
+      >
         <Pressable style={styles.overlay} onPress={() => setMoreOpen(false)}>
-          <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]} onPress={() => { }}>
+          <Pressable
+            style={[
+              styles.sheet,
+              { paddingBottom: Math.max(insets.bottom, 16) + 8 },
+            ]}
+            onPress={() => {}}
+          >
             <View style={styles.handle} />
             <Text style={styles.sheetTitle}>기타</Text>
             <View style={styles.grid}>
               {MORE_ITEMS.map((item) => (
-                <Pressable key={item.title} style={styles.gridItem} onPress={() => go(item.route)}>
+                <Pressable
+                  key={item.title}
+                  style={styles.gridItem}
+                  onPress={() => go(item.route)}
+                >
                   <View style={styles.gridIcon}>
                     <Ionicons name={item.icon} size={22} color={C.primary} />
                   </View>
@@ -164,7 +223,13 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   tab: { flex: 1, alignItems: "center", gap: 3 },
-  iconWrap: { width: 44, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  iconWrap: {
+    width: 44,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   iconWrapActive: { backgroundColor: C.primarySoft },
   label: { fontSize: 11, fontWeight: "600", color: C.inkMute },
   labelActive: { color: C.primary, fontWeight: "700" },
@@ -188,7 +253,11 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
 
-  overlay: { flex: 1, backgroundColor: "rgba(31,34,51,0.4)", justifyContent: "flex-end" },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(31,34,51,0.4)",
+    justifyContent: "flex-end",
+  },
   sheet: {
     backgroundColor: C.card,
     borderTopLeftRadius: 28,
@@ -196,8 +265,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 10,
   },
-  handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: C.line, marginBottom: 16 },
-  sheetTitle: { fontSize: 17, fontWeight: "700", color: C.ink, marginBottom: 16 },
+  handle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.line,
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: C.ink,
+    marginBottom: 16,
+  },
   grid: { flexDirection: "row", flexWrap: "wrap", rowGap: 18 },
   gridItem: { width: "25%", alignItems: "center", gap: 6 },
   gridIcon: {

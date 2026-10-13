@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const BASE_URL = 'http://10.10.22.134:3000/api/v1'; // 내 방 와이파이
 //const BASE_URL = 'http://localhost:3000/api/v1'; // 백엔드 주소로 바꿔줘
-//const BASE_URL = "http://172.20.1.230:3000/api/v1"; // 차319 와이파이
+const BASE_URL = "http://172.20.27.182:3000/api/v1"; // 차319 와이파이
 // EXPO_PUBLIC_API_BASE_URL(.env)이 있으면 그걸 쓰고, 없으면 로컬호스트로 폴백
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
-  ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/v1`
-  : "http://localhost:3000/api/v1";
+// const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
+//   ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/v1`
+//   : "http://localhost:3000/api/v1";
 
 // 기본 요청 함수
 async function request<T>(
@@ -291,7 +291,7 @@ export const groupApi = {
         group_members: [
           {
             joined_at: Date;
-          }
+          },
         ];
       }[]
     >("/groups"),
@@ -312,7 +312,7 @@ export const groupApi = {
           book: { title: string };
         },
       ];
-      creator: { nickname: string; }
+      creator: { nickname: string };
     }>(`/groups/${group_id}`),
 
   // 그룹 입장
@@ -379,7 +379,7 @@ export const groupApi = {
       update_group_book: {
         book_id: string;
         target_date: Date;
-      }
+      };
     }>(`/groups/${group_id}/update`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -497,7 +497,9 @@ export const bookApi = {
         category: string; // 문학 / 인문과학 / 사회과학 / 자연과학
         recommended_at: string; // "2026.10"
       }[];
-    }>(`/recommendation/librarian?limit=${limit}${genre ? `&genre=${encodeURIComponent(genre)}` : ""}`),
+    }>(
+      `/recommendation/librarian?limit=${limit}${genre ? `&genre=${encodeURIComponent(genre)}` : ""}`,
+    ),
 
   // 또래가 읽고 있는 책 — 같은 연령대 사용자 책장 기준, 부족하면 전체 사용자 인기 책 (scope: "all")
   getPeerRecommendations: (limit = 10) =>

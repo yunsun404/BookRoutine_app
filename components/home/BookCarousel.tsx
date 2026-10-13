@@ -95,7 +95,12 @@ export function gaugeColor(ratio: number) {
 
 const EMPTY_SLOT_ID = "empty-slot"; // homescreen.tsx의 "책 등록하기" 슬롯
 
-export default function BookCarousel({ books, currentIndex, onIndexChange, onPress }: Props) {
+export default function BookCarousel({
+  books,
+  currentIndex,
+  onIndexChange,
+  onPress,
+}: Props) {
   const [width, setWidth] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const lastIndex = useRef(currentIndex);
@@ -119,7 +124,8 @@ export default function BookCarousel({ books, currentIndex, onIndexChange, onPre
 
   if (books.length === 0) return null;
 
-  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
+  const onLayout = (e: LayoutChangeEvent) =>
+    setWidth(e.nativeEvent.layout.width);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!width || programmatic.current) return;
@@ -164,7 +170,9 @@ export default function BookCarousel({ books, currentIndex, onIndexChange, onPre
               hitSlop={6}
               accessibilityLabel={`${i + 1}번째 책`}
             >
-              <View style={[styles.dot, i === currentIndex && styles.dotActive]} />
+              <View
+                style={[styles.dot, i === currentIndex && styles.dotActive]}
+              />
             </Pressable>
           ))}
         </View>
@@ -184,10 +192,16 @@ function BookCard({ book, onPress }: { book: Book; onPress?: () => void }) {
     >
       <View style={styles.bookRow}>
         {book.coverUrl ? (
-          <Image source={{ uri: book.coverUrl }} style={styles.cover} resizeMode="cover" />
+          <Image
+            source={{ uri: book.coverUrl }}
+            style={styles.cover}
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
-            <Text style={styles.coverEmptyText} numberOfLines={3}>{book.title}</Text>
+            <Text style={styles.coverEmptyText} numberOfLines={3}>
+              {book.title}
+            </Text>
           </View>
         )}
 
@@ -196,41 +210,70 @@ function BookCard({ book, onPress }: { book: Book; onPress?: () => void }) {
             <View style={styles.badgeDot} />
             <Text style={styles.badgeText}>독서 중</Text>
           </View>
-          <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
-          {!!book.author && <Text style={styles.author} numberOfLines={1}>{book.author}</Text>}
+          <Text style={styles.title} numberOfLines={2}>
+            {book.title}
+          </Text>
+          {!!book.author && (
+            <Text style={styles.author} numberOfLines={1}>
+              {book.author}
+            </Text>
+          )}
         </View>
       </View>
 
-      <TemperatureGauge ratio={ratio} current={book.currentPage} total={book.totalPages} />
+      <TemperatureGauge
+        ratio={ratio}
+        current={book.currentPage}
+        total={book.totalPages}
+      />
     </Pressable>
   );
 }
 
 /* ───────── 온도 게이지 ───────── */
-function TemperatureGauge({ ratio, current, total }: { ratio: number; current: number; total: number }) {
+function TemperatureGauge({
+  ratio,
+  current,
+  total,
+}: {
+  ratio: number;
+  current: number;
+  total: number;
+}) {
   const clamped = Math.max(0, Math.min(1, ratio));
   const pct = Math.round(clamped * 100);
   const color = gaugeColor(clamped);
 
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(anim, { toValue: clamped, duration: 700, useNativeDriver: false }).start();
+    Animated.timing(anim, {
+      toValue: clamped,
+      duration: 700,
+      useNativeDriver: false,
+    }).start();
   }, [clamped]);
 
-  const fillWidth = anim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+  const fillWidth = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
 
   return (
     <View style={styles.gaugeWrap}>
       <View style={styles.gaugeRow}>
         <View style={styles.track}>
-          <Animated.View style={[styles.fill, { width: fillWidth, backgroundColor: color }]} />
+          <Animated.View
+            style={[styles.fill, { width: fillWidth, backgroundColor: color }]}
+          />
         </View>
         <Text style={[styles.temp, { color }]}>
           {pct}
           <Text style={styles.tempUnit}>°C</Text>
         </Text>
       </View>
-      <Text style={styles.pageCount}>{current} / {total}쪽</Text>
+      <Text style={styles.pageCount}>
+        {current} / {total}쪽
+      </Text>
     </View>
   );
 }
@@ -240,7 +283,11 @@ function AddBookCard({ onPress }: { onPress?: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, styles.addCard, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [
+        styles.card,
+        styles.addCard,
+        pressed && { opacity: 0.85 },
+      ]}
     >
       <View style={styles.addIcon}>
         <Ionicons name="add" size={26} color={C.primary} />
@@ -269,8 +316,18 @@ const styles = StyleSheet.create({
   },
   bookRow: { flexDirection: "row", gap: 16, alignItems: "center" },
   cover: { width: 78, height: 113, borderRadius: 8, backgroundColor: C.line },
-  coverEmpty: { alignItems: "center", justifyContent: "center", backgroundColor: C.primarySoft, padding: 6 },
-  coverEmptyText: { fontSize: 12, fontWeight: "700", color: C.primary, textAlign: "center" },
+  coverEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.primarySoft,
+    padding: 6,
+  },
+  coverEmptyText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.primary,
+    textAlign: "center",
+  },
   info: { flex: 1, gap: 6 },
   badge: {
     flexDirection: "row",
@@ -289,9 +346,21 @@ const styles = StyleSheet.create({
 
   gaugeWrap: { marginTop: 18, gap: 6 },
   gaugeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  track: { flex: 1, height: 10, borderRadius: 10, backgroundColor: C.line, overflow: "hidden" },
+  track: {
+    flex: 1,
+    height: 10,
+    borderRadius: 10,
+    backgroundColor: C.line,
+    overflow: "hidden",
+  },
   fill: { height: "100%", borderRadius: 10 },
-  temp: { fontSize: 20, fontWeight: "800", letterSpacing: -0.5, minWidth: 64, textAlign: "right" },
+  temp: {
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    minWidth: 64,
+    textAlign: "right",
+  },
   tempUnit: { fontSize: 13, fontWeight: "700" },
   pageCount: { fontSize: 12, fontWeight: "600", color: C.inkMute },
 
@@ -318,7 +387,12 @@ const styles = StyleSheet.create({
   addTitle: { fontSize: 16, fontWeight: "700", color: C.ink },
   addSub: { fontSize: 13, color: C.inkSub },
 
-  dots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 12 },
+  dots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 12,
+  },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.line },
   dotActive: { width: 18, backgroundColor: C.primary },
 });

@@ -30,8 +30,11 @@ export default function EbookListScreen() {
     setError(false);
     try {
       const res = await fetchEbookList({ page: 1, limit: 20 });
+      // 서버가 { items: [...] }가 아닌 응답(HTML, 에러 객체 등)을 주면 화면이 터지지 않고 에러 상태로 가도록 방어
+      if (!Array.isArray(res?.items)) throw new Error('전자책 목록 응답 형식이 올바르지 않습니다.');
       setItems(res.items);
-    } catch {
+    } catch (e) {
+      console.error('전자책 목록 조회 실패:', e);
       setError(true);
     } finally {
       setLoading(false);
