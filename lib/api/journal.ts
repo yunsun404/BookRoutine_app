@@ -1,7 +1,7 @@
 import { authFetch, BASE_URL } from '@/constants/api';
 import type { Journal } from '../types/journal';
 
-const JOURNALS = `${BASE_URL}/journals`;
+const JOURNALS = `${BASE_URL}/reading-journals`;
 
 export class HttpError extends Error {
   constructor(public status: number) { super(`HTTP ${status}`); }
@@ -15,7 +15,7 @@ async function json<T>(res: Response): Promise<T> {
 /** 해당 날짜 일지. 없으면(404) null */
 export async function fetchJournal(date: string): Promise<Journal | null> {
   try {
-    return await json<Journal>(await authFetch(`${JOURNALS}?date=${date}`));
+    return await json<Journal>(await authFetch(`${JOURNALS}/by-date?date=${date}`));
   } catch (e) {
     if (e instanceof HttpError && e.status === 404) return null;
     throw e;
@@ -33,7 +33,7 @@ export async function fetchJournalDates(month: string): Promise<string[]> {
 /** 일지 생성 (백엔드에서 LLM 호출). 409 = 이미 있음, 422 = 그날 독서 기록 없음 */
 export async function createJournal(date: string): Promise<Journal> {
   return json<Journal>(
-    await authFetch(JOURNALS, {
+    await authFetch(`${JOURNALS}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date }),
