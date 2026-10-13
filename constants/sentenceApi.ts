@@ -82,3 +82,49 @@ export async function scanSentenceImage(imageBase64: string, format: "jpg" | "pn
   });
   return parse<OcrResult>(res, "문장을 인식하지 못했어요.");
 }
+
+// ───────── 검색 ─────────
+export type SearchMode = "keyword" | "semantic" | "hybrid";
+
+export interface SentenceSearchItem extends Sentence {
+  score: number;
+  book: {
+    book_id: string;
+    title: string;
+    author: string | null;
+    cover_url: string | null;
+  } | null;
+}
+
+export interface SentenceSearchResult {
+  query: string;
+  terms: string[]; // 서버가 정규화한 검색어 토큰 → 하이라이트 기준
+  mode: SearchMode;
+  total: number;
+  truncated: boolean;
+  limit: number;
+  offset: number;
+  took_ms: number;
+  items: SentenceSearchItem[];
+}
+
+export async function searchSentences(
+  q: string,
+  opts: {
+    mode?: SearchMode;
+    bookId?: string;
+    limit?: number;
+    offset?: number;
+    signal?: AbortSignal; // 새 검색어가 들어오면 이전 요청을 취소하기 위함
+  } = {},
+): Promise<SentenceSearchResult> {
+  const params = new URLSearchParams({ q, mode: opts.mode ?? "keyword" });
+  if (opts.bookId) params.set("book_id", opts.bookId);
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.offset != null) params.set("offset", String(opts.offset));
+
+  const res = await authFetch(`${BASE_URL}/sentences/search?${params.toString()}`, {
+    signal: opts.signal,
+  });
+  return parse<SentenceSearchResult>(res, "문장을 검색하지 못했어요.");
+}

@@ -20,20 +20,6 @@ import { aiSummaryApi, BookAiSummary } from "../../lib/aiSummaryApi";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const AI_CARD_WIDTH = SCREEN_WIDTH - 48; // 옆 카드가 살짝 보이도록
 
-/**
- * 선호 장르 파싱 — DB에는 { favorite_genre: ["판타지", "추리"] } 형태로 저장돼 있음
- * (예전 데이터 대비로 배열/문자열도 받아줌)
- */
-function toGenres(value: unknown): string[] {
-  const raw =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? (value as { favorite_genre?: unknown }).favorite_genre
-      : value;
-  if (Array.isArray(raw)) return raw.filter((g): g is string => typeof g === "string" && g.length > 0);
-  if (typeof raw === "string" && raw) return [raw];
-  return [];
-}
-
 /** key_insights(Json)가 문자열 배열이면 최대 3개만 뽑아서 사용 */
 function toInsights(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -44,11 +30,46 @@ export default function RecommendScreen() {
   const [loading, setLoading] = useState(true);
   const [nickname, setNickname] = useState("");
 
-  // 선호 장르 (여러 개면 칩으로 골라서 봄)
-  const [genres, setGenres] = useState<string[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState("");
-  const [genreBooks, setGenreBooks] = useState<RowBook[]>([]);
-  const [genreLoading, setGenreLoading] = useState(false);
+  // 국립중앙도서관 사서 추천 (최근 추천순, DB에 없는 책이라 isbn으로 책 소개를 연다)
+  // 선호 장르 중 사서 추천이 있는 장르면 장르별(칩으로 전환), 없으면 전체 최신 추천
+  const [librarianBooks, setLibrarianBooks] = useState<RowBook[]>([]);
+  const [librarianGenres, setLibrarianGenres] = useState<string[]>([]);
+  const [librarianGenre, setLibrarianGenre] = useState<string | null>(null);
+  const [librarianLoading, setLibrarianLoading] = useState(false);
+
+  const applyLibrarian = (res: Awaited<ReturnType<typeof bookApi.getLibrarianRecommendations>>) => {
+    setLibrarianGenres(res.genres);
+    setLibrarianGenre(res.genre);
+    setLibrarianBooks(
+      res.items.map((b) => ({
+        key: b.isbn,
+        title: b.title,
+        author: b.author,
+        coverUrl: b.cover_url,
+        caption: `${b.recommended_at} · ${b.category}`,
+        onPress: () => router.push({ pathname: "/book-detail", params: { isbn: b.isbn } }),
+      })),
+    );
+  };
+
+  // 장르 칩을 누르면 그 장르의 사서 추천으로 다시 불러옴
+  const selectLibrarianGenre = async (genre: string) => {
+    if (genre === librarianGenre) return;
+    setLibrarianGenre(genre);
+    setLibrarianLoading(true);
+    try {
+      applyLibrarian(await bookApi.getLibrarianRecommendations(genre, 10));
+    } catch (e) {
+      console.error("사서 추천 불러오기 실패:", e);
+      setLibrarianBooks([]);
+    } finally {
+      setLibrarianLoading(false);
+    }
+  };
+
+  // 또래가 읽고 있는 책 — scope가 all이면 전체 사용자 인기 책
+  const [peerBooks, setPeerBooks] = useState<RowBook[]>([]);
+  const [peerAgeGroup, setPeerAgeGroup] = useState<number | null>(null);
 
   // ⭕ DB에 저장된 AI 요약 — 마지막으로 요약된 책 5개 (책마다 1개, 오래된 순)
   const [aiSummaries, setAiSummaries] = useState<BookAiSummary[]>([]);
@@ -61,13 +82,36 @@ export default function RecommendScreen() {
       try {
         setLoading(true);
 
-        // 1. 사용자 닉네임 / 선호 장르
+        // 1. 사용자 닉네임
         const me = await userApi.getMe();
-        if (me) {
-          setNickname(me.nickname ?? "");
-          const favorite = toGenres(me.favorite_genre);
-          setGenres(favorite);
-          setSelectedGenre(favorite[0] ?? "");
+        if (me) setNickname(me.nickname ?? "");
+
+        // 사서 추천 / 또래 추천은 서로 기다릴 필요 없어서 동시에 요청 (하나 실패해도 나머지는 표시)
+        const [librarianRes, peerRes] = await Promise.allSettled([
+          bookApi.getLibrarianRecommendations(undefined, 10),
+          bookApi.getPeerRecommendations(10),
+        ]);
+
+        if (librarianRes.status === "fulfilled") {
+          applyLibrarian(librarianRes.value);
+        } else {
+          console.error("사서 추천 불러오기 실패:", librarianRes.reason);
+        }
+
+        if (peerRes.status === "fulfilled") {
+          setPeerAgeGroup(peerRes.value.scope === "peer" ? peerRes.value.age_group : null);
+          setPeerBooks(
+            peerRes.value.items.map((b) => ({
+              key: b.book_id,
+              title: b.title,
+              author: b.author,
+              coverUrl: b.cover_url,
+              caption: `${b.reader_count}명이 담았어요`,
+              onPress: () => router.push({ pathname: "/book-detail", params: { book_id: b.book_id, infoOnly: "1" } }),
+            })),
+          );
+        } else {
+          console.error("또래 추천 불러오기 실패:", peerRes.reason);
         }
 
         // 2. [AI 요약] 내 타래 + 내 그룹 타래 기준, 마지막으로 요약된 책 5개를 DB에서 조회
@@ -109,40 +153,6 @@ export default function RecommendScreen() {
     initRecommendData();
   }, []);
 
-  // 장르 기반 추천 — 고른 장르의 알라딘 책 10권 (DB에 없는 책이라 isbn으로 책 소개를 연다)
-  useEffect(() => {
-    if (!selectedGenre) {
-      setGenreBooks([]);
-      return;
-    }
-    let cancelled = false;
-
-    (async () => {
-      setGenreLoading(true);
-      try {
-        const res = await bookApi.getGenreRecommendations(selectedGenre, 10);
-        if (cancelled) return;
-        setGenreBooks(
-          res.items.map((b) => ({
-            key: b.isbn,
-            title: b.title,
-            author: b.author,
-            coverUrl: b.cover_url,
-            onPress: () => router.push({ pathname: "/book-detail", params: { isbn: b.isbn } }),
-          })),
-        );
-      } catch (e) {
-        console.error("장르 추천 불러오기 실패:", e);
-        if (!cancelled) setGenreBooks([]);
-      } finally {
-        if (!cancelled) setGenreLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedGenre]);
 
   if (loading) {
     return (
@@ -214,47 +224,76 @@ export default function RecommendScreen() {
           )}
         </View>
 
-        {/* 2. 장르 기반 추천: 선호 장르의 알라딘 책 10권 (선호 장르가 없으면 숨김) */}
-        {genres.length > 0 && (
+        {/* 2. 국립중앙도서관 사서 추천
+              선호 장르 중 사서 추천이 있는 장르(철학/역사/인문학/경제/과학/외국도서)면 장르별 + 칩,
+              없으면(판타지/로맨스/추리/요리만 골랐거나 선호 장르 없음) 전체 최신 사서 추천 */}
+        <View style={styles.genreSection}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleTight]}>
+            {librarianGenre ? (
+              <>
+                이런 <Text style={styles.genreHighlight}>{librarianGenre}</Text> 책은 어떤가요?
+              </>
+            ) : (
+              <>
+                <Text style={styles.genreHighlight}>사서</Text>가 추천한 책
+              </>
+            )}
+          </Text>
+          <View style={styles.sourceBadge}>
+            <Text style={styles.sourceBadgeText}>국립중앙도서관 사서 추천 · 최근 추천순</Text>
+          </View>
+
+          {librarianGenres.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+            >
+              {librarianGenres.map((g) => {
+                const active = g === librarianGenre;
+                return (
+                  <Pressable
+                    key={g}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => selectLibrarianGenre(g)}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{g}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {librarianLoading ? (
+            <View style={styles.rowLoading}>
+              <ActivityIndicator color={Colors.textSecondary || "#333"} />
+            </View>
+          ) : librarianBooks.length > 0 ? (
+            <BookRow books={librarianBooks} />
+          ) : (
+            <Text style={styles.rowEmpty}>추천할 책을 불러오지 못했어요.</Text>
+          )}
+        </View>
+
+        {/* 3. 또래가 읽고 있는 책: 같은 연령대 사용자 책장 기준 (부족하면 전체 사용자 인기 책) */}
+        {peerBooks.length > 0 && (
           <View style={styles.genreSection}>
             <Text style={styles.sectionTitle}>
-              이런 <Text style={styles.genreHighlight}>{selectedGenre}</Text> 책은 어떤가요?
+              {peerAgeGroup != null ? (
+                <>
+                  <Text style={styles.genreHighlight}>{peerAgeGroup}대</Text> 북루틴 사용자들이 읽고 있어요
+                </>
+              ) : (
+                <>
+                  <Text style={styles.genreHighlight}>북루틴</Text> 사용자들이 많이 읽는 책
+                </>
+              )}
             </Text>
-
-            {genres.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipRow}
-              >
-                {genres.map((g) => {
-                  const active = g === selectedGenre;
-                  return (
-                    <Pressable
-                      key={g}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setSelectedGenre(g)}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{g}</Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            )}
-
-            {genreLoading ? (
-              <View style={styles.rowLoading}>
-                <ActivityIndicator color={Colors.textSecondary || "#333"} />
-              </View>
-            ) : genreBooks.length > 0 ? (
-              <BookRow books={genreBooks} />
-            ) : (
-              <Text style={styles.rowEmpty}>추천할 책을 불러오지 못했어요.</Text>
-            )}
+            <BookRow books={peerBooks} />
           </View>
         )}
 
-        {/* 3. 나만을 위한 추천: 장르유사도/난이도매칭/완독패턴 가중합 */}
+        {/* 4. 나만을 위한 추천: 장르유사도/난이도매칭/완독패턴 가중합 */}
         <View style={styles.genreSection}>
           <Text style={styles.sectionTitle}>
             <Text style={styles.genreHighlight}>{nickname || "회원"}</Text>님만을 위한 책을 추천해드려요
@@ -295,6 +334,56 @@ const styles = StyleSheet.create({
     color: "#000",
     paddingHorizontal: 16,
     marginBottom: 14,
+  },
+  // 사서 추천 칩이 붙을 때는 제목 아래 여백을 줄임
+  sectionTitleTight: {
+    marginBottom: 6,
+  },
+  // 장르 추천 출처 표시 (작게)
+  sourceBadge: {
+    alignSelf: "flex-start",
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "#F2F4F7",
+  },
+  sourceBadgeText: {
+    fontSize: 11,
+    color: "#667085",
+    fontWeight: "600",
+  },
+  // 사서 추천 장르 칩 (선호 장르 중 사서 추천이 있는 장르가 여러 개일 때)
+  chipRow: {
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border || "#E0E0E0",
+    backgroundColor: "#fff",
+  },
+  chipActive: {
+    backgroundColor: "#222",
+    borderColor: "#222",
+  },
+  chipText: {
+    fontSize: 13,
+    color: "#555",
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: "#fff",
+  },
+  rowLoading: {
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
   },
   // 💡 홈화면 피드/체크리스트 카드 구조를 이식한 AI 요약 블록 스타일
   aiSection: {
@@ -372,37 +461,6 @@ const styles = StyleSheet.create({
   },
   genreHighlight: {
     color: Colors.textSecondary || "#4A90E2",
-  },
-  // 선호 장르 칩 (장르가 여러 개일 때)
-  chipRow: {
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 14,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: Colors.border || "#E0E0E0",
-    backgroundColor: "#fff",
-  },
-  chipActive: {
-    backgroundColor: "#222",
-    borderColor: "#222",
-  },
-  chipText: {
-    fontSize: 13,
-    color: "#555",
-    fontWeight: "600",
-  },
-  chipTextActive: {
-    color: "#fff",
-  },
-  rowLoading: {
-    height: 200,
-    justifyContent: "center",
-    alignItems: "center",
   },
   rowEmpty: {
     paddingHorizontal: 16,

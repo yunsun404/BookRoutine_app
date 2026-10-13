@@ -14,16 +14,21 @@ import {
   type Sentence,
   type SentenceSource,
 } from "@/constants/sentenceApi";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import AddSentenceSheet, { type AddMethod } from "./AddSentenceSheet";
 import SentenceCard from "./SentenceCard";
 import SentenceEditorModal, { EMPTY_FORM, type SentenceFormValue } from "./SentenceEditorModal";
+import SentenceImageMaker from "./SentenceImageMaker";
 import { P } from "@/constants/palette";
 
 type Props = {
   bookId: string;
+  bookTitle?: string;
+  bookAuthor?: string | null;
   totalPages?: number | null;
   addSheetVisible: boolean;
   onCloseAddSheet: () => void;
@@ -47,12 +52,13 @@ const CLOSED_EDITOR: EditorState = {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export default function SentenceTab({ bookId, totalPages, addSheetVisible, onCloseAddSheet }: Props) {
+export default function SentenceTab({ bookId, bookTitle, bookAuthor, totalPages, addSheetVisible, onCloseAddSheet }: Props) {
   const [sentences, setSentences] = useState<Sentence[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [editor, setEditor] = useState<EditorState>(CLOSED_EDITOR);
+  const [imageTarget, setImageTarget] = useState<Sentence | null>(null); // 이미지로 만들 문장
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -228,7 +234,13 @@ export default function SentenceTab({ bookId, totalPages, addSheetVisible, onClo
     // ScrollView 안에 있으므로 FlatList 대신 map을 씁니다.
     // (같은 방향의 VirtualizedList를 ScrollView에 중첩하면 RN이 경고를 띄움)
     body = sentences.map((s) => (
-      <SentenceCard key={s.sentence_id} sentence={s} onPress={openEditEditor} onLongPress={confirmDelete} />
+      <SentenceCard
+        key={s.sentence_id}
+        sentence={s}
+        onPress={openEditEditor}
+        onLongPress={confirmDelete}
+        onImagePress={setImageTarget}
+      />
     ));
   }
 
@@ -239,6 +251,20 @@ export default function SentenceTab({ bookId, totalPages, addSheetVisible, onClo
         {!loading && !error && <Text style={styles.headerCount}>{sentences.length}</Text>}
         <View style={{ flex: 1 }} />
         {sentences.length > 0 && <Text style={styles.headerHint}>길게 눌러 삭제</Text>}
+        {/* 문장 검색: 기본은 "이 책" 범위, 검색 화면에서 "전체 책"으로 넓힐 수 있음 */}
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/sentence-search",
+              params: { book_id: bookId, book_title: bookTitle ?? "" },
+            })
+          }
+          hitSlop={10}
+          style={styles.searchButton}
+          accessibilityLabel="문장 검색"
+        >
+          <Ionicons name="search" size={18} color={P.inkSoft} />
+        </Pressable>
       </View>
 
       {body}
@@ -253,6 +279,14 @@ export default function SentenceTab({ bookId, totalPages, addSheetVisible, onClo
         totalPages={totalPages}
         onClose={closeEditor}
         onSubmit={handleSubmit}
+      />
+
+      <SentenceImageMaker
+        visible={!!imageTarget}
+        sentence={imageTarget}
+        bookTitle={bookTitle}
+        bookAuthor={bookAuthor}
+        onClose={() => setImageTarget(null)}
       />
 
       {/* OCR 진행 중 오버레이 — 사용자가 결과를 기다리는 동안 다른 조작을 막음 */}
@@ -278,6 +312,15 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: "700", color: P.ink },
   headerCount: { fontSize: 16, fontWeight: "700", color: P.accent },
   headerHint: { fontSize: 12, color: P.textTertiary },
+  searchButton: {
+    marginLeft: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: P.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyBox: {
     alignItems: "center",
     paddingVertical: 40,

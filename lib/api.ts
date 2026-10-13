@@ -481,16 +481,35 @@ export const bookApi = {
       }[]
     >(`/recommendation${limit ? `?limit=${limit}` : ""}`),
 
-  // 장르 기반 추천 — 알라딘에서 해당 장르 책을 판매량순으로 (내 책장에 있는 책 제외)
-  getGenreRecommendations: (genre: string, limit = 10) =>
+  // 국립중앙도서관 사서 추천 (최근 추천순, 내 책장에 있는 책 제외)
+  // - 선호 장르 중 사서 추천이 있는 장르(철학/역사/인문학/경제/과학/외국도서)가 있으면 그 장르 (genre 생략 시 첫 번째)
+  // - 없으면 전체 최신 사서 추천 (genre: null)
+  getLibrarianRecommendations: (genre?: string, limit = 10) =>
     request<{
-      genre: string;
+      genres: string[]; // 칩으로 보여줄 장르
+      genre: string | null; // 지금 보여주는 장르
       items: {
         isbn: string;
         title: string;
         author: string | null;
         cover_url: string | null;
         publisher: string | null;
+        category: string; // 문학 / 인문과학 / 사회과학 / 자연과학
+        recommended_at: string; // "2026.10"
       }[];
-    }>(`/recommendation/genre?genre=${encodeURIComponent(genre)}&limit=${limit}`),
+    }>(`/recommendation/librarian?limit=${limit}${genre ? `&genre=${encodeURIComponent(genre)}` : ""}`),
+
+  // 또래가 읽고 있는 책 — 같은 연령대 사용자 책장 기준, 부족하면 전체 사용자 인기 책 (scope: "all")
+  getPeerRecommendations: (limit = 10) =>
+    request<{
+      scope: "peer" | "all";
+      age_group: number | null; // 20 → 20대
+      items: {
+        book_id: string;
+        title: string;
+        author: string | null;
+        cover_url: string | null;
+        reader_count: number;
+      }[];
+    }>(`/recommendation/peers?limit=${limit}`),
 };

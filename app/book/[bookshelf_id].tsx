@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import Header from "../../components/Header";
+import { P } from "@/constants/palette";
 
 interface BookDetail {
   bookshelf_id: string;
@@ -100,7 +101,7 @@ export default function BookDetailScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#8B4513" />
+        <ActivityIndicator size="large" color={P.primary} />
       </View>
     );
   }
@@ -120,7 +121,7 @@ export default function BookDetailScreen() {
       <Header />
 
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color="#333" />
+        <Ionicons name="arrow-back" size={24} color={P.ink} />
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -186,7 +187,7 @@ export default function BookDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0EFED",
+    backgroundColor: P.bg,
   },
   center: {
     flex: 1,
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     marginHorizontal: 16,
     borderRadius: 16,
-    shadowColor: "#000",
+    shadowColor: P.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 130,
     borderRadius: 8,
-    backgroundColor: "#E1D9D1",
+    backgroundColor: P.coverPlaceholder,
     marginRight: 16,
   },
   bookInfo: {
@@ -227,22 +228,22 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
     marginBottom: 4,
   },
   author: {
     fontSize: 13,
-    color: "#666",
+    color: P.textSecondary,
     marginBottom: 2,
   },
   goalDays: {
     fontSize: 12,
-    color: "#555",
+    color: P.textSecondary,
     marginBottom: 2,
   },
   goalPeriod: {
     fontSize: 11,
-    color: "#999",
+    color: P.textTertiary,
     marginBottom: 8,
   },
   progressRow: {
@@ -253,18 +254,18 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     flex: 1,
     height: 5,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: P.border,
     borderRadius: 3,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#C8B84A",
+    backgroundColor: P.primary,
     borderRadius: 3,
   },
   pageText: {
     fontSize: 11,
-    color: "#999",
+    color: P.textTertiary,
   },
   threadSection: {
     paddingHorizontal: 16,
@@ -273,12 +274,12 @@ const styles = StyleSheet.create({
   threadTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: P.ink,
     marginBottom: 12,
   },
   threadEmpty: {
     fontSize: 14,
-    color: "#999",
+    color: P.textTertiary,
     textAlign: "center",
     paddingVertical: 20,
   },
@@ -287,7 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
-    shadowColor: "#000",
+    shadowColor: P.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
@@ -301,15 +302,15 @@ const styles = StyleSheet.create({
   threadPage: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#4A3B32",
+    color: P.primary,
   },
   threadDate: {
     fontSize: 11,
-    color: "#999",
+    color: P.textTertiary,
   },
   threadContent: {
     fontSize: 13,
-    color: "#333",
+    color: P.ink,
     lineHeight: 20,
   },
 });

@@ -1,5 +1,5 @@
 // components/sentences/SentenceCard.tsx
-// 모아둔 문장 하나를 보여주는 카드. 탭 → 수정, 길게 누르기 → 삭제.
+// 모아둔 문장 하나를 보여주는 카드. 탭 → 수정, 길게 누르기 → 삭제, 🖼 버튼 → 문장 이미지 만들기.
 import type { Sentence } from "@/constants/sentenceApi";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -10,6 +10,7 @@ type Props = {
   sentence: Sentence;
   onPress: (sentence: Sentence) => void;
   onLongPress: (sentence: Sentence) => void;
+  onImagePress?: (sentence: Sentence) => void;
 };
 
 function formatDate(iso: string) {
@@ -19,7 +20,7 @@ function formatDate(iso: string) {
   return `${d.getFullYear()}.${mm}.${dd}`;
 }
 
-export default function SentenceCard({ sentence, onPress, onLongPress }: Props) {
+export default function SentenceCard({ sentence, onPress, onLongPress, onImagePress }: Props) {
   return (
     <Pressable
       onPress={() => onPress(sentence)}
@@ -46,6 +47,18 @@ export default function SentenceCard({ sentence, onPress, onLongPress }: Props) 
           size={14}
           color={P.textTertiary}
         />
+        {onImagePress && (
+          // 카드(Pressable) 안의 Pressable: 안쪽 버튼이 터치를 먼저 가져가서
+          // 이미지 버튼을 눌러도 카드의 "수정" 동작은 실행되지 않습니다.
+          <Pressable
+            onPress={() => onImagePress(sentence)}
+            hitSlop={8}
+            style={styles.imageButton}
+            accessibilityLabel="문장 이미지 만들기"
+          >
+            <Ionicons name="image-outline" size={15} color={P.primary} />
+          </Pressable>
+        )}
       </View>
     </Pressable>
   );
@@ -92,4 +105,13 @@ const styles = StyleSheet.create({
   },
   page: { fontSize: 12, fontWeight: "700", color: P.primary },
   date: { fontSize: 12, color: P.textTertiary },
+  imageButton: {
+    marginLeft: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: P.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
