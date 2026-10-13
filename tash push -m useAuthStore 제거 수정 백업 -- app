@@ -1,0 +1,153 @@
+[1mdiff --git a/app/(auth)/logout.tsx b/app/(auth)/logout.tsx[m
+[1mindex 1a05c80..97ca933 100644[m
+[1m--- a/app/(auth)/logout.tsx[m
+[1m+++ b/app/(auth)/logout.tsx[m
+[36m@@ -1,5 +1,4 @@[m
+ import { authApi } from "@/lib/api";[m
+[31m-import { useAuthStore } from "@/store/useAuthStore";[m
+ import { useRouter } from "expo-router";[m
+ import { useState } from "react";[m
+ import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";[m
+[36m@@ -9,7 +8,7 @@[m [mexport default function LogoutScreen() {[m
+ [m
+ [m
+     const router = useRouter();[m
+[31m-    const { clearAuth } = useAuthStore();[m
+[32m+[m
+ [m
+     const [refresh_token, setRefreshToken] = useState('');[m
+     const [loading, setLoading] = useState(false);[m
+[36m@@ -28,7 +27,7 @@[m [mexport default function LogoutScreen() {[m
+             console.log('넘어가는지 보자');[m
+             console.log('로그아웃: ', success);[m
+             // 2. 로그인 상태 업데이트[m
+[31m-            clearAuth();[m
+[32m+[m[32m            // clearAuth();[m
+             // 3. 로그인 화면으로 이동[m
+             router.replace('/');[m
+         } catch (error) {[m
+[1mdiff --git a/app/(auth)/signup.tsx b/app/(auth)/signup.tsx[m
+[1mindex d76e725..ffe1c8f 100644[m
+[1m--- a/app/(auth)/signup.tsx[m
+[1m+++ b/app/(auth)/signup.tsx[m
+[36m@@ -1,5 +1,4 @@[m
+ import { authApi } from "@/lib/api";[m
+[31m-import { useAuthStore } from "@/store/useAuthStore";[m
+ import { useRouter } from "expo-router";[m
+ import { useState } from "react";[m
+ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";[m
+[36m@@ -23,7 +22,7 @@[m [mconst genreOptions = ['판타지', '로맨스', '인문학', '철학', '추리',[m
+ [m
+ export default function SignupScreen() {[m
+     const router = useRouter();[m
+[31m-    const { setAuth } = useAuthStore();[m
+[32m+[m[32m    // const { setAuth } = useAuthStore();[m
+ [m
+     const [username, setUsername] = useState('');[m
+     const [email, setEmail] = useState('');[m
+[36m@@ -54,7 +53,7 @@[m [mexport default function SignupScreen() {[m
+             // 임시로 as any 처리를 하여 속성 오류를 우회합니다. 추후 lib/api.ts의 타입 정의도 업데이트가 필요합니다.[m
+             const { user_id, access_token, refresh_token } = await authApi.register(payload as any);[m
+             // 2. 로그인 상태 업데이트[m
+[31m-            await setAuth({ user_id, nickname }, access_token, refresh_token);[m
+[32m+[m[32m            // await setAuth({ user_id, nickname }, access_token, refresh_token);[m
+             // 3. 메인 화면으로 이동[m
+             router.replace('/(tabs)/homescreen');[m
+         } catch (error) {[m
+[1mdiff --git a/app/(profile)/editprofile.tsx b/app/(profile)/editprofile.tsx[m
+[1mindex ce56d7c..3c9f99d 100644[m
+[1m--- a/app/(profile)/editprofile.tsx[m
+[1m+++ b/app/(profile)/editprofile.tsx[m
+[36m@@ -1,5 +1,4 @@[m
+ import { userApi } from "@/lib/api";[m
+[31m-import { useAuthStore } from "@/store/useAuthStore";[m
+ import { useRouter } from "expo-router";[m
+ import { useEffect, useState } from "react";[m
+ import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";[m
+[36m@@ -24,7 +23,6 @@[m [mconst ageOptions = ['10대', '20대', '30대', '40대', '50대 이상'];[m
+ export default function EditProfileScreen() {[m
+     const router = useRouter();[m
+     const [loading, setLoading] = useState(false);[m
+[31m-    const { updateUser } = useAuthStore();[m
+     const [username, setUsername] = useState('');[m
+     const [nickname, setNickname] = useState('');[m
+     const [age, setAge] = useState<number | undefined | null>();[m
+[36m@@ -83,7 +81,7 @@[m [mexport default function EditProfileScreen() {[m
+                 favorite_genre: favorite_genre.length > 0 ? { favorite_genre } : undefined,[m
+             };[m
+             await userApi.updateMe(payload as any);[m
+[31m-            updateUser({ nickname, profile_image, age });[m
+[32m+[m[32m            // updateUser({ nickname, profile_image, age });[m
+             router.back();[m
+         } catch (error) {[m
+             console.error('프로필 수정 오류:', error);[m
+[1mdiff --git a/app/(profile)/myprofile.tsx b/app/(profile)/myprofile.tsx[m
+[1mindex 6f6a693..e17a76c 100644[m
+[1m--- a/app/(profile)/myprofile.tsx[m
+[1m+++ b/app/(profile)/myprofile.tsx[m
+[36m@@ -1,5 +1,4 @@[m
+ import { authApi, userApi } from "@/lib/api";[m
+[31m-import { useAuthStore } from "@/store/useAuthStore";[m
+ import { useRouter } from "expo-router";[m
+ import { useEffect, useState } from "react";[m
+ import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";[m
+[36m@@ -21,7 +20,6 @@[m [mexport default function MyProfileScreen() {[m
+         created_at: Date;[m
+     }>();[m
+     const [modalVisible, setModalVisible] = useState(false);[m
+[31m-    const { clearAuth } = useAuthStore();[m
+ [m
+     const handleGetProfile = async () => {[m
+         try {[m
+[36m@@ -42,7 +40,7 @@[m [mexport default function MyProfileScreen() {[m
+             // 1. 탈퇴 API 호출[m
+             const { success } = await authApi.deleteAccount({});[m
+             // 2. 로그인 상태 업데이트[m
+[31m-            clearAuth();[m
+[32m+[m[32m            // clearAuth();[m
+             // 3. 로그인 화면으로 이동[m
+             router.replace('/');[m
+         } catch (error) {[m
+[1mdiff --git a/app/index.tsx b/app/index.tsx[m
+[1mindex 948f9db..1a9d60d 100644[m
+[1m--- a/app/index.tsx[m
+[1m+++ b/app/index.tsx[m
+[36m@@ -13,7 +13,7 @@[m [mimport {[m
+ } from 'react-native';[m
+ import { authApi, userApi } from '../lib/api';[m
+ import { syncPushToken } from '../lib/notifications';[m
+[31m-import { useAuthStore } from '../store/useAuthStore';[m
+[32m+[m
+ [m
+ // RN의 Alert.alert는 웹에서 아무것도 표시하지 않습니다(no-op).[m
+ // 그래서 웹에서는 로그인 실패 메시지가 안 보여 "그냥 멈춘 것"처럼 느껴지므로 브라우저 alert로 대체합니다.[m
+[36m@@ -27,7 +27,7 @@[m [mfunction showAlert(title: string, message: string) {[m
+ [m
+ export default function LoginScreen() {[m
+   const router = useRouter();[m
+[31m-  const { setAuth } = useAuthStore();[m
+[32m+[m[32m  // const { setAuth } = useAuthStore();[m
+ [m
+   const [username, setUsername] = useState('');[m
+   const [password, setPassword] = useState('');[m
+[36m@@ -47,14 +47,14 @@[m [mexport default function LoginScreen() {[m
+         password,[m
+       });[m
+ [m
+[31m-      await setAuth([m
+[31m-        { user_id: '', nickname: '' },[m
+[31m-        access_token,[m
+[31m-        refresh_token[m
+[31m-      );[m
+[32m+[m[32m      // await setAuth([m
+[32m+[m[32m      //   { user_id: '', nickname: '' },[m
+[32m+[m[32m      //   access_token,[m
+[32m+[m[32m      //   refresh_token[m
+[32m+[m[32m      // );[m
+ [m
+       const me = await userApi.getMe();[m
+[31m-      await setAuth(me, access_token, refresh_token);[m
+[32m+[m[32m      // await setAuth(me, access_token, refresh_token);[m
+ [m
+       // 로그인 성공 = access_token이 막 생긴 시점. PATCH /users/me/fcm-token은 인증이[m
+       // 필요해서 이 시점보다 앞에서는 호출할 수 없습니다. 권한 거부/개발 빌드가 아닌[m
