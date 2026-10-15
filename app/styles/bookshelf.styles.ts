@@ -1,5 +1,5 @@
-import { Dimensions, StyleSheet } from "react-native";
 import { P } from "@/constants/palette";
+import { Dimensions, StyleSheet } from "react-native";
 
 const { width } = Dimensions.get("window");
 const COLUMN_COUNT = 3;
@@ -352,7 +352,7 @@ export default StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#F3F0E6",
+    backgroundColor: "#F1ECFF",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 14,
