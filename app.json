@@ -56,14 +56,6 @@
         }
       ],
       "react-native-fast-tflite",
-      [
-        "react-native-vision-camera",
-        {
-          "cameraPermissionText": "독서 중 집중도를 측정하기 위해 카메라를 사용해요. 영상은 기기 밖으로 전송되지 않아요.",
-          "enableMicrophonePermission": false,
-          "enableCodeScanner": false
-        }
-      ],
       ["expo-build-properties", { "android": { "minSdkVersion": 26 } }]
     ],
     "experiments": {
