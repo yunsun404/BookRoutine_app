@@ -224,7 +224,7 @@ export default function BookshelfScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 책장 — '내 책장 보기' 탭일 때만 렌더링 */}
+      {/* 책장 */}
       {activeTab === "bookshelf" && (
         <FlatList
           data={[
@@ -263,12 +263,9 @@ export default function BookshelfScreen() {
                         style={styles.folderCoverImage}
                       />
                       {/* 표지 사진 위에 이름/권수를 바로 얹으면 텍스트가 사진에 묻히니,
-                            어두운 그라데이션 대신 하단에 반투명 바를 깔아 항상 읽히게 합니다. */}
+                          어두운 그라데이션 대신 하단에 반투명 바를 깔아 항상 읽히게 합니다. */}
                       <View style={styles.folderCoverOverlay}>
-                        <Text
-                          style={styles.folderNameOnCover}
-                          numberOfLines={1}
-                        >
+                        <Text style={styles.folderNameOnCover} numberOfLines={1}>
                           {item.data.folder_name}
                         </Text>
                         <Text style={styles.folderCountOnCover}>
@@ -384,7 +381,7 @@ export default function BookshelfScreen() {
                     <Ionicons
                       name="ribbon"
                       size={28}
-                      color={acquired ? "#C8B84A" : "#B5B5B5"}
+                      color={acquired ? P.primary : "#B5B5B5"}
                     />
                   </View>
                   <View style={styles.badgeInfo}>
