@@ -9,38 +9,35 @@
  *       - 고개를 기울여도 눈은 수평이어야 함 (더 기울면 gazeConfig 의 ROTATE_CLOCKWISE_POSITIVE 반대로)
  *  ④ 모델 결과(cm)가 시선 따라 바뀌는가 (위/아래/좌/우 보기)
  *  ⑤ 1회 총 시간 (목표 500ms 이하)
+ *  ⑥ 집중 판정: 5초 보정 후 → 고개 돌리기/눈 감기/딴 곳 보기/자리 비우기가 각각 판정되는가
  *
  * 접속: router.push('/dev/gaze-check')  /  확인 끝나면 삭제
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NitroImage } from 'react-native-nitro-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraPermission } from 'react-native-vision-camera';
 
-import { type GazeSample, useGazeSampler } from '../../lib/gaze/useGazeSampler';
+import { useGazeFocusTracker } from '../../hooks/useGazeFocusTracker';
+
+const STATE_LABEL = { focused: '집중', unfocused: '딴짓', away: '자리 비움' } as const;
+const STATE_COLOR = { focused: '#2BA84A', unfocused: '#E5A100', away: '#E5484D' } as const;
 
 const f1 = (v: number | null | undefined) => (v == null ? '-' : v.toFixed(1));
 const f2 = (v: number | null | undefined) => (v == null ? '-' : v.toFixed(2));
 
 export default function GazeCheckScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
-  const [s, setS] = useState<GazeSample | null>(null);
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  const onSample = useCallback((next: GazeSample) => {
-    setS((prev) => {
-      // 이전 디버그 눈 이미지는 메모리 해제
-      prev?.debugEyes?.left.dispose();
-      prev?.debugEyes?.right.dispose();
-      return next;
-    });
-  }, []);
-
-  const { photoOutput, modelState } = useGazeSampler({ enabled: hasPermission, onSample, debug: true });
+  const { photoOutput, modelState, result, lastSample: s, recalibrate } = useGazeFocusTracker({
+    enabled: hasPermission,
+    debug: true,
+  });
 
   if (!hasPermission) {
     return (
@@ -58,7 +55,17 @@ export default function GazeCheckScreen() {
     <SafeAreaView style={styles.screen}>
       <Camera style={styles.preview} device="front" isActive outputs={[photoOutput]} />
       <View style={styles.panel}>
-        <Text style={styles.title}>시선추적 확인 (모델: {modelState})</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>시선추적 확인 (모델: {modelState})</Text>
+          <Pressable style={styles.smallBtn} onPress={recalibrate}>
+            <Text style={styles.smallBtnText}>다시 보정</Text>
+          </Pressable>
+        </View>
+        <Text style={[styles.state, { color: STATE_COLOR[result?.state ?? 'away'] }]}>
+          {result?.phase === 'calibrating'
+            ? `보정 중 ${Math.round(result.calibrationProgress * 100)}% — 화면을 편하게 보세요`
+            : `${STATE_LABEL[result?.state ?? 'away']} · ${result?.reason ?? '-'}`}
+        </Text>
         <View style={styles.eyes}>
           {s?.debugEyes ? (
             <>
@@ -98,7 +105,11 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: '700' },
   preview: { flex: 1 },
   panel: { backgroundColor: 'rgba(255,255,255,0.95)', padding: 16, gap: 6 },
-  title: { fontSize: 16, fontWeight: '800', color: '#1F2233' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { fontSize: 15, fontWeight: '800', color: '#1F2233' },
+  smallBtn: { backgroundColor: '#EEF0FF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  smallBtnText: { color: '#6B7BFF', fontWeight: '700', fontSize: 12 },
+  state: { fontSize: 17, fontWeight: '800' },
   eyes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   eye: { width: 96, height: 96, borderRadius: 6, backgroundColor: '#ddd' },
   gazeBox: { marginLeft: 8 },

@@ -33,20 +33,25 @@ export interface ReadingSession {
   reward_exp?: number;
 }
 
+/** 프레임 1개의 집중 판정 결과 */
+export type FocusState = 'focused' | 'unfocused' | 'away';
+
+/** 카메라 → 집중 판정 → 버킷 기록기로 들어가는 값 (0.5초마다 1개) */
 export interface FocusFrameSample {
-  timestamp: number;
-  faceDetected: boolean;
-  isFocused: boolean;
-  yaw?: number;
-  pitch?: number;
+  timestamp: number; // Date.now()
+  state: FocusState;
+  yaw?: number; // 머리 좌우 각도 (버킷 평균용, 선택)
+  pitch?: number; // 머리 상하 각도 (버킷 평균용, 선택)
 }
 
+/** 백엔드로 보내는 30초 버킷 (백엔드 FocusSampleInputDto와 1:1) */
 export interface FocusSampleInput {
-  bucketStart: string;
-  bucketEnd: string;
-  focusedRatio: number;
-  faceDetected?: boolean;
-  interruption?: boolean;
+  bucketStart: string; // ISO
+  bucketEnd: string; // ISO
+  focusedSec: number; // 화면을 보며 집중한 초
+  unfocusedSec: number; // 얼굴은 보이지만 집중 안 한 초
+  awaySec: number; // 얼굴이 안 보인 초 (자리 비움)
+  interruptionCount: number; // 자리를 비운 횟수
   avgYaw?: number;
   avgPitch?: number;
 }

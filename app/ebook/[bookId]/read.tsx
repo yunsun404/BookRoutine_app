@@ -3,7 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Camera, useCameraPermission } from 'react-native-vision-camera';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
+import { useGazeFocusTracker } from '../../../hooks/useGazeFocusTracker';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
 import { ReadingSession } from '../../../lib/types/ebook';
 
@@ -20,7 +22,16 @@ const C = {
   line: '#ECECF3',
   primarySoft: '#EEF0FF',
   danger: '#F2555A',
+  focused: '#2BA84A',
+  unfocused: '#E5A100',
 };
+
+/* 집중 상태 칩 표시 */
+const FOCUS_CHIP = {
+  focused: { label: '집중', color: C.focused },
+  unfocused: { label: '딴짓', color: C.unfocused },
+  away: { label: '자리 비움', color: C.danger },
+} as const;
 
 const formatElapsed = (sec: number) => {
   const m = Math.floor(sec / 60);
@@ -40,8 +51,17 @@ export default function EbookReadingScreen() {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
-  const { pushFrame, flushCurrentBucket, drainCompletedBuckets } = useFocusBucketRecorder();
+  const { pushFrame, flushCurrentBucket, drainCompletedBuckets, requeueBuckets } = useFocusBucketRecorder();
   const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // [시선추적] 카메라 권한 → 0.5초마다 판정 → pushFrame 으로 30초 버킷에 기록
+  const { hasPermission, requestPermission } = useCameraPermission();
+  useEffect(() => {
+    if (!hasPermission) requestPermission();
+  }, [hasPermission, requestPermission]);
+
+  const tracking = !!session && hasPermission && !finishing;
+  const { photoOutput, result: focus, recalibrate } = useGazeFocusTracker({ enabled: tracking, onFrame: pushFrame });
 
   useEffect(() => {
     (async () => {
@@ -64,7 +84,7 @@ export default function EbookReadingScreen() {
     };
   }, [bookId]);
 
-  // 집중도 배치 전송
+  // 집중도 배치 전송 (실패하면 되돌려 놓고 다음 주기에 다시 보냄. 서버가 중복은 무시)
   useEffect(() => {
     if (!session) return;
     sendTimerRef.current = setInterval(async () => {
@@ -73,14 +93,14 @@ export default function EbookReadingScreen() {
       try {
         await sendFocusBatch(session.session_id, batch);
       } catch {
-        // 실패 시 재시도 큐잉 로직 필요하면 여기에 추가
+        requeueBuckets(batch);
       }
     }, SEND_INTERVAL_MS);
 
     return () => {
       if (sendTimerRef.current) clearInterval(sendTimerRef.current);
     };
-  }, [session]);
+  }, [session, drainCompletedBuckets, requeueBuckets]);
 
   // 읽은 시간 표시용 타이머
   useEffect(() => {
@@ -122,6 +142,7 @@ export default function EbookReadingScreen() {
         goResult(session.session_id);
         return;
       }
+      requeueBuckets(lastBatch); // 다시 "종료하기"를 누르면 같이 보냄
       setConfirmVisible(false);
       setError(`세션 종료 처리에 실패했어요. (${status ?? e?.code ?? e?.message ?? '알 수 없는 오류'})`);
     } finally {
@@ -149,6 +170,15 @@ export default function EbookReadingScreen() {
     );
   }
 
+  // 집중 상태 칩 문구
+  const focusChip = !hasPermission
+    ? { label: '카메라 꺼짐 · 집중도 측정 안 됨', color: C.inkMute }
+    : !focus
+      ? { label: '측정 준비 중', color: C.inkMute }
+      : focus.phase === 'calibrating'
+        ? { label: `화면을 봐 주세요 ${Math.round(focus.calibrationProgress * 100)}%`, color: C.primary }
+        : FOCUS_CHIP[focus.state];
+
   return (
     <SafeAreaView style={styles.container}>
       {/* 상단 바 */}
@@ -166,6 +196,25 @@ export default function EbookReadingScreen() {
           <Text style={styles.statusText}>독서 중</Text>
           <Text style={styles.statusTime}>{formatElapsed(elapsed)}</Text>
         </View>
+
+        {/* 집중 상태 (누르면 다시 보정) */}
+        <Pressable
+          style={styles.focusChip}
+          onPress={hasPermission ? recalibrate : requestPermission}
+          accessibilityLabel="집중 상태, 누르면 다시 보정"
+        >
+          <View style={[styles.statusDot, { backgroundColor: focusChip.color }]} />
+          <Text style={[styles.focusText, { color: focusChip.color }]} numberOfLines={1}>
+            {focusChip.label}
+          </Text>
+        </Pressable>
+
+        {/* 카메라 미리보기 (작게) — 사진은 기기 안에서만 처리, 저장·전송 안 함 */}
+        {hasPermission && (
+          <View style={styles.camWrap}>
+            <Camera style={styles.cam} device="front" isActive={tracking} outputs={[photoOutput]} />
+          </View>
+        )}
       </View>
 
       <ScrollView style={styles.textArea} contentContainerStyle={styles.textContent} showsVerticalScrollIndicator={false}>
@@ -219,7 +268,7 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, backgroundColor: C.bg },
 
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   backBtn: {
     width: 42,
     height: 42,
@@ -245,6 +294,21 @@ const styles = StyleSheet.create({
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.primary },
   statusText: { fontSize: 12, fontWeight: '700', color: C.primary },
   statusTime: { fontSize: 12, fontWeight: '600', color: C.inkSub, fontVariant: ['tabular-nums'] },
+  focusChip: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  focusText: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  camWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', marginLeft: 'auto', backgroundColor: C.line },
+  cam: { width: 40, height: 40 },
 
   textArea: { flex: 1 },
   textContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 120 },
