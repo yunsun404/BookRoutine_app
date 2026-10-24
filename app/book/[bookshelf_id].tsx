@@ -1,10 +1,13 @@
 import { authFetch, BASE_URL } from "@/constants/api";
+import { P } from "@/constants/palette";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +15,6 @@ import {
   View,
 } from "react-native";
 import Header from "../../components/Header";
-import { P } from "@/constants/palette";
 
 interface BookDetail {
   bookshelf_id: string;
@@ -54,11 +56,31 @@ const getDayLabel = (days: number[]) => {
   return days.map((d) => DAY_LABELS[d]).join("/");
 };
 
+// 웹(Chrome 에뮬레이션)에서는 Alert.alert의 버튼 콜백이 동작하지 않아 window.confirm으로 분기
+const confirmDelete = (): Promise<boolean> => {
+  const message = "이 책을 책장에서 삭제할까요?\n타래와 목표 기록은 그대로 남아요.";
+  if (Platform.OS === "web") {
+    return Promise.resolve(window.confirm(message));
+  }
+  return new Promise((resolve) =>
+    Alert.alert("책 삭제", message, [
+      { text: "취소", style: "cancel", onPress: () => resolve(false) },
+      { text: "삭제", style: "destructive", onPress: () => resolve(true) },
+    ]),
+  );
+};
+
+const showError = (message: string) => {
+  if (Platform.OS === "web") window.alert(message);
+  else Alert.alert(message);
+};
+
 export default function BookDetailScreen() {
   const { bookshelf_id } = useLocalSearchParams<{ bookshelf_id: string }>();
   const [detail, setDetail] = useState<BookDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchDetail();
@@ -85,16 +107,33 @@ export default function BookDetailScreen() {
   const fetchThreads = async () => {
     try {
       const url = `${BASE_URL}/threads?book_id=${detail?.book.book_id}`;
-      //console.log("타래 URL:", url);
       const res = await authFetch(url);
-      //console.log("타래 status:", res.status);
       const data = await res.json();
-      //console.log("타래 data:", JSON.stringify(data));
       if (Array.isArray(data)) setThreads(data);
       else if (data?.threads) setThreads(data.threads);
       else if (data?.data) setThreads(data.data);
     } catch (error) {
       console.error("타래 에러:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    const ok = await confirmDelete();
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const res = await authFetch(`${BASE_URL}/bookshelf/${bookshelf_id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`삭제 실패 (${res.status})`);
+      router.back();
+    } catch (error) {
+      console.error("책 삭제 에러:", error);
+      showError("책을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -120,9 +159,23 @@ export default function BookDetailScreen() {
     <View style={styles.container}>
       <Header />
 
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color={P.ink} />
-      </TouchableOpacity>
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color={P.ink} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleDelete}
+          disabled={deleting}
+          hitSlop={8}
+          accessibilityLabel="책장에서 삭제"
+        >
+          {deleting ? (
+            <ActivityIndicator size="small" color={P.textTertiary} />
+          ) : (
+            <Ionicons name="trash-outline" size={22} color={P.textSecondary} />
+          )}
+        </TouchableOpacity>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 책 정보 */}
@@ -194,7 +247,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  backButton: {
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     marginBottom: 8,
   },
