@@ -1,24 +1,26 @@
 /**
- * [임시] 시선추적 앱 내부 추론 — 확인 화면 (3-1 사진→눈 픽셀, 3-2 눈 자르기, 2 모델 추론)
+ * [임시] 시선추적 확인 화면 — 기기 테스트·기준값 조정용
  *
  * 확인 항목
  *  ① 카메라 미리보기
- *  ② 얼굴·머리 각도·눈 뜸 확률이 나오는가
+ *  ② 얼굴·머리 각도·눈 뜸 확률·얼굴 크기·눈 밝기가 나오는가
  *  ③ 잘린 눈 2장이 학습 데이터처럼 보이는가  ← 가장 중요
  *       - 눈이 가운데, 수평, 눈썹 일부 포함 / 왼쪽 칸 = 사진에서 왼쪽에 보이는 눈
  *       - 고개를 기울여도 눈은 수평이어야 함 (더 기울면 gazeConfig 의 ROTATE_CLOCKWISE_POSITIVE 반대로)
- *  ④ 모델 결과(cm)가 시선 따라 바뀌는가 (위/아래/좌/우 보기)
+ *  ④ 모델 결과(cm)가 시선 따라 바뀌는가 (고개는 고정, 눈만 위/아래/좌/우)
  *  ⑤ 1회 총 시간 (목표 500ms 이하)
- *  ⑥ 집중 판정: 5초 보정 후 → 고개 돌리기/눈 감기/딴 곳 보기/자리 비우기가 각각 판정되는가
+ *  ⑥ [보정] 버튼 → 보정 화면 → 시선 오차(cm) 확인 → 화면 위 빨간 점이 내가 보는 곳을 따라오는가
+ *  ⑦ 판정: 고개 돌리기 / 눈 감기 / 화면 밖 보기 / 10초 한 곳 응시(멍때림) / 자리 비우기
  *
  * 접속: router.push('/dev/gaze-check')  /  확인 끝나면 삭제
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NitroImage } from 'react-native-nitro-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraPermission } from 'react-native-vision-camera';
 
+import { CALIBRATION_PREVIEW_SPACE, type CalibrationPhase, GazeCalibrationOverlay } from '../../components/gaze/GazeCalibrationOverlay';
 import { useGazeFocusTracker } from '../../hooks/useGazeFocusTracker';
 
 const STATE_LABEL = { focused: '집중', unfocused: '딴짓', away: '자리 비움' } as const;
@@ -29,15 +31,15 @@ const f2 = (v: number | null | undefined) => (v == null ? '-' : v.toFixed(2));
 
 export default function GazeCheckScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
+  const [calibrating, setCalibrating] = useState(false);
+  const [calPhase, setCalPhase] = useState<CalibrationPhase>('posture');
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  const { photoOutput, modelState, result, lastSample: s, recalibrate } = useGazeFocusTracker({
-    enabled: hasPermission,
-    debug: true,
-  });
+  const { photoOutput, modelState, result, lastSample: s, calibration, subscribe, setCalibration } =
+    useGazeFocusTracker({ enabled: hasPermission, debug: true, calibrating });
 
   if (!hasPermission) {
     return (
@@ -51,20 +53,40 @@ export default function GazeCheckScreen() {
   }
 
   const t = s?.timing;
+  const label =
+    result?.phase === 'calibrating'
+      ? `기준 잡는 중 ${Math.round(result.calibrationProgress * 100)}%`
+      : result?.detail === 'staring'
+        ? `멍때림 · ${result.reason}`
+        : `${STATE_LABEL[result?.state ?? 'away']} · ${result?.reason ?? '-'}`;
+
   return (
     <SafeAreaView style={styles.screen}>
-      <Camera style={styles.preview} device="front" isActive outputs={[photoOutput]} />
+      <View style={!calibrating ? styles.preview : calPhase === 'posture' ? styles.camLarge : styles.camHidden}>
+        <Camera style={StyleSheet.absoluteFill} device="front" isActive outputs={[photoOutput]} implementationMode="compatible" />
+        {/* 보정 후: 변환된 시선 위치 (미리보기 영역 비율로 축소해서 표시) */}
+        {calibration?.map && result?.screenGaze && (
+          <View
+            style={[
+              styles.gazeDot,
+              {
+                left: `${Math.min(100, Math.max(0, (result.screenGaze.x / calibration.screen.width) * 100))}%`,
+                top: `${Math.min(100, Math.max(0, (result.screenGaze.y / calibration.screen.height) * 100))}%`,
+              },
+            ]}
+          />
+        )}
+      </View>
       <View style={styles.panel}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>시선추적 확인 (모델: {modelState})</Text>
-          <Pressable style={styles.smallBtn} onPress={recalibrate}>
-            <Text style={styles.smallBtnText}>다시 보정</Text>
+          <Pressable style={styles.smallBtn} onPress={() => setCalibrating(true)}>
+            <Text style={styles.smallBtnText}>보정</Text>
           </Pressable>
         </View>
-        <Text style={[styles.state, { color: STATE_COLOR[result?.state ?? 'away'] }]}>
-          {result?.phase === 'calibrating'
-            ? `보정 중 ${Math.round(result.calibrationProgress * 100)}% — 화면을 편하게 보세요`
-            : `${STATE_LABEL[result?.state ?? 'away']} · ${result?.reason ?? '-'}`}
+        <Text style={[styles.state, { color: STATE_COLOR[result?.state ?? 'away'] }]}>{label}</Text>
+        <Text style={styles.sub}>
+          보정: {calibration ? `${calibration.quality} · 오차 ${f1(calibration.errorCm)}cm · 흔들림 ${f1(calibration.noiseDp)}dp` : '안 함 (자동 기준)'}
         </Text>
         <View style={styles.eyes}>
           {s?.debugEyes ? (
@@ -76,7 +98,7 @@ export default function GazeCheckScreen() {
             <Text style={styles.sub}>눈 이미지 없음</Text>
           )}
           <View style={styles.gazeBox}>
-            <Text style={styles.gazeLabel}>시선 (cm)</Text>
+            <Text style={styles.gazeLabel}>모델 출력 (cm)</Text>
             <Text style={styles.gaze}>x {f1(s?.gaze?.x)}</Text>
             <Text style={styles.gaze}>y {f1(s?.gaze?.y)}</Text>
           </View>
@@ -85,7 +107,7 @@ export default function GazeCheckScreen() {
           얼굴 {s?.faceDetected ? '✅' : '❌'} · yaw {f1(s?.yaw)} · pitch {f1(s?.pitch)} · roll {f1(s?.roll)}
         </Text>
         <Text style={styles.row}>
-          눈 뜸 좌 {f2(s?.leftEyeOpen)} · 우 {f2(s?.rightEyeOpen)}
+          눈 뜸 좌 {f2(s?.leftEyeOpen)} · 우 {f2(s?.rightEyeOpen)} · 얼굴 크기 {f2(s?.faceWidthRatio)} · 눈 밝기 {f1(s?.eyeBrightness)}
         </Text>
         <Text style={styles.sub}>
           시간(ms) 촬영 {t?.capture ?? '-'} · 검출 {t?.detect ?? '-'} · 자르기 {t?.crop ?? '-'} · 추론 {t?.infer ?? '-'} · 총{' '}
@@ -93,6 +115,17 @@ export default function GazeCheckScreen() {
         </Text>
         {s?.error && <Text style={styles.err}>오류: {s.error}</Text>}
       </View>
+
+      {calibrating && (
+        <GazeCalibrationOverlay
+          subscribe={subscribe}
+          onPhaseChange={setCalPhase}
+          onDone={(cal) => {
+            setCalibration(cal);
+            setCalibrating(false);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -103,11 +136,17 @@ const styles = StyleSheet.create({
   msg: { fontSize: 15, color: '#1F2233' },
   btn: { backgroundColor: '#6B7BFF', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10 },
   btnText: { color: '#fff', fontWeight: '700' },
-  preview: { flex: 1 },
+  preview: { flex: 1, zIndex: 20 },
+  camLarge: {
+    position: 'absolute', top: (CALIBRATION_PREVIEW_SPACE - 240) / 2, alignSelf: 'center', width: 240, height: 240,
+    borderRadius: 120, overflow: 'hidden', borderWidth: 4, borderColor: '#6B7BFF', zIndex: 20,
+  },
+  camHidden: { position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0 },
+  gazeDot: { position: 'absolute', width: 16, height: 16, marginLeft: -8, marginTop: -8, borderRadius: 8, backgroundColor: '#E5484D' },
   panel: { backgroundColor: 'rgba(255,255,255,0.95)', padding: 16, gap: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 15, fontWeight: '800', color: '#1F2233' },
-  smallBtn: { backgroundColor: '#EEF0FF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  smallBtn: { backgroundColor: '#EEF0FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   smallBtnText: { color: '#6B7BFF', fontWeight: '700', fontSize: 12 },
   state: { fontSize: 17, fontWeight: '800' },
   eyes: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -5,6 +5,8 @@
 export const GAZE_CONFIG = {
   /** 몇 ms마다 1번 검사할지 (판정 단위가 30초라 0.5초면 충분) */
   SAMPLE_INTERVAL_MS: 500,
+  /** 개인 보정 중에는 더 자주 검사 (점 하나당 값을 많이 모으려고. 이전 검사가 안 끝났으면 자동으로 건너뜀) */
+  CALIBRATION_INTERVAL_MS: 250,
   /** 검사용 사진 해상도 목표 (작을수록 빠름. 실제 값은 기기가 가까운 값으로 맞춤) */
   PHOTO_TARGET: { width: 640, height: 480 },
   /** 얼굴 검출 전에 사진 긴 변을 이 크기 이하로 줄임 */

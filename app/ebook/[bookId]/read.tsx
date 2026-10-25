@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraPermission } from 'react-native-vision-camera';
+import {
+  CALIBRATION_PREVIEW_SPACE,
+  type CalibrationPhase,
+  GazeCalibrationOverlay,
+} from '../../../components/gaze/GazeCalibrationOverlay';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
 import { useGazeFocusTracker } from '../../../hooks/useGazeFocusTracker';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
@@ -60,8 +65,19 @@ export default function EbookReadingScreen() {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
+  // [개인 보정] 세션 시작 직후 보정 화면 → 끝나면 독서 화면 (칩을 누르면 다시 보정)
+  const [calibrating, setCalibrating] = useState(true);
+  const [calPhase, setCalPhase] = useState<CalibrationPhase>('posture');
+  const showCalibration = !!session && hasPermission && calibrating;
+
   const tracking = !!session && hasPermission && !finishing;
-  const { photoOutput, result: focus, recalibrate } = useGazeFocusTracker({ enabled: tracking, onFrame: pushFrame });
+  const {
+    photoOutput,
+    result: focus,
+    subscribe,
+    setCalibration,
+    notifyScroll,
+  } = useGazeFocusTracker({ enabled: tracking, onFrame: pushFrame, calibrating: showCalibration });
 
   useEffect(() => {
     (async () => {
@@ -177,7 +193,16 @@ export default function EbookReadingScreen() {
       ? { label: '측정 준비 중', color: C.inkMute }
       : focus.phase === 'calibrating'
         ? { label: `화면을 봐 주세요 ${Math.round(focus.calibrationProgress * 100)}%`, color: C.primary }
-        : FOCUS_CHIP[focus.state];
+        : focus.detail === 'staring'
+          ? { label: '멍때림', color: C.unfocused }
+          : FOCUS_CHIP[focus.state];
+
+  // 카메라 미리보기 위치: 자세 맞추기 = 크게 / 점 따라보기 = 숨김 / 독서 중 = 오른쪽 위 작게
+  const camStyle = showCalibration
+    ? calPhase === 'posture'
+      ? styles.camLarge
+      : styles.camHidden
+    : styles.camSmall;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,7 +225,7 @@ export default function EbookReadingScreen() {
         {/* 집중 상태 (누르면 다시 보정) */}
         <Pressable
           style={styles.focusChip}
-          onPress={hasPermission ? recalibrate : requestPermission}
+          onPress={hasPermission ? () => setCalibrating(true) : requestPermission}
           accessibilityLabel="집중 상태, 누르면 다시 보정"
         >
           <View style={[styles.statusDot, { backgroundColor: focusChip.color }]} />
@@ -209,15 +234,17 @@ export default function EbookReadingScreen() {
           </Text>
         </Pressable>
 
-        {/* 카메라 미리보기 (작게) — 사진은 기기 안에서만 처리, 저장·전송 안 함 */}
-        {hasPermission && (
-          <View style={styles.camWrap}>
-            <Camera style={styles.cam} device="front" isActive={tracking} outputs={[photoOutput]} />
-          </View>
-        )}
+        {/* 카메라 미리보기 자리 (실제 카메라는 아래에서 위치를 바꿔 가며 그림) */}
+        {hasPermission && <View style={styles.camSpacer} />}
       </View>
 
-      <ScrollView style={styles.textArea} contentContainerStyle={styles.textContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.textArea}
+        contentContainerStyle={styles.textContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={notifyScroll}
+        scrollEventThrottle={500}
+      >
         <Text style={styles.bookTitle}>{title}</Text>
         <Text style={styles.content}>{content}</Text>
       </ScrollView>
@@ -232,6 +259,32 @@ export default function EbookReadingScreen() {
           <Text style={styles.finishText}>독서 종료하기</Text>
         </Pressable>
       </View>
+
+      {/* 개인 보정 화면 (독서 시작 전 / 칩을 눌렀을 때) */}
+      {showCalibration && (
+        <GazeCalibrationOverlay
+          subscribe={subscribe}
+          onPhaseChange={setCalPhase}
+          onDone={(cal) => {
+            setCalibration(cal);
+            setCalibrating(false);
+          }}
+        />
+      )}
+
+      {/* 카메라 — 항상 같은 자리에 1개만 두고 크기·위치만 바꿈 (다시 만들면 카메라가 재시작됨)
+          사진은 기기 안에서만 처리, 저장·전송 안 함 */}
+      {hasPermission && (
+        <View style={camStyle} pointerEvents="none">
+          <Camera
+            style={StyleSheet.absoluteFill}
+            device="front"
+            isActive={tracking}
+            outputs={[photoOutput]}
+            implementationMode="compatible"
+          />
+        </View>
+      )}
 
       {/* 종료 확인 */}
       <Modal transparent visible={confirmVisible} animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
@@ -307,8 +360,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   focusText: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  camWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', marginLeft: 'auto', backgroundColor: C.line },
-  cam: { width: 40, height: 40 },
+  camSpacer: { width: 40, height: 40, marginLeft: 'auto' },
+  camSmall: {
+    position: 'absolute', top: 12, right: 20, width: 40, height: 40, borderRadius: 20,
+    overflow: 'hidden', backgroundColor: C.line, zIndex: 20,
+  },
+  camLarge: {
+    position: 'absolute', top: (CALIBRATION_PREVIEW_SPACE - 240) / 2, alignSelf: 'center', width: 240, height: 240,
+    borderRadius: 120, overflow: 'hidden', borderWidth: 4, borderColor: C.primary, backgroundColor: C.line, zIndex: 20,
+  },
+  camHidden: { position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0 },
 
   textArea: { flex: 1 },
   textContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 120 },

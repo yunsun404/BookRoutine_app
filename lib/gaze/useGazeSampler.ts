@@ -36,6 +36,10 @@ export interface GazeSample {
   /** 눈 뜸 확률 0~1 (사람 기준 왼눈/오른눈) */
   leftEyeOpen: number | null;
   rightEyeOpen: number | null;
+  /** 얼굴 폭 / 사진 폭 (0~1). 거리 확인용 — 클수록 가까움 */
+  faceWidthRatio: number | null;
+  /** 잘린 눈 이미지 평균 밝기 (0~255). 조명 확인용 */
+  eyeBrightness: number | null;
   /** 모델이 예측한 시선 위치 (cm, 카메라 기준). 모델 없음/눈 자르기 실패 시 null */
   gaze: { x: number; y: number } | null;
   /** 단계별 시간 (ms) */
@@ -90,7 +94,7 @@ export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = 
       const timing = { capture: 0, detect: 0, crop: 0, infer: 0, total: 0 };
       const base: GazeSample = {
         timestamp: t0, faceDetected: false, yaw: null, pitch: null, roll: null,
-        leftEyeOpen: null, rightEyeOpen: null, gaze: null, timing,
+        leftEyeOpen: null, rightEyeOpen: null, faceWidthRatio: null, eyeBrightness: null, gaze: null, timing,
       };
       const toDispose: Image[] = [];
       let tmpPath: string | null = null;
@@ -130,6 +134,7 @@ export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = 
           roll: face.rollAngle,
           leftEyeOpen: face.leftEyeOpenProbability ?? null,
           rightEyeOpen: face.rightEyeOpenProbability ?? null,
+          faceWidthRatio: face.bounds.width / image.width,
         };
 
         // 3) 눈 자르기
@@ -144,6 +149,7 @@ export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = 
         const R = await cropEye(image, plan.right, plan.tiltDeg);
         const t3 = Date.now();
         timing.crop = t3 - t2;
+        sample.eyeBrightness = meanOf(L.tensor, R.tensor);
 
         // 4) 모델 추론 (모델이 아직 없으면 건너뜀)
         const model = modelRef.current;
@@ -180,4 +186,12 @@ export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = 
   }, [enabled, appActive, intervalMs, debug, photoOutput, detector]);
 
   return { photoOutput, modelState: tflite.state };
+}
+
+/** 두 눈 이미지 전체 픽셀 평균 밝기 */
+function meanOf(a: Float32Array, b: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += a[i];
+  for (let i = 0; i < b.length; i++) sum += b[i];
+  return sum / (a.length + b.length);
 }
