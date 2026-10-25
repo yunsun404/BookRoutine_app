@@ -353,7 +353,7 @@ export default function BookshelfScreen() {
         onSelect={setFolderImage}
       />
 
-      {/* 뱃지 */}
+      {/* 뱃지 — '내 뱃지 보기' 탭일 때만 렌더링 */}
       {activeTab === "badge" &&
         (badgesLoading ? (
           <View style={styles.center}>
@@ -386,7 +386,10 @@ export default function BookshelfScreen() {
                   </View>
                   <View style={styles.badgeInfo}>
                     <Text
-                      style={[styles.badgeName, !acquired && styles.badgeNameLocked]}
+                      style={[
+                        styles.badgeName,
+                        !acquired && styles.badgeNameLocked,
+                      ]}
                     >
                       {item.badge_name}
                     </Text>
@@ -404,7 +407,9 @@ export default function BookshelfScreen() {
             }}
             ListFooterComponent={
               <View style={[styles.badgeCard, styles.badgeCardLocked]}>
-                <View style={[styles.badgeIconCircle, styles.badgeIconCircleLocked]}>
+                <View
+                  style={[styles.badgeIconCircle, styles.badgeIconCircleLocked]}
+                >
                   <Ionicons name="help" size={28} color="#B5B5B5" />
                 </View>
                 <View style={styles.badgeInfo}>
