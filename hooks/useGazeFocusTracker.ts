@@ -1,0 +1,126 @@
+/**
+ * 시선추적 → 집중 판정 → (선택) 버킷 기록기 연결 훅 (v2)
+ *
+ *   useGazeSampler (0.5초마다 GazeSample, 보정 중엔 0.25초)
+ *        ├→ subscribe 한 곳 (보정 화면이 원재료를 받아 감)
+ *        ↓   (보정 중에는 여기서 멈춤 — 판정·기록 안 함)
+ *   FocusJudge (개인 보정 기준 또는 자동 기준 → focused / unfocused / away)
+ *        ↓
+ *   onFrame({ timestamp, state, detail, yaw, pitch })  → useFocusBucketRecorder 의 pushFrame
+ */
+import { useCallback, useRef, useState } from 'react';
+
+import { FocusJudge, type JudgeResult } from '../lib/gaze/focusJudge';
+import type { GazeCalibration } from '../lib/gaze/gazeCalibration';
+import { GAZE_CONFIG } from '../lib/gaze/gazeConfig';
+import { type GazeSample, useGazeSampler } from '../lib/gaze/useGazeSampler';
+import type { FocusFrameSample } from '../lib/types/ebook';
+
+interface Options {
+  enabled: boolean;
+  /** 판정 결과 1개마다 호출 → 보통 recorder.pushFrame 을 넣음 */
+  onFrame?: (frame: FocusFrameSample) => void;
+  /** true 면 개인 보정 중: 판정·기록은 쉬고 원재료만 subscribe 쪽으로 보냄 (검사 간격도 짧게) */
+  calibrating?: boolean;
+  /** 확인 화면용: 매 샘플마다 화면 갱신 + 잘린 눈 이미지 포함 */
+  debug?: boolean;
+}
+
+export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, debug = false }: Options) {
+  const judgeRef = useRef(new FocusJudge());
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
+  const calibratingRef = useRef(calibrating);
+  calibratingRef.current = calibrating;
+  const listenersRef = useRef(new Set<(s: GazeSample) => void>());
+
+  const [result, setResult] = useState<JudgeResult | null>(null);
+  const [lastSample, setLastSample] = useState<GazeSample | null>(null);
+  const [calibration, setCalibrationState] = useState<GazeCalibration | null>(null);
+
+  const onSample = useCallback(
+    (s: GazeSample) => {
+      listenersRef.current.forEach((fn) => fn(s));
+      if (debug) {
+        setLastSample((prev) => {
+          if (prev !== s) {
+            prev?.debugEyes?.left.dispose();
+            prev?.debugEyes?.right.dispose();
+          }
+          return s;
+        });
+      }
+      if (calibratingRef.current) return;
+
+      // 촬영 자체가 실패한 샘플(카메라 준비 전 등)은 판정하지 않음 → "자리 비움"으로 잘못 기록되는 것 방지
+      // (계속 실패하면 프레임이 안 들어와서 버킷 기록기가 3초 뒤부터 away 로 처리함)
+      if (s.error && !s.faceDetected) return;
+
+      const r = judgeRef.current.judge(s);
+      onFrameRef.current?.({
+        timestamp: s.timestamp,
+        state: r.state,
+        detail: r.detail,
+        yaw: s.yaw ?? undefined,
+        pitch: s.pitch ?? undefined,
+      });
+
+      if (debug) {
+        setResult(r);
+      } else {
+        // 판정·세부 이유·단계·진행률이 바뀔 때만 화면 갱신
+        setResult((prev) =>
+          prev &&
+          prev.state === r.state &&
+          prev.detail === r.detail &&
+          prev.phase === r.phase &&
+          Math.abs(prev.calibrationProgress - r.calibrationProgress) < 0.1
+            ? prev
+            : r,
+        );
+      }
+    },
+    [debug],
+  );
+
+  const { photoOutput, modelState } = useGazeSampler({
+    enabled,
+    onSample,
+    debug,
+    intervalMs: calibrating ? GAZE_CONFIG.CALIBRATION_INTERVAL_MS : GAZE_CONFIG.SAMPLE_INTERVAL_MS,
+  });
+
+  /** 원재료(GazeSample) 받기 — 보정 화면용. 반환값을 호출하면 구독 해제 */
+  const subscribe = useCallback((fn: (s: GazeSample) => void) => {
+    listenersRef.current.add(fn);
+    return () => {
+      listenersRef.current.delete(fn);
+    };
+  }, []);
+
+  /** 개인 보정 결과 적용 (null = 보정 건너뜀 → 처음 5초 자동 기준) */
+  const setCalibration = useCallback((cal: GazeCalibration | null) => {
+    judgeRef.current.setCalibration(cal);
+    setCalibrationState(cal);
+    setResult(null);
+  }, []);
+
+  /** 사용자가 스크롤했음 (멍때림 판단용) */
+  const notifyScroll = useCallback(() => judgeRef.current.notifyScroll(Date.now()), []);
+
+  return {
+    /** <Camera outputs={[photoOutput]} /> 에 넣기 */
+    photoOutput,
+    /** 'loading' | 'loaded' | 'error' — error 여도 고개 기준 판정은 동작 */
+    modelState,
+    /** 최신 판정 (null = 아직 없음) */
+    result,
+    /** debug 모드에서만 채워짐 */
+    lastSample,
+    /** 적용된 개인 보정 (null = 자동 기준) */
+    calibration,
+    subscribe,
+    setCalibration,
+    notifyScroll,
+  };
+}

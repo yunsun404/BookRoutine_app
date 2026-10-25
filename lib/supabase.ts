@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import ws from "ws";
+import "react-native-url-polyfill/auto"; // 앱에서 Supabase가 URL 기능을 정상적으로 쓰도록 (이미 설치돼 있음)
+// import ws from "ws"; : Node.js 전용 라이브러리로, 휴대폰 앱에는 웹소켓 기능이 이미 들어 있어 앱에서는 오류가 남. (Node.js 서버에서 실행할 때를 위한 설정)
 
 const supabaseUrl = "https://vdzyacisqouvpsxuqltt.supabase.co";
 const supabaseAnonKey =
@@ -8,15 +9,17 @@ const supabaseAnonKey =
 // 웹 브라우저 환경과 모바일/Node 환경 모두에서 에러 없이 동작하도록 조건부 설정을 적용한다.
 const isBrowser = typeof window !== "undefined";
 
+// 앱(React Native)과 웹 브라우저 모두 웹소켓을 기본으로 갖고 있어서 별도 설정이 필요 없다.
+// (예전의 `ws` 라이브러리는 Node.js 서버용이라 앱에서 불러오면 빌드가 실패함)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
   },
-  realtime: {
-    transport: isBrowser ? undefined : (ws as any),
-  },
+  // realtime: {
+  //   transport: isBrowser ? undefined : (ws as any),
+  // },
 });
 
 // Supabase 연결 상태 점검 및 에러 로그 출력 함수 

@@ -1,68 +1,19 @@
+/**
+ * 집중 버킷 기록 훅 (FocusBucketBuilder를 화면에서 쓰기 쉽게 감싼 것)
+ * 함수 이름은 기존과 같음 → read.tsx 수정 없이 교체 가능
+ */
 import { useCallback, useRef } from 'react';
-import { FocusFrameSample, FocusSampleInput } from '../lib/types/ebook';
-
-const BUCKET_MS = 8000;
-const NO_FACE_INTERRUPTION_THRESHOLD = 0.3;
-
-interface BucketAccumulator {
-  bucketStart: number;
-  frames: FocusFrameSample[];
-}
+import { FocusBucketBuilder } from '../lib/focus/focusBucketBuilder';
+import type { FocusFrameSample, FocusSampleInput } from '../lib/types/ebook';
 
 export function useFocusBucketRecorder() {
-  const currentBucket = useRef<BucketAccumulator | null>(null);
-  const completedBuckets = useRef<FocusSampleInput[]>([]);
+  // useRef: 화면이 다시 그려져도 같은 builder를 계속 사용 (상태가 초기화되지 않음)
+  const builder = useRef(new FocusBucketBuilder());
 
-  const pushFrame = useCallback((frame: FocusFrameSample) => {
-    if (!currentBucket.current) {
-      currentBucket.current = { bucketStart: frame.timestamp, frames: [] };
-    }
-    const bucket = currentBucket.current;
-    bucket.frames.push(frame);
+  const pushFrame = useCallback((frame: FocusFrameSample) => builder.current.push(frame), []);
+  const flushCurrentBucket = useCallback(() => builder.current.flush(Date.now()), []);
+  const drainCompletedBuckets = useCallback((): FocusSampleInput[] => builder.current.drain(), []);
+  const requeueBuckets = useCallback((samples: FocusSampleInput[]) => builder.current.requeue(samples), []);
 
-    if (frame.timestamp - bucket.bucketStart >= BUCKET_MS) {
-      completedBuckets.current.push(summarizeBucket(bucket, frame.timestamp));
-      currentBucket.current = null;
-    }
-  }, []);
-
-  const flushCurrentBucket = useCallback(() => {
-    const bucket = currentBucket.current;
-    if (bucket && bucket.frames.length > 0) {
-      const last = bucket.frames[bucket.frames.length - 1];
-      completedBuckets.current.push(summarizeBucket(bucket, last.timestamp));
-      currentBucket.current = null;
-    }
-  }, []);
-
-  const drainCompletedBuckets = useCallback((): FocusSampleInput[] => {
-    const drained = completedBuckets.current;
-    completedBuckets.current = [];
-    return drained;
-  }, []);
-
-  return { pushFrame, flushCurrentBucket, drainCompletedBuckets };
-}
-
-function summarizeBucket(bucket: BucketAccumulator, endTimestamp: number): FocusSampleInput {
-  const { frames } = bucket;
-  const focusedCount = frames.filter((f) => f.isFocused).length;
-  const noFaceCount = frames.filter((f) => !f.faceDetected).length;
-  const yaws = frames.filter((f) => f.yaw !== undefined).map((f) => f.yaw as number);
-  const pitches = frames.filter((f) => f.pitch !== undefined).map((f) => f.pitch as number);
-
-  return {
-    bucketStart: new Date(bucket.bucketStart).toISOString(),
-    bucketEnd: new Date(endTimestamp).toISOString(),
-    focusedRatio: frames.length > 0 ? focusedCount / frames.length : 0,
-    faceDetected: noFaceCount / frames.length < 0.5,
-    interruption: noFaceCount / frames.length >= NO_FACE_INTERRUPTION_THRESHOLD,
-    avgYaw: average(yaws),
-    avgPitch: average(pitches),
-  };
-}
-
-function average(nums: number[]): number | undefined {
-  if (nums.length === 0) return undefined;
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
+  return { pushFrame, flushCurrentBucket, drainCompletedBuckets, requeueBuckets };
 }
