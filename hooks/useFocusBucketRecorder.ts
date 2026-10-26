@@ -14,6 +14,8 @@ export function useFocusBucketRecorder() {
   const flushCurrentBucket = useCallback(() => builder.current.flush(Date.now()), []);
   const drainCompletedBuckets = useCallback((): FocusSampleInput[] => builder.current.drain(), []);
   const requeueBuckets = useCallback((samples: FocusSampleInput[]) => builder.current.requeue(samples), []);
+  /** 화면 표시용: 이번 세션 버킷 전체 + 누적 집중·딴짓·자리 비움 시간(초) */
+  const getStats = useCallback(() => builder.current.stats(), []);
 
-  return { pushFrame, flushCurrentBucket, drainCompletedBuckets, requeueBuckets };
+  return { pushFrame, flushCurrentBucket, drainCompletedBuckets, requeueBuckets, getStats };
 }

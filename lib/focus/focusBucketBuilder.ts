@@ -28,6 +28,8 @@ export class FocusBucketBuilder {
   private angleSum = { yaw: 0, pitch: 0, nYaw: 0, nPitch: 0 }; // 머리 각도 평균용
   private last: FocusFrameSample | null = null;
   private completed: FocusSampleInput[] = [];
+  /** 이번 세션에 완성된 모든 버킷 (전송해도 지우지 않음 → 실시간 집중도·골든타임 표시용) */
+  private history: FocusSampleInput[] = [];
 
   /** 판단 결과 1개 넣기 */
   push(frame: FocusFrameSample) {
@@ -70,6 +72,20 @@ export class FocusBucketBuilder {
     return out;
   }
 
+  /** 화면 표시용: 완성된 버킷 전체 + 지금 채우는 중인 버킷까지 포함한 누적 시간(초) */
+  stats(): { history: FocusSampleInput[]; focusedSec: number; unfocusedSec: number; awaySec: number } {
+    const done = this.history.reduce(
+      (a, b) => ({ f: a.f + b.focusedSec, u: a.u + b.unfocusedSec, w: a.w + b.awaySec }),
+      { f: 0, u: 0, w: 0 },
+    );
+    return {
+      history: this.history,
+      focusedSec: done.f + this.acc.focused / 1000,
+      unfocusedSec: done.u + this.acc.unfocused / 1000,
+      awaySec: done.w + this.acc.away / 1000,
+    };
+  }
+
   /** 전송 실패한 버킷 되돌려 놓기 (다음 전송 때 다시 보냄. 백엔드가 중복은 무시) */
   requeue(samples: FocusSampleInput[]) {
     this.completed = [...samples, ...this.completed];
@@ -105,7 +121,7 @@ export class FocusBucketBuilder {
 
   /** 지금 버킷을 백엔드 형식으로 완성하고 다음 버킷 시작 */
   private closeBucket(end: number) {
-    this.completed.push({
+    const bucket: FocusSampleInput = {
       bucketStart: new Date(this.bucketStart!).toISOString(),
       bucketEnd: new Date(end).toISOString(),
       focusedSec: round1(this.acc.focused),
@@ -114,7 +130,9 @@ export class FocusBucketBuilder {
       interruptionCount: this.interruptions,
       avgYaw: this.angleSum.nYaw ? Math.round((this.angleSum.yaw / this.angleSum.nYaw) * 10) / 10 : undefined,
       avgPitch: this.angleSum.nPitch ? Math.round((this.angleSum.pitch / this.angleSum.nPitch) * 10) / 10 : undefined,
-    });
+    };
+    this.completed.push(bucket);
+    this.history.push(bucket);
     this.angleSum = { yaw: 0, pitch: 0, nYaw: 0, nPitch: 0 };
     this.bucketStart = end;
     this.acc = { focused: 0, unfocused: 0, away: 0 };
