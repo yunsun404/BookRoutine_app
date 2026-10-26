@@ -8,7 +8,8 @@
  *        ↓
  *   onFrame({ timestamp, state, detail, yaw, pitch })  → useFocusBucketRecorder 의 pushFrame
  */
-import { useCallback, useRef, useState } from 'react';
+import { type RefObject, useCallback, useRef, useState } from 'react';
+import type { CameraRef } from 'react-native-vision-camera';
 
 import { FocusJudge, type JudgeResult } from '../lib/gaze/focusJudge';
 import type { GazeCalibration } from '../lib/gaze/gazeCalibration';
@@ -24,9 +25,11 @@ interface Options {
   calibrating?: boolean;
   /** 확인 화면용: 매 샘플마다 화면 갱신 + 잘린 눈 이미지 포함 */
   debug?: boolean;
+  /** <Camera ref={cameraRef}> — 미리보기 캡처(셔터 소리 없음)에 필요 */
+  cameraRef?: RefObject<CameraRef | null>;
 }
 
-export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, debug = false }: Options) {
+export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, debug = false, cameraRef }: Options) {
   const judgeRef = useRef(new FocusJudge());
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
@@ -88,6 +91,7 @@ export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, deb
     onSample,
     debug,
     intervalMs: calibrating ? GAZE_CONFIG.CALIBRATION_INTERVAL_MS : GAZE_CONFIG.SAMPLE_INTERVAL_MS,
+    cameraRef,
   });
 
   /** 원재료(GazeSample) 받기 — 보정 화면용. 반환값을 호출하면 구독 해제 */
@@ -105,8 +109,8 @@ export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, deb
     setResult(null);
   }, []);
 
-  /** 사용자가 스크롤했음 (멍때림 판단용) */
-  const notifyScroll = useCallback(() => judgeRef.current.notifyScroll(Date.now()), []);
+  /** 사용자가 스크롤했음 (멍때림·훑어보기 판단용). offsetY = 스크롤 위치(dp) */
+  const notifyScroll = useCallback((offsetY?: number) => judgeRef.current.notifyScroll(Date.now(), offsetY), []);
 
   return {
     /** <Camera outputs={[photoOutput]} /> 에 넣기 */

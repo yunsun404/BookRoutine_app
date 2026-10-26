@@ -7,6 +7,17 @@ export const GAZE_CONFIG = {
   SAMPLE_INTERVAL_MS: 500,
   /** 개인 보정 중에는 더 자주 검사 (점 하나당 값을 많이 모으려고. 이전 검사가 안 끝났으면 자동으로 건너뜀) */
   CALIBRATION_INTERVAL_MS: 250,
+  /**
+   * 화면 캡처 방식
+   *  - 'snapshot': 카메라 미리보기 화면을 캡처 (셔터 소리 없음, 안드로이드 전용) ← 기본
+   *  - 'photo'   : 사진 촬영 (한국 기기는 법 규정상 셔터 소리가 강제로 남)
+   * snapshot 은 미리보기 뷰 크기 그대로 캡처되므로, 카메라 뷰를 SNAPSHOT_VIEW 크기 이상으로 둘 것
+   */
+  CAPTURE_MODE: 'snapshot' as 'snapshot' | 'photo',
+  /** snapshot 이 실패하면 사진 촬영으로 대신할지 (true 면 소리가 날 수 있음) */
+  SNAPSHOT_FALLBACK_TO_PHOTO: false,
+  /** snapshot 용 숨김 카메라 뷰 크기 (dp) — 사진 640×480 과 비슷한 해상도가 나오도록 */
+  SNAPSHOT_VIEW: { width: 240, height: 320 },
   /** 검사용 사진 해상도 목표 (작을수록 빠름. 실제 값은 기기가 가까운 값으로 맞춤) */
   PHOTO_TARGET: { width: 640, height: 480 },
   /** 얼굴 검출 전에 사진 긴 변을 이 크기 이하로 줄임 */

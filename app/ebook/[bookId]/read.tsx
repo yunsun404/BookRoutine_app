@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, type CameraRef, useCameraPermission } from 'react-native-vision-camera';
 import {
   CALIBRATION_PREVIEW_SPACE,
   type CalibrationPhase,
@@ -12,6 +12,7 @@ import {
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
 import { useGazeFocusTracker } from '../../../hooks/useGazeFocusTracker';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
+import { GAZE_CONFIG } from '../../../lib/gaze/gazeConfig';
 import { ReadingSession } from '../../../lib/types/ebook';
 
 const SEND_INTERVAL_MS = 30000;
@@ -70,6 +71,7 @@ export default function EbookReadingScreen() {
   const [calPhase, setCalPhase] = useState<CalibrationPhase>('posture');
   const showCalibration = !!session && hasPermission && calibrating;
 
+  const cameraRef = useRef<CameraRef>(null);
   const tracking = !!session && hasPermission && !finishing;
   const {
     photoOutput,
@@ -77,7 +79,12 @@ export default function EbookReadingScreen() {
     subscribe,
     setCalibration,
     notifyScroll,
-  } = useGazeFocusTracker({ enabled: tracking, onFrame: pushFrame, calibrating: showCalibration });
+  } = useGazeFocusTracker({ enabled: tracking, onFrame: pushFrame, calibrating: showCalibration, cameraRef });
+
+  // 독서 중간에 다시 보정하면: 그때까지의 버킷을 마무리 (보정 시간이 "자리 비움"으로 쌓이지 않게)
+  useEffect(() => {
+    if (showCalibration && session) flushCurrentBucket();
+  }, [showCalibration, session, flushCurrentBucket]);
 
   useEffect(() => {
     (async () => {
@@ -118,12 +125,12 @@ export default function EbookReadingScreen() {
     };
   }, [session, drainCompletedBuckets, requeueBuckets]);
 
-  // 읽은 시간 표시용 타이머
+  // 읽은 시간 표시용 타이머 (보정 중에는 멈춤 → 실제로 읽은 시간만)
   useEffect(() => {
-    if (!session) return;
+    if (!session || showCalibration) return;
     const t = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(t);
-  }, [session]);
+  }, [session, showCalibration]);
 
   const goResult = (sessionId: string) => {
     setConfirmVisible(false);
@@ -197,12 +204,9 @@ export default function EbookReadingScreen() {
           ? { label: '멍때림', color: C.unfocused }
           : FOCUS_CHIP[focus.state];
 
-  // 카메라 미리보기 위치: 자세 맞추기 = 크게 / 점 따라보기 = 숨김 / 독서 중 = 오른쪽 위 작게
-  const camStyle = showCalibration
-    ? calPhase === 'posture'
-      ? styles.camLarge
-      : styles.camHidden
-    : styles.camSmall;
+  // 카메라 뷰 위치: 자세 맞추기 = 크게 보이게 / 그 외 = 글 뒤에 숨김
+  //  (셔터 소리 없는 "미리보기 캡처" 방식이라 뷰가 일정 크기 이상이어야 해서, 작게 줄이지 않고 뒤에 숨김)
+  const camStyle = showCalibration && calPhase === 'posture' ? styles.camLarge : styles.camBehind;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -234,15 +238,19 @@ export default function EbookReadingScreen() {
           </Text>
         </Pressable>
 
-        {/* 카메라 미리보기 자리 (실제 카메라는 아래에서 위치를 바꿔 가며 그림) */}
-        {hasPermission && <View style={styles.camSpacer} />}
+        {/* 측정 중 표시 (카메라 화면은 글 뒤에 숨어 있음) */}
+        {hasPermission && (
+          <View style={styles.camBadge}>
+            <Ionicons name="videocam" size={16} color={tracking ? C.primary : C.inkMute} />
+          </View>
+        )}
       </View>
 
       <ScrollView
         style={styles.textArea}
         contentContainerStyle={styles.textContent}
         showsVerticalScrollIndicator={false}
-        onScroll={notifyScroll}
+        onScroll={(e) => notifyScroll(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={500}
       >
         <Text style={styles.bookTitle}>{title}</Text>
@@ -272,11 +280,12 @@ export default function EbookReadingScreen() {
         />
       )}
 
-      {/* 카메라 — 항상 같은 자리에 1개만 두고 크기·위치만 바꿈 (다시 만들면 카메라가 재시작됨)
-          사진은 기기 안에서만 처리, 저장·전송 안 함 */}
+      {/* 카메라 — 항상 1개만 두고 위치·크기만 바꿈 (다시 만들면 카메라가 재시작됨)
+          화면은 기기 안에서만 처리, 저장·전송 안 함 */}
       {hasPermission && (
         <View style={camStyle} pointerEvents="none">
           <Camera
+            ref={cameraRef}
             style={StyleSheet.absoluteFill}
             device="front"
             isActive={tracking}
@@ -320,6 +329,7 @@ export default function EbookReadingScreen() {
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, backgroundColor: C.bg },
+  // (참고) 카메라 뷰는 zIndex -1 로 글 뒤에 있음 → 글 영역(textArea)은 배경색이 있어 가려짐
 
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   backBtn: {
@@ -360,18 +370,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   focusText: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  camSpacer: { width: 40, height: 40, marginLeft: 'auto' },
-  camSmall: {
-    position: 'absolute', top: 12, right: 20, width: 40, height: 40, borderRadius: 20,
-    overflow: 'hidden', backgroundColor: C.line, zIndex: 20,
+  camBadge: {
+    width: 32, height: 32, borderRadius: 16, marginLeft: 'auto', backgroundColor: C.primarySoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  camBehind: {
+    position: 'absolute', top: 0, left: 0, width: GAZE_CONFIG.SNAPSHOT_VIEW.width, height: GAZE_CONFIG.SNAPSHOT_VIEW.height,
+    opacity: 0, zIndex: -1,
   },
   camLarge: {
     position: 'absolute', top: (CALIBRATION_PREVIEW_SPACE - 240) / 2, alignSelf: 'center', width: 240, height: 240,
     borderRadius: 120, overflow: 'hidden', borderWidth: 4, borderColor: C.primary, backgroundColor: C.line, zIndex: 20,
   },
-  camHidden: { position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0 },
 
-  textArea: { flex: 1 },
+
+  textArea: { flex: 1, backgroundColor: C.bg },
   textContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 120 },
   bookTitle: { fontSize: 24, fontWeight: '800', color: C.ink, letterSpacing: -0.6, marginBottom: 24 },
   content: { fontSize: 17, lineHeight: 31, color: C.ink },

@@ -2,7 +2,8 @@
  * 0.5초마다 [사진 1장 → 얼굴·눈 찾기 → 눈 자르기 → 모델 추론] 을 실행하는 훅
  *
  * 흐름
- *   capturePhoto (셔터음 X)  →  toImageAsync (방향·좌우반전 자동 보정)  →  긴 변 640 이하로 축소
+ *   [기본] 미리보기 화면 캡처(takeSnapshot, 셔터 소리 없음)  /  [대체] 사진 촬영(capturePhoto)
+ *   →  긴 변 640 이하로 축소
  *   → 임시 jpg 저장 → ML Kit 얼굴 검출(눈 윤곽, 머리 각도, 눈 뜸 확률) → 임시 파일 즉시 삭제
  *   → 눈 2개 자르기(eyeCrop.ts) → TFLite 추론 → GazeSample 1개를 onSample 로 전달
  *
@@ -16,11 +17,11 @@
  *       <Camera device="front" isActive outputs={[photoOutput]} />
  */
 import { File } from 'expo-file-system';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useTensorflowModel } from 'react-native-fast-tflite';
 import type { Image } from 'react-native-nitro-image';
-import { usePhotoOutput } from 'react-native-vision-camera';
+import { type CameraRef, usePhotoOutput } from 'react-native-vision-camera';
 import { useImageFaceDetector } from 'react-native-vision-camera-face-detector';
 
 import { cropEye, planEyeCrops } from './eyeCrop';
@@ -54,9 +55,17 @@ interface Options {
   onSample: (s: GazeSample) => void;
   debug?: boolean;
   intervalMs?: number;
+  /** <Camera ref={cameraRef}> — snapshot 방식에 필요 */
+  cameraRef?: RefObject<CameraRef | null>;
 }
 
-export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = GAZE_CONFIG.SAMPLE_INTERVAL_MS }: Options) {
+export function useGazeSampler({
+  enabled,
+  onSample,
+  debug = false,
+  intervalMs = GAZE_CONFIG.SAMPLE_INTERVAL_MS,
+  cameraRef,
+}: Options) {
   const photoOutput = usePhotoOutput({
     targetResolution: GAZE_CONFIG.PHOTO_TARGET,
     containerFormat: 'jpeg',
@@ -100,10 +109,8 @@ export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = 
       let tmpPath: string | null = null;
 
       try {
-        // 1) 사진 → 방향 보정된 Image → 축소
-        const photo = await photoOutput.capturePhoto({ enableShutterSound: false, flashMode: 'off' }, {});
-        let image = await photo.toImageAsync();
-        photo.dispose();
+        // 1) 화면 캡처 → Image → 축소
+        let image = await captureImage();
         const longSide = Math.max(image.width, image.height);
         if (longSide > GAZE_CONFIG.MAX_DETECT_SIDE) {
           const k = GAZE_CONFIG.MAX_DETECT_SIDE / longSide;
@@ -181,9 +188,26 @@ export function useGazeSampler({ enabled, onSample, debug = false, intervalMs = 
       }
     };
 
+    /** 기본: 미리보기 캡처 (소리 없음). 실패 시 설정에 따라 사진 촬영으로 대체 */
+    const captureImage = async (): Promise<Image> => {
+      const cam = cameraRef?.current;
+      if (GAZE_CONFIG.CAPTURE_MODE === 'snapshot') {
+        try {
+          if (!cam) throw new Error('카메라가 아직 준비되지 않았어요');
+          return await cam.takeSnapshot();
+        } catch (e) {
+          if (!GAZE_CONFIG.SNAPSHOT_FALLBACK_TO_PHOTO) throw e;
+        }
+      }
+      const photo = await photoOutput.capturePhoto({ enableShutterSound: false, flashMode: 'off' }, {});
+      const img = await photo.toImageAsync();
+      photo.dispose();
+      return img;
+    };
+
     const timer = setInterval(tick, intervalMs);
     return () => clearInterval(timer);
-  }, [enabled, appActive, intervalMs, debug, photoOutput, detector]);
+  }, [enabled, appActive, intervalMs, debug, photoOutput, detector, cameraRef]);
 
   return { photoOutput, modelState: tflite.state };
 }

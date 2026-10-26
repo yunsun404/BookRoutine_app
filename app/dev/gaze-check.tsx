@@ -14,14 +14,15 @@
  *
  * 접속: router.push('/dev/gaze-check')  /  확인 끝나면 삭제
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NitroImage } from 'react-native-nitro-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, type CameraRef, useCameraPermission } from 'react-native-vision-camera';
 
 import { CALIBRATION_PREVIEW_SPACE, type CalibrationPhase, GazeCalibrationOverlay } from '../../components/gaze/GazeCalibrationOverlay';
 import { useGazeFocusTracker } from '../../hooks/useGazeFocusTracker';
+import { GAZE_CONFIG } from '../../lib/gaze/gazeConfig';
 
 const STATE_LABEL = { focused: '집중', unfocused: '딴짓', away: '자리 비움' } as const;
 const STATE_COLOR = { focused: '#2BA84A', unfocused: '#E5A100', away: '#E5484D' } as const;
@@ -33,13 +34,14 @@ export default function GazeCheckScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const [calibrating, setCalibrating] = useState(false);
   const [calPhase, setCalPhase] = useState<CalibrationPhase>('posture');
+  const cameraRef = useRef<CameraRef>(null);
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
   const { photoOutput, modelState, result, lastSample: s, calibration, subscribe, setCalibration } =
-    useGazeFocusTracker({ enabled: hasPermission, debug: true, calibrating });
+    useGazeFocusTracker({ enabled: hasPermission, debug: true, calibrating, cameraRef });
 
   if (!hasPermission) {
     return (
@@ -56,14 +58,21 @@ export default function GazeCheckScreen() {
   const label =
     result?.phase === 'calibrating'
       ? `기준 잡는 중 ${Math.round(result.calibrationProgress * 100)}%`
-      : result?.detail === 'staring'
-        ? `멍때림 · ${result.reason}`
+      : result?.detail === 'staring' || result?.detail === 'skimming'
+        ? `${result.detail === 'staring' ? '멍때림' : '훑어보기'} · ${result.reason}`
         : `${STATE_LABEL[result?.state ?? 'away']} · ${result?.reason ?? '-'}`;
 
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={!calibrating ? styles.preview : calPhase === 'posture' ? styles.camLarge : styles.camHidden}>
-        <Camera style={StyleSheet.absoluteFill} device="front" isActive outputs={[photoOutput]} implementationMode="compatible" />
+      <View style={!calibrating ? styles.preview : calPhase === 'posture' ? styles.camLarge : styles.camBehind}>
+        <Camera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          device="front"
+          isActive
+          outputs={[photoOutput]}
+          implementationMode="compatible"
+        />
         {/* 보정 후: 변환된 시선 위치 (미리보기 영역 비율로 축소해서 표시) */}
         {calibration?.map && result?.screenGaze && (
           <View
@@ -141,7 +150,10 @@ const styles = StyleSheet.create({
     position: 'absolute', top: (CALIBRATION_PREVIEW_SPACE - 240) / 2, alignSelf: 'center', width: 240, height: 240,
     borderRadius: 120, overflow: 'hidden', borderWidth: 4, borderColor: '#6B7BFF', zIndex: 20,
   },
-  camHidden: { position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0 },
+  camBehind: {
+    position: 'absolute', top: 0, left: 0, width: GAZE_CONFIG.SNAPSHOT_VIEW.width, height: GAZE_CONFIG.SNAPSHOT_VIEW.height,
+    opacity: 0, zIndex: -1,
+  },
   gazeDot: { position: 'absolute', width: 16, height: 16, marginLeft: -8, marginTop: -8, borderRadius: 8, backgroundColor: '#E5484D' },
   panel: { backgroundColor: 'rgba(255,255,255,0.95)', padding: 16, gap: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
