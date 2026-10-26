@@ -2,7 +2,8 @@
  * 전자책 독서 화면
  *
  *  - 독서 시작 → 개인 보정 화면 → 몰입 모드(글만 보임)
- *  - 글을 터치하면 위·아래 바가 나타남 (4초 뒤 자동으로 숨김)
+ *  - 화면을 터치하면 위·아래 바가 나타나고, 다시 터치하면 사라짐 (보정 직후에만 3초 보여 줬다가 숨김)
+ *  - 보정 중에는 위·아래 바와 칩을 그리지 않음 (보정 점을 가리지 않게)
  *      위: 뒤로가기 · 제목 · 읽은 시간 · 측정 중 표시
  *      아래: 실시간 집중도 · 집중 시간 · 골든타임 · 30초 집중 그래프 · 진행률 · 종료
  *  - 바가 숨겨져 있어도 오른쪽 위 작은 칩에 지금 상태와 집중도가 항상 보임
@@ -29,7 +30,7 @@ import { GAZE_CONFIG } from '../../../lib/gaze/gazeConfig';
 import { ReadingSession } from '../../../lib/types/ebook';
 
 const SEND_INTERVAL_MS = 30000;
-const BARS_AUTO_HIDE_MS = 4000;
+const BARS_INTRO_MS = 3000; // 보정 직후 "바가 있다"는 걸 알려 주려고 잠깐 보여 주는 시간
 
 /* 리디자인 색상 (이 파일 안에서만 사용) */
 const C = {
@@ -114,20 +115,22 @@ export default function EbookReadingScreen() {
     if (showCalibration && session) flushCurrentBucket();
   }, [showCalibration, session, flushCurrentBucket]);
 
-  /* ─────────── 위·아래 바 (터치하면 보이고 4초 뒤 숨김) ─────────── */
-  const [barsVisible, setBarsVisible] = useState(true);
-  const barsAnim = useRef(new Animated.Value(1)).current;
+  /* ─────────── 위·아래 바 (터치하면 보이고, 다시 터치하면 숨김) ─────────── */
+  const [barsVisible, setBarsVisible] = useState(false);
+  const barsAnim = useRef(new Animated.Value(0)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showBars = (visible: boolean) => {
+  const showBars = (visible: boolean, autoHideMs?: number) => {
     setBarsVisible(visible);
     Animated.timing(barsAnim, { toValue: visible ? 1 : 0, duration: 200, useNativeDriver: true }).start();
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    if (visible) hideTimer.current = setTimeout(() => showBars(false), BARS_AUTO_HIDE_MS);
+    if (visible && autoHideMs) hideTimer.current = setTimeout(() => showBars(false), autoHideMs);
   };
-  // 보정이 끝나 독서를 시작하면 잠깐 보여 줬다가 숨김
+  // 보정이 끝나 독서를 시작하면 3초만 보여 줬다가 숨김 / 보정 중에는 숨김
   useEffect(() => {
-    if (session && !showCalibration) showBars(true);
+    if (!session) return;
+    if (showCalibration) showBars(false);
+    else showBars(true, BARS_INTRO_MS);
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
@@ -310,12 +313,14 @@ export default function EbookReadingScreen() {
         }}
         scrollEventThrottle={500}
       >
-        <Pressable onPress={() => showBars(!barsVisible)}>
+        <Pressable style={styles.tapArea} onPress={() => showBars(!barsVisible)}>
           <Text style={styles.bookTitle}>{title}</Text>
           <Text style={styles.content}>{content}</Text>
         </Pressable>
       </ScrollView>
 
+      {!showCalibration && (
+      <>
       {/* 상태 칩 — 바가 숨겨져 있어도 항상 보임 (누르면 다시 보정) */}
       <Pressable
         style={[styles.focusChip, { top: barsVisible ? 68 : 12 }]}
@@ -405,6 +410,8 @@ export default function EbookReadingScreen() {
           <Text style={styles.finishText}>독서 종료하기</Text>
         </Pressable>
       </Animated.View>
+      </>
+      )}
 
       {/* 개인 보정 화면 (독서 시작 전 / 칩을 눌렀을 때) */}
       {showCalibration && (
@@ -471,7 +478,8 @@ const styles = StyleSheet.create({
 
   /* 본문 */
   textArea: { flex: 1, backgroundColor: C.bg },
-  textContent: { paddingHorizontal: 24, paddingTop: 72, paddingBottom: 260 },
+  textContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 72, paddingBottom: 260 },
+  tapArea: { flexGrow: 1 }, // 글이 짧아도 화면 어디를 눌러도 바가 토글되도록
   bookTitle: { fontSize: 24, fontWeight: '800', color: C.ink, letterSpacing: -0.6, marginBottom: 24 },
   content: { fontSize: 17, lineHeight: 31, color: C.ink },
 
