@@ -16,6 +16,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   calibrationTargets,
   computeCalibration,
+  settled,
   type CalibPointData,
   type GazeCalibration,
   type Pt,
@@ -25,8 +26,18 @@ import type { GazeSample } from '../../lib/gaze/useGazeSampler';
 
 export type CalibrationPhase = 'posture' | 'dots' | 'fixation' | 'result';
 
-const DOT_MS = 2_500;
-const FIXATION_MS = 3_000;
+/**
+ * 점마다 머무는 시간: 기기 속도에 맞춰 자동 조절
+ *  - 최소 DOT_MIN_MS 는 보여 주고, 안정된 값이 DOT_TARGET_SAMPLES 개 모이면 다음 점으로
+ *  - 느린 기기라도 DOT_MAX_MS 가 지나면 넘어감 (그 점은 값이 부족하면 계산에서 빠짐)
+ */
+const DOT_MIN_MS = 1_500;
+const DOT_MAX_MS = 5_000;
+const DOT_TARGET_SAMPLES = 3;
+const FIXATION_MIN_MS = 3_000;
+const FIXATION_MAX_MS = 6_000;
+const FIXATION_TARGET_SAMPLES = 5;
+const POLL_MS = 200;
 const POSTURE_OK_STREAK = 3; // 연속 3번(약 0.75초) 자세 OK → 자동 진행
 const POSTURE_FORCE_MS = 10_000; // 10초 지나면 "그래도 진행" 버튼 표시
 /** 부모가 큰 미리보기를 놓는 영역 높이 (자세 단계에서 이 아래에 안내를 그림) */
@@ -107,32 +118,42 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
     return () => clearTimeout(t);
   }, [phase]);
 
-  // 점 단계: 점마다 2.5초
+  // 점 단계: 점마다 값이 충분히 모이면 다음으로 (최소 1.5초, 최대 5초)
   useEffect(() => {
     if (phase !== 'dots' || !targets.length) return;
     const point: CalibPointData = { target: targets[dotIndex], shownAt: Date.now(), obs: [] };
     currentRef.current = point;
-    const t = setTimeout(() => {
-      pointsRef.current.push(point);
-      if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
-      else setPhase('fixation');
-    }, DOT_MS);
-    return () => clearTimeout(t);
+    const t = setInterval(() => {
+      const elapsed = Date.now() - point.shownAt;
+      const enough = settled(point).length >= DOT_TARGET_SAMPLES;
+      if ((elapsed >= DOT_MIN_MS && enough) || elapsed >= DOT_MAX_MS) {
+        clearInterval(t);
+        pointsRef.current.push(point);
+        if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
+        else setPhase('fixation');
+      }
+    }, POLL_MS);
+    return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, dotIndex, size]);
 
-  // 가운데 응시 3초 → 계산
+  // 가운데 응시: 최소 3초, 값이 5개 모이면 계산 (최대 6초)
   useEffect(() => {
     if (phase !== 'fixation' || !size) return;
     const point: CalibPointData = { target: { x: size.width / 2, y: size.height / 2 }, shownAt: Date.now(), obs: [] };
     currentRef.current = point;
-    const t = setTimeout(() => {
-      currentRef.current = null;
-      fixationRef.current = point;
-      setResult(computeCalibration(pointsRef.current, point, size));
-      setPhase('result');
-    }, FIXATION_MS);
-    return () => clearTimeout(t);
+    const t = setInterval(() => {
+      const elapsed = Date.now() - point.shownAt;
+      const enough = settled(point).length >= FIXATION_TARGET_SAMPLES;
+      if ((elapsed >= FIXATION_MIN_MS && enough) || elapsed >= FIXATION_MAX_MS) {
+        clearInterval(t);
+        currentRef.current = null;
+        fixationRef.current = point;
+        setResult(computeCalibration(pointsRef.current, point, size));
+        setPhase('result');
+      }
+    }, POLL_MS);
+    return () => clearInterval(t);
   }, [phase, size]);
 
   const dot = phase === 'dots' ? targets[dotIndex] : phase === 'fixation' && size ? { x: size.width / 2, y: size.height / 2 } : null;
@@ -180,9 +201,14 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
         <View style={[styles.panel, styles.resultPanel]}>
           <Text style={styles.title}>{result.quality === 'poor' ? '보정 완료 (고개 위주 측정)' : '보정 완료'}</Text>
           <Text style={styles.big}>
-            {Number.isFinite(result.errorCm) ? `시선 오차 약 ${result.errorCm.toFixed(1)}cm` : '시선 값 부족'}
+            {Number.isFinite(result.errorCm) ? `시선 오차 약 ${result.errorCm.toFixed(1)}cm` : '시선 측정값 부족'}
           </Text>
           <Text style={styles.desc}>{result.summary}</Text>
+          {!Number.isFinite(result.errorCm) && (
+            <Text style={styles.desc}>
+              얼굴과 두 눈이 화면에 잘 보이게 하고 [다시 하기]를 눌러 주세요. 그대로 시작하면 고개 방향 위주로 측정해요.
+            </Text>
+          )}
           <View style={styles.row}>
             <Pressable style={styles.ghostBtn} onPress={startPosture}>
               <Text style={styles.ghostText}>다시 하기</Text>
