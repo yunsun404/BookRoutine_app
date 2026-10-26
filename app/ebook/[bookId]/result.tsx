@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FocusTimeline, TimelineLegend, type TimelineBar } from '../../../components/reading/FocusTimeline';
 import { fetchSessionFocusDetail, fetchSessionReward } from '../../../lib/api/ebooks';
 import { SessionReward } from '../../../lib/types/ebook';
 
@@ -24,6 +25,14 @@ const C = {
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+const toMin = (sec?: number | null) => Math.round((sec ?? 0) / 60);
+
+/** 집중 · 딴짓 · 자리 비움 시간 (초) */
+interface Breakdown {
+  focused: number;
+  unfocused: number;
+  away: number;
+}
 
 export default function ReadingResultScreen() {
   const { sessionId, bookId, title } = useLocalSearchParams<{
@@ -38,6 +47,8 @@ export default function ReadingResultScreen() {
     start: null,
     end: null,
   });
+  const [bars, setBars] = useState<TimelineBar[]>([]);
+  const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -51,9 +62,23 @@ export default function ReadingResultScreen() {
         fetchSessionReward(sessionId),
       ]);
       if (detailRes.status === 'fulfilled') {
+        const { session, timeline } = detailRes.value;
         setGoldenTime({
-          start: detailRes.value.session.golden_time_start ?? null,
-          end: detailRes.value.session.golden_time_end ?? null,
+          start: session.golden_time_start ?? null,
+          end: session.golden_time_end ?? null,
+        });
+        // 30초 버킷별 집중 비율 (서버가 focus_rate 0~100 을 붙여 줌)
+        setBars(
+          (timeline ?? []).map((b: any) => ({
+            start: new Date(b.bucket_start).getTime(),
+            end: new Date(b.bucket_end).getTime(),
+            rate: (b.focus_rate ?? 0) / 100,
+          })),
+        );
+        setBreakdown({
+          focused: session.total_focused_sec ?? 0,
+          unfocused: session.total_unfocused_sec ?? 0,
+          away: (session as any).total_away_sec ?? 0,
         });
       }
       if (rewardRes.status === 'fulfilled') setReward(rewardRes.value);
@@ -68,6 +93,11 @@ export default function ReadingResultScreen() {
   }, [load]);
 
   const score = reward?.avgFocusScore;
+  const golden =
+    goldenTime.start && goldenTime.end
+      ? { start: new Date(goldenTime.start).getTime(), end: new Date(goldenTime.end).getTime() }
+      : null;
+  const total = breakdown ? breakdown.focused + breakdown.unfocused + breakdown.away : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,6 +140,27 @@ export default function ReadingResultScreen() {
                 </Text>
               </View>
 
+              {/* 집중 흐름 (30초 단위) */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>집중 흐름 (30초 단위)</Text>
+                <FocusTimeline bars={bars} golden={golden} height={72} showTimes />
+                <TimelineLegend />
+              </View>
+
+              {/* 시간 구성 */}
+              {breakdown && total > 0 && (
+                <View style={styles.section}>
+                  <View style={styles.stackBar}>
+                    <View style={{ flex: breakdown.focused, backgroundColor: C.primary }} />
+                    <View style={{ flex: breakdown.unfocused, backgroundColor: '#E5A100' }} />
+                    <View style={{ flex: breakdown.away, backgroundColor: C.line }} />
+                  </View>
+                  <Text style={styles.stackText}>
+                    집중 {toMin(breakdown.focused)}분 · 딴짓·멍때림 {toMin(breakdown.unfocused)}분 · 자리 비움 {toMin(breakdown.away)}분
+                  </Text>
+                </View>
+              )}
+
               {/* 골든타임 */}
               <View style={styles.infoRow}>
                 <View style={[styles.infoIcon, { backgroundColor: C.peachSoft }]}>
@@ -120,8 +171,11 @@ export default function ReadingResultScreen() {
                   <Text style={styles.infoValue}>
                     {goldenTime.start && goldenTime.end
                       ? `${formatTime(goldenTime.start)} ~ ${formatTime(goldenTime.end)}`
-                      : '기록이 없어요'}
+                      : '이번엔 없어요'}
                   </Text>
+                  {!golden && (
+                    <Text style={styles.infoHint}>30초 중 21초 이상 집중을 5분 넘게 이어 가면 기록돼요</Text>
+                  )}
                 </View>
               </View>
 
@@ -218,6 +272,12 @@ const styles = StyleSheet.create({
   infoIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   infoLabel: { fontSize: 12, fontWeight: '600', color: C.inkMute },
   infoValue: { fontSize: 15, fontWeight: '700', color: C.ink, marginTop: 2 },
+  infoHint: { fontSize: 11, color: C.inkMute, marginTop: 2 },
+
+  section: { gap: 8 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: C.inkSub },
+  stackBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: C.line },
+  stackText: { fontSize: 12, color: C.inkSub },
 
   buttonRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
   ghostBtn: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
