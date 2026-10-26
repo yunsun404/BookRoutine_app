@@ -40,8 +40,8 @@ export type FocusState = 'focused' | 'unfocused' | 'away';
 export interface FocusFrameSample {
   timestamp: number; // Date.now()
   state: FocusState;
-  /** unfocused 세부 이유 (앱 안에서만 사용, 서버로 보내지 않음). 예: 'staring' = 멍때림 */
-  detail?: 'staring' | 'offscreen' | 'head' | 'eyes-closed';
+  /** unfocused 세부 이유 (앱 안에서만 사용, 서버로 보내지 않음). 'staring' = 멍때림, 'skimming' = 훑어보기 */
+  detail?: 'staring' | 'skimming' | 'offscreen' | 'head' | 'eyes-closed';
   yaw?: number; // 머리 좌우 각도 (버킷 평균용, 선택)
   pitch?: number; // 머리 상하 각도 (버킷 평균용, 선택)
 }

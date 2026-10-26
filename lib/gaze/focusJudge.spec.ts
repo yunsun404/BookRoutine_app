@@ -142,3 +142,27 @@ describe('FocusJudge v2 (개인 보정 사용)', () => {
     expect(j.judge(at(0, 9999, 9999)).reason).toBe('집중 (고개 기준)');
   });
 });
+
+describe('FocusJudge 훑어보기 (빠른 스크롤)', () => {
+  const calibrated2 = () => {
+    const j = new FocusJudge();
+    for (let t = 0; t <= 5; t += 0.5) j.judge(s(t, { gaze: null }));
+    return j;
+  };
+
+  it('30초 동안 1초에 50dp씩 계속 스크롤하면 훑어보기', () => {
+    const j = calibrated2();
+    for (let t = 6; t <= 36; t++) j.notifyScroll(T0 + t * 1000, (t - 6) * 50);
+    j.judge(s(36, { gaze: null }));
+    expect(j.judge(s(36.5, { gaze: null }))).toMatchObject({ state: 'unfocused', detail: 'skimming' });
+  });
+
+  it('20초마다 한 화면(600dp)씩 넘기는 빠른 읽기도 집중', () => {
+    const j = calibrated2();
+    j.notifyScroll(T0 + 10_000, 0);
+    j.notifyScroll(T0 + 11_000, 600);
+    j.notifyScroll(T0 + 31_000, 600);
+    j.notifyScroll(T0 + 32_000, 1200);
+    expect(j.judge(s(33, { gaze: null })).raw).toBe('focused');
+  });
+});

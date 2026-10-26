@@ -11,12 +11,14 @@
  *   1. 얼굴 없음                                   → away       (자리 비움)
  *   2. 두 눈 모두 감음                             → unfocused  (졸음)
  *   3. 고개가 기준보다 많이 돌아감                 → unfocused  (딴 곳 봄)
- *   4. ① 시선이 화면 밖 (보정 시) / 기준에서 크게 벗어남 (자동 기준 시) → unfocused
- *   5. ② 최근 10초 시선 움직임이 "가만히 볼 때 흔들림" 수준 + 그동안 스크롤 없음
+ *   4. 최근 30초 스크롤 속도가 "읽을 수 있는 속도"보다 훨씬 빠름 → unfocused  (훑어보기, detail='skimming')
+ *   5. ① 시선이 화면 밖 (보정 시) / 기준에서 크게 벗어남 (자동 기준 시) → unfocused
+ *   6. ② 최근 10초 시선 움직임이 "가만히 볼 때 흔들림" 수준 + 그동안 스크롤 없음
  *                                                  → unfocused  (멍때림, detail='staring')
- *   6. 나머지                                       → focused
+ *   7. 나머지                                       → focused
  *
- * 멍때림은 백엔드로 보낼 때 unfocused 에 포함 (detail 은 앱 안에서만 사용 → 나중에 따로 보내도록 확장 가능)
+ * 한계: 시선이 화면 안에 있고 적당한 속도로 스크롤하면 "읽는 중"으로 봄 (내용 이해 여부는 측정하지 않음)
+ * 멍때림·훑어보기는 백엔드로 보낼 때 unfocused 에 포함 (detail 은 앱 안에서만 사용 → 나중에 따로 보내도록 확장 가능)
  */
 import type { FocusState } from '../types/ebook';
 import type { GazeCalibration } from './gazeCalibration';
@@ -44,6 +46,14 @@ export const FOCUS_JUDGE_POLICY = {
   STARE_NOISE_K: 1.5,
   /** 흔들림이 너무 작게 잡혀도 최소 이만큼은 허용 (dp) */
   STARE_MIN_SPREAD_DP: 20,
+  /** 훑어보기: 최근 이 시간 동안 스크롤한 거리로 속도 계산 */
+  SKIM_WINDOW_MS: 30_000,
+  /**
+   * 이 속도(dp/초)보다 빠르면 훑어보기.
+   * 보통 읽기: 한 화면(약 600dp, 20줄) ≈ 30~40초 → 15~20dp/초 / 빠르게 읽기: 20초 → 30dp/초
+   * 45dp/초 ≈ 1초에 1.5줄 — 빠른 독자보다도 빠른 속도
+   */
+  SKIM_MAX_DP_PER_SEC: 45,
   /** 흔들림 보정 창 크기 */
   SMOOTH_WINDOW: 3,
   /** 기준값 적응 속도 (0이면 고정) */
@@ -65,7 +75,7 @@ export interface JudgeInput {
 
 export type JudgePhase = 'calibrating' | 'tracking';
 /** unfocused 의 세부 이유 (앱 화면 표시용) */
-export type FocusDetail = 'staring' | 'offscreen' | 'head' | 'eyes-closed';
+export type FocusDetail = 'staring' | 'skimming' | 'offscreen' | 'head' | 'eyes-closed';
 
 export interface JudgeResult {
   /** 최종 판정 (흔들림 보정 후) → 버킷 기록기로 */
@@ -108,6 +118,7 @@ export class FocusJudge {
   private lastState: FocusState | null = null;
   private screenTrail: { t: number; x: number; y: number }[] = [];
   private lastScrollAt = 0;
+  private scrollTrail: { t: number; y: number }[] = [];
 
   constructor(private readonly policy: FocusJudgePolicy = FOCUS_JUDGE_POLICY) {}
 
@@ -131,11 +142,25 @@ export class FocusJudge {
     this.recent = [];
     this.lastState = null;
     this.screenTrail = [];
+    this.scrollTrail = [];
   }
 
-  /** 사용자가 스크롤했음 (멍때림 판단용) */
-  notifyScroll(t: number) {
+  /** 사용자가 스크롤했음 (멍때림·훑어보기 판단용). y = 스크롤 위치(dp) */
+  notifyScroll(t: number, y?: number) {
     this.lastScrollAt = Math.max(this.lastScrollAt, t);
+    if (y == null) return;
+    this.scrollTrail.push({ t, y });
+    const from = t - this.policy.SKIM_WINDOW_MS;
+    while (this.scrollTrail.length > 1 && this.scrollTrail[0].t < from) this.scrollTrail.shift();
+  }
+
+  /** 최근 30초 평균 스크롤 속도 (dp/초) */
+  private scrollSpeed(now: number): number {
+    const from = now - this.policy.SKIM_WINDOW_MS;
+    const pts = this.scrollTrail.filter((p) => p.t >= from);
+    let dist = 0;
+    for (let i = 1; i < pts.length; i++) dist += Math.abs(pts[i].y - pts[i - 1].y);
+    return dist / (this.policy.SKIM_WINDOW_MS / 1000);
   }
 
   get baseline(): Readonly<AutoBaseline> | null {
@@ -230,6 +255,12 @@ export class FocusJudge {
     }
     if (s.pitch != null && Math.abs(s.pitch - b.pitch) > p.MAX_PITCH_DEV_DEG) {
       return { raw: 'unfocused', detail: 'head', reason: `고개 상하 ${(s.pitch - b.pitch).toFixed(0)}°` };
+    }
+
+    // 훑어보기: 읽을 수 없을 만큼 빠르게 스크롤
+    const speed = this.scrollSpeed(s.timestamp);
+    if (speed > p.SKIM_MAX_DP_PER_SEC) {
+      return { raw: 'unfocused', detail: 'skimming', reason: `훑어보기 (${speed.toFixed(0)}dp/초)` };
     }
 
     // ① 영역 — (가) 보정 시: 화면 안/밖
