@@ -184,7 +184,8 @@ export default function GroupScreen() {
     try {
       setModalLoading(true);
       console.log('searchTitle:', searchTitle);
-      console.log('selectedBookId:', selectedBook);
+      console.log('selectedBook:', selectedBook);
+      console.log('selectedBook.isbn: ', selectedBook?.isbn);
       const result = await groupApi.create({
         group_name: groupName.trim(),
         people_count: maxPeople ?? undefined,
@@ -216,7 +217,12 @@ export default function GroupScreen() {
     }
     try {
       const results = await groupApi.searchBooks(text);
-      setSearchResults(results);
+      const mapped = results.map((book: any) => ({
+        ...book,
+        isbn: book.isbn13 ?? book.isbn,  // isbn13을 isbn으로 매핑
+        cover_url: book.cover_url ?? book.cover,
+      }));
+      setSearchResults(mapped);
     } catch (error) {
       console.error('검색 오류:', error);
     }
