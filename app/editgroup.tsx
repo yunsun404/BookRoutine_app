@@ -69,7 +69,12 @@ export default function EditgroupScreen() {
         }
         try {
             const results = await groupApi.searchBooks(text);
-            setSearchResults(results);
+            const mapped = results.map((book: any) => ({
+                ...book,
+                isbn: book.isbn13 ?? book.isbn,  // isbn13을 isbn으로 매핑
+                cover_url: book.cover_url ?? book.cover,
+            }));
+            setSearchResults(mapped);
         } catch (error) {
             console.error('검색 오류:', error);
         }
