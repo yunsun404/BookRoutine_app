@@ -2,8 +2,10 @@
  * 개인 보정 화면 (= 독서 전 카메라 초기 설정)
  *
  *  ① 자세 맞추기  : 큰 카메라 미리보기 + 체크리스트(거리·각도·눈·밝기). 모두 ✅ 상태가 1초 유지되면 자동 진행
- *  ② 점 따라보기  : 점 5개가 2.5초씩 나타남 → 그동안의 모델 출력을 모음
- *  ③ 가운데 응시  : 가운데 점 3초 → "가만히 볼 때 흔들림"(잡음) 측정
+ *  ② 점 따라보기  : 점 5개가 차례로 나타남 → 그동안의 모델 출력을 모음
+ *                   점은 다음 위치로 부드럽게 이동하고, 이동하는 동안의 값은 모으지 않음
+ *                   (도착한 순간을 shownAt 으로 잡아서 settled() 의 0.7초 안정 구간이 이동 시간과 섞이지 않게)
+ *  ③ 가운데 응시  : 마지막 점에서 가운데로 이동 → 가운데 점 3초 → "가만히 볼 때 흔들림"(잡음) 측정
  *  ④ 결과        : 시선 오차(cm) 표시 → [시작하기] / [다시 하기]
  *  언제든 [건너뛰기] → 보정 없이 시작 (처음 5초 자동 기준, 고개 위주 판정)
  *
@@ -11,7 +13,7 @@
  * 좌표 기준: 이 오버레이 영역 (onLayout 으로 크기 측정) — 판정도 같은 크기를 "화면"으로 사용
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   calibrationTargets,
@@ -38,6 +40,10 @@ const FIXATION_MIN_MS = 3_000;
 const FIXATION_MAX_MS = 6_000;
 const FIXATION_TARGET_SAMPLES = 5;
 const POLL_MS = 200;
+/** 점이 다음 위치로 이동하는 시간 (이 동안의 값은 모으지 않음) */
+const DOT_MOVE_MS = 450;
+/** 점 반지름 (styles.dot 크기의 절반) */
+const DOT_RADIUS = 14;
 const POSTURE_OK_STREAK = 3; // 연속 3번(약 0.75초) 자세 OK → 자동 진행
 const POSTURE_FORCE_MS = 10_000; // 10초 지나면 "그래도 진행" 버튼 표시
 /** 부모가 큰 미리보기를 놓는 영역 높이 (자세 단계에서 이 아래에 안내를 그림) */
@@ -62,6 +68,18 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
   const fixationRef = useRef<CalibPointData | null>(null);
   const currentRef = useRef<CalibPointData | null>(null);
   const okStreakRef = useRef(0);
+
+  // 점 위치 (점 단계·가운데 응시 단계가 같이 씀 → 이전 위치에서 이어서 움직임)
+  const dotPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  /** 점을 target 으로 부드럽게 옮기는 애니메이션 (start 는 부르는 쪽에서) */
+  const moveDotTo = (target: Pt) =>
+    Animated.timing(dotPos, {
+      toValue: target,
+      duration: DOT_MOVE_MS,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    });
 
   const targets: Pt[] = size ? calibrationTargets(size.width, size.height) : [];
 
@@ -118,45 +136,82 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
     return () => clearTimeout(t);
   }, [phase]);
 
-  // 점 단계: 점마다 값이 충분히 모이면 다음으로 (최소 1.5초, 최대 5초)
+  // 점 단계: [이동(수집 안 함)] → 도착 → 점마다 값이 충분히 모이면 다음으로 (도착 후 최소 1.5초, 최대 5초)
   useEffect(() => {
     if (phase !== 'dots' || !targets.length) return;
-    const point: CalibPointData = { target: targets[dotIndex], shownAt: Date.now(), obs: [] };
-    currentRef.current = point;
-    const t = setInterval(() => {
-      const elapsed = Date.now() - point.shownAt;
-      const enough = settled(point).length >= DOT_TARGET_SAMPLES;
-      if ((elapsed >= DOT_MIN_MS && enough) || elapsed >= DOT_MAX_MS) {
-        clearInterval(t);
-        pointsRef.current.push(point);
-        if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
-        else setPhase('fixation');
-      }
-    }, POLL_MS);
-    return () => clearInterval(t);
+    const target = targets[dotIndex];
+    currentRef.current = null; // 이동하는 동안 들어온 값은 버림
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const begin = () => {
+      // shownAt = 점이 "도착한" 시각 → settled() 가 이 시각부터 0.7초 뒤의 값만 씀
+      const point: CalibPointData = { target, shownAt: Date.now(), obs: [] };
+      currentRef.current = point;
+      timer = setInterval(() => {
+        const elapsed = Date.now() - point.shownAt;
+        const enough = settled(point).length >= DOT_TARGET_SAMPLES;
+        if ((elapsed >= DOT_MIN_MS && enough) || elapsed >= DOT_MAX_MS) {
+          if (timer) clearInterval(timer);
+          currentRef.current = null; // 다 모았으면 바로 수집 멈춤
+          pointsRef.current.push(point);
+          if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
+          else setPhase('fixation');
+        }
+      }, POLL_MS);
+    };
+
+    // 첫 점은 그 자리에 바로 나타남 / 나머지는 이전 점 위치에서 미끄러지듯 이동
+    const anim = dotIndex === 0 ? null : moveDotTo(target);
+    if (anim) {
+      anim.start(({ finished }) => {
+        if (finished) begin(); // 중간에 멈춘 경우(화면 나감 등)는 시작하지 않음
+      });
+    } else {
+      dotPos.setValue(target);
+      begin();
+    }
+    return () => {
+      anim?.stop();
+      if (timer) clearInterval(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, dotIndex, size]);
 
-  // 가운데 응시: 최소 3초, 값이 5개 모이면 계산 (최대 6초)
+  // 가운데 응시: 마지막 점에서 가운데로 이동 → 도착 후 최소 3초, 값이 5개 모이면 계산 (최대 6초)
   useEffect(() => {
     if (phase !== 'fixation' || !size) return;
-    const point: CalibPointData = { target: { x: size.width / 2, y: size.height / 2 }, shownAt: Date.now(), obs: [] };
-    currentRef.current = point;
-    const t = setInterval(() => {
-      const elapsed = Date.now() - point.shownAt;
-      const enough = settled(point).length >= FIXATION_TARGET_SAMPLES;
-      if ((elapsed >= FIXATION_MIN_MS && enough) || elapsed >= FIXATION_MAX_MS) {
-        clearInterval(t);
-        currentRef.current = null;
-        fixationRef.current = point;
-        setResult(computeCalibration(pointsRef.current, point, size));
-        setPhase('result');
-      }
-    }, POLL_MS);
-    return () => clearInterval(t);
+    const target = { x: size.width / 2, y: size.height / 2 };
+    currentRef.current = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const begin = () => {
+      const point: CalibPointData = { target, shownAt: Date.now(), obs: [] };
+      currentRef.current = point;
+      timer = setInterval(() => {
+        const elapsed = Date.now() - point.shownAt;
+        const enough = settled(point).length >= FIXATION_TARGET_SAMPLES;
+        if ((elapsed >= FIXATION_MIN_MS && enough) || elapsed >= FIXATION_MAX_MS) {
+          if (timer) clearInterval(timer);
+          currentRef.current = null;
+          fixationRef.current = point;
+          setResult(computeCalibration(pointsRef.current, point, size));
+          setPhase('result');
+        }
+      }, POLL_MS);
+    };
+
+    const anim = moveDotTo(target);
+    anim.start(({ finished }) => {
+      if (finished) begin();
+    });
+    return () => {
+      anim.stop();
+      if (timer) clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, size]);
 
-  const dot = phase === 'dots' ? targets[dotIndex] : phase === 'fixation' && size ? { x: size.width / 2, y: size.height / 2 } : null;
+  const showDot = phase === 'dots' || phase === 'fixation';
 
   return (
     <View style={styles.overlay} onLayout={(e) => setSize(e.nativeEvent.layout)}>
@@ -186,14 +241,18 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
         </View>
       )}
 
-      {(phase === 'dots' || phase === 'fixation') && (
+      {showDot && (
         <>
           <Text style={styles.guide}>
             {phase === 'dots'
               ? `머리는 그대로, 눈으로만 점을 봐 주세요 (${dotIndex + 1}/${targets.length})`
               : '가운데 점을 가만히 봐 주세요'}
           </Text>
-          {dot && <View key={`${phase}-${dotIndex}`} style={[styles.dot, { left: dot.x - 14, top: dot.y - 14 }]} />}
+          {/* 점 하나를 계속 두고 위치만 움직임 (left/top 은 반지름만큼 당겨서 점 중심 = dotPos) */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.dot, { transform: dotPos.getTranslateTransform() }]}
+          />
         </>
       )}
 
@@ -241,5 +300,7 @@ const styles = StyleSheet.create({
   primaryBtn: { flex: 1, height: 48, borderRadius: 14, backgroundColor: '#6B7BFF', alignItems: 'center', justifyContent: 'center' },
   primaryText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   guide: { position: 'absolute', top: 16, left: 24, right: 24, textAlign: 'center', fontSize: 14, fontWeight: '600', color: '#6E7191' },
-  dot: { position: 'absolute', width: 28, height: 28, borderRadius: 14, backgroundColor: '#6B7BFF', borderWidth: 6, borderColor: '#C9CFFF' },
+  dot: {
+    position: 'absolute', left: -DOT_RADIUS, top: -DOT_RADIUS,
+    width: DOT_RADIUS * 2, height: DOT_RADIUS * 2, borderRadius: DOT_RADIUS, backgroundColor: '#6B7BFF', borderWidth: 6, borderColor: '#C9CFFF' },
 });
