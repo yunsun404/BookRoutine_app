@@ -17,7 +17,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://내ngrok주소.ngrok-free.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://issuing-facing-shore.ngrok-free.dev"
       }
     },
     "production": {}

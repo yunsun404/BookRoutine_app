@@ -1,3 +1,4 @@
+import AiSummaryLines from "@/components/AiSummaryLines";
 import { authFetch, BASE_URL } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -22,6 +23,7 @@ const AI_SUMMARY_ENDPOINT = `${BASE_URL}/threads-ai/summary`;
 const USER_ID = "7ff77428-bdab-4724-9a67-ed5587217978";
 
 // AI 요약 타래를 구분하는 마커 (addSummary에서 저장할 때도 이 문구로 시작함)
+// ⚠️ 백엔드 threads-ai.service.ts의 AI_SUMMARY_MARKER와 똑같아야 합니다.
 const AI_SUMMARY_MARKER = "[ AI 요약 ✨]";
 
 type Thread = {
@@ -60,6 +62,10 @@ const markAiSummaryThreads = (list: Thread[]): Thread[] =>
     ...t,
     isAiSummary: t.isAiSummary || t.content?.startsWith(AI_SUMMARY_MARKER),
   }));
+
+// AI 요약 타래에서 마커를 떼고 본문만 꺼냅니다.
+const stripMarker = (content?: string) =>
+  (content ?? "").replace(AI_SUMMARY_MARKER, "").replace(/^\s*\n/, "").trim();
 
 const formatDate = (iso?: string) => {
   if (!iso) return "";
@@ -241,10 +247,18 @@ export default function ThreadScreen() {
         body: JSON.stringify({ book_id: BOOK_ID }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || !data.summary) {
         showNotice("AI 요약을 만들지 못했어요");
         return;
       }
+
+      // 이전 AI 요약 카드는 지워서 항상 최신 요약 하나만 남깁니다.
+      const oldSummaries = threads.filter((t) => t.isAiSummary);
+      await Promise.all(
+        oldSummaries.map((t) =>
+          authFetch(`${THREADS_ENDPOINT}/${t.thread_id}`, { method: "DELETE" }).catch(() => null),
+        ),
+      );
 
       // AI 요약을 실제 타래로 저장 (새로고침해도 남도록)
       const saveRes = await authFetch(THREADS_ENDPOINT, {
@@ -265,7 +279,7 @@ export default function ThreadScreen() {
       }
 
       await fetchThreads();
-      showNotice("AI 요약을 추가했어요");
+      showNotice(data.ai_unavailable ? "AI 서버가 꺼져 있어 이전 요약을 보여드려요" : "AI 요약을 추가했어요");
     } catch (error) {
       showNotice("AI 요약 서버에 연결할 수 없어요");
     } finally {
@@ -316,9 +330,12 @@ export default function ThreadScreen() {
                 <Text style={s.date}>{formatDate(item.created_at)}</Text>
               </View>
 
-              <Text style={s.content}>
-                {item.isAiSummary ? item.content?.replace(`${AI_SUMMARY_MARKER}\n`, "") : item.content}
-              </Text>
+              {/* AI 요약은 "페이지 · 문장"을 한 줄씩, 일반 타래는 본문 그대로 */}
+              {item.isAiSummary ? (
+                <AiSummaryLines summary={stripMarker(item.content)} />
+              ) : (
+                <Text style={s.content}>{item.content}</Text>
+              )}
 
               <View style={s.actions}>
                 {!item.isAiSummary && (
