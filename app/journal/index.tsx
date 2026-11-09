@@ -28,6 +28,37 @@ const labelOf = (k: string) => {
   return `${d.getFullYear()}. ${pad(d.getMonth() + 1)}. ${pad(d.getDate())} (${DOW[d.getDay()]})`;
 };
 
+/* ---------- 응답 정리 ----------
+ * 백엔드가 아직 checklist / focus / book을 안 보내도 화면이 터지지 않게 기본값을 채운다.
+ * 백엔드가 이 필드들을 보내기 시작하면 그 값이 그대로 쓰인다.
+ */
+function normalizeJournal(raw: any): Journal | null {
+  if (!raw) return null;
+  return {
+    ...raw,
+    title: raw.title ?? '',
+    content: raw.content ?? '',
+    highlights: Array.isArray(raw.highlights) ? raw.highlights : [],
+    checklist: Array.isArray(raw.checklist) ? raw.checklist : [],
+    focus: {
+      score: raw.focus?.score ?? null,
+      golden_hour: raw.focus?.golden_hour ?? null,
+    },
+    book: raw.book ?? null,
+    next_suggestion: raw.next_suggestion ?? null,
+  } as Journal;
+}
+
+/* ---------- 생성 실패 문구 (서버 상태 코드 기준) ---------- */
+function createErrorMessage(e: unknown): string {
+  if (e instanceof HttpError) {
+    if (e.status === 400) return '이 날은 독서 기록이 없어서 일지를 만들 수 없어요.';
+    if (e.status === 429) return '이 날짜의 일지는 최대 3번까지 만들 수 있어요.';
+    if (e.status === 502) return 'AI가 일지를 쓰다가 실패했어요. 다시 시도해 주세요.';
+  }
+  return '일지를 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
+}
+
 /* ---------- screen ---------- */
 export default function JournalScreen() {
   const params = useLocalSearchParams<{ date?: string }>();
@@ -48,10 +79,15 @@ export default function JournalScreen() {
     setError(false);
     setCreateError(null);
     try {
-      setJournal(await fetchJournal(date));
+      setJournal(normalizeJournal(await fetchJournal(date)));
     } catch (e) {
-      console.warn('[journal] load failed', e);
-      setError(true);
+      // 일지가 없을 때 404로 오는 경우도 '없음' 상태로 처리
+      if (e instanceof HttpError && e.status === 404) {
+        setJournal(null);
+      } else {
+        console.warn('[journal] load failed', e);
+        setError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -63,11 +99,10 @@ export default function JournalScreen() {
     setCreating(true);
     setCreateError(null);
     try {
-      setJournal(await createJournal(date));
+      setJournal(normalizeJournal(await createJournal(date)));
     } catch (e) {
       if (e instanceof HttpError && e.status === 409) load();
-      else if (e instanceof HttpError && e.status === 422) setCreateError('이 날은 독서 기록이 없어서 일지를 만들 수 없어요.');
-      else setCreateError('일지를 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+      else setCreateError(createErrorMessage(e));
     } finally {
       setCreating(false);
     }
@@ -184,8 +219,8 @@ function Highlights({ items, serif }: { items: JournalHighlight[]; serif?: strin
         <Text style={styles.sectionTitle}>오늘의 문장</Text>
         <Text style={styles.sectionCount}>{items.length}개</Text>
       </View>
-      {items.map((h) => (
-        <View key={h.sentence_id} style={styles.quoteCard}>
+      {items.map((h, i) => (
+        <View key={h.sentence_id ?? `h-${i}`} style={styles.quoteCard}>
           <View style={styles.quoteBar} />
           <View style={styles.quoteBody}>
             <Text style={[styles.quoteText, serif ? { fontFamily: serif } : null]}>{h.text}</Text>
