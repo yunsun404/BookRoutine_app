@@ -4,3 +4,7 @@ node_modules/
 *.safetensors
 *.pt
 *.zip
+
+# local env files
+.env
+.env*.local

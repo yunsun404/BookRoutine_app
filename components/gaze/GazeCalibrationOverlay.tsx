@@ -3,8 +3,10 @@
  *
  *  ① 자세 맞추기  : 큰 카메라 미리보기 + 체크리스트(거리·각도·눈·밝기). 모두 ✅ 상태가 1초 유지되면 자동 진행
  *  ② 점 따라보기  : 점 5개가 차례로 나타남 → 그동안의 모델 출력을 모음
- *                   점은 다음 위치로 부드럽게 이동하고, 이동하는 동안의 값은 모으지 않음
- *                   (도착한 순간을 shownAt 으로 잡아서 settled() 의 0.7초 안정 구간이 이동 시간과 섞이지 않게)
+ *                   점마다: 부드럽게 이동 → 도착 신호(톡) → 0.3초 대기 → 값 모으기
+ *                   이동·신호·대기 중의 값은 모으지 않음 (대기가 끝난 시각을 shownAt 으로 잡음
+ *                   → settled() 의 0.7초까지 더해 도착 후 약 1초부터의 값만 계산에 쓰임)
+ *                   실기기 테스트: 고개가 점을 따라 움직이면 오차가 크게 나빠짐 → 안내 문구로 강조
  *  ③ 가운데 응시  : 마지막 점에서 가운데로 이동 → 가운데 점 3초 → "가만히 볼 때 흔들림"(잡음) 측정
  *  ④ 결과        : 시선 오차(cm) 표시 → [시작하기] / [다시 하기]
  *  언제든 [건너뛰기] → 보정 없이 시작 (처음 5초 자동 기준, 고개 위주 판정)
@@ -35,13 +37,17 @@ export type CalibrationPhase = 'posture' | 'dots' | 'fixation' | 'result';
  */
 const DOT_MIN_MS = 1_500;
 const DOT_MAX_MS = 5_000;
-const DOT_TARGET_SAMPLES = 3;
+const DOT_TARGET_SAMPLES = 4; // 3 → 4: 튀는 값에 덜 흔들리게
 const FIXATION_MIN_MS = 3_000;
 const FIXATION_MAX_MS = 6_000;
 const FIXATION_TARGET_SAMPLES = 5;
 const POLL_MS = 200;
 /** 점이 다음 위치로 이동하는 시간 (이 동안의 값은 모으지 않음) */
 const DOT_MOVE_MS = 450;
+/** 도착 신호(점이 "톡" 커졌다 돌아옴) 길이 */
+const ARRIVE_POP_MS = 280;
+/** 도착한 뒤 값을 모으기 전에 더 기다리는 시간 (눈이 점에 도착할 시간을 줌) */
+const ARRIVE_HOLD_MS = 300;
 /** 점 반지름 (styles.dot 크기의 절반) */
 const DOT_RADIUS = 14;
 const POSTURE_OK_STREAK = 3; // 연속 3번(약 0.75초) 자세 OK → 자동 진행
@@ -71,6 +77,8 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
 
   // 점 위치 (점 단계·가운데 응시 단계가 같이 씀 → 이전 위치에서 이어서 움직임)
   const dotPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  // 점 크기 (도착 신호용)
+  const dotScale = useRef(new Animated.Value(1)).current;
 
   /** 점을 target 으로 부드럽게 옮기는 애니메이션 (start 는 부르는 쪽에서) */
   const moveDotTo = (target: Pt) =>
@@ -136,78 +144,105 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
     return () => clearTimeout(t);
   }, [phase]);
 
-  // 점 단계: [이동(수집 안 함)] → 도착 → 점마다 값이 충분히 모이면 다음으로 (도착 후 최소 1.5초, 최대 5초)
-  useEffect(() => {
-    if (phase !== 'dots' || !targets.length) return;
-    const target = targets[dotIndex];
-    currentRef.current = null; // 이동하는 동안 들어온 값은 버림
-    let timer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * 점 하나 진행: [이동(선택)] → 도착 신호(톡) → 잠깐 대기 → 값 모으기 → onDone(point)
+   *  - 이동·도착 신호·대기 동안 들어온 값은 버림 (눈이 아직 점에 도착하지 않았을 수 있어서)
+   *  - shownAt = 대기가 끝난 시각 → settled() 의 0.7초까지 더해 "도착 후 약 1초"부터의 값만 계산에 쓰임
+   *  - 반환값 = 정리 함수 (화면을 나가거나 단계가 바뀌면 애니메이션·타이머를 모두 멈춤)
+   */
+  const runDotStep = (
+    target: Pt,
+    opts: {
+      move: boolean;
+      minMs: number;
+      maxMs: number;
+      targetSamples: number;
+      onDone: (point: CalibPointData) => void;
+    },
+  ) => {
+    currentRef.current = null;
+    let poll: ReturnType<typeof setInterval> | null = null;
+    let hold: ReturnType<typeof setTimeout> | null = null;
+    let pop: Animated.CompositeAnimation | null = null;
 
     const begin = () => {
-      // shownAt = 점이 "도착한" 시각 → settled() 가 이 시각부터 0.7초 뒤의 값만 씀
       const point: CalibPointData = { target, shownAt: Date.now(), obs: [] };
       currentRef.current = point;
-      timer = setInterval(() => {
+      poll = setInterval(() => {
         const elapsed = Date.now() - point.shownAt;
-        const enough = settled(point).length >= DOT_TARGET_SAMPLES;
-        if ((elapsed >= DOT_MIN_MS && enough) || elapsed >= DOT_MAX_MS) {
-          if (timer) clearInterval(timer);
+        const enough = settled(point).length >= opts.targetSamples;
+        if ((elapsed >= opts.minMs && enough) || elapsed >= opts.maxMs) {
+          if (poll) clearInterval(poll);
+          poll = null;
           currentRef.current = null; // 다 모았으면 바로 수집 멈춤
-          pointsRef.current.push(point);
-          if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
-          else setPhase('fixation');
+          opts.onDone(point);
         }
       }, POLL_MS);
     };
 
-    // 첫 점은 그 자리에 바로 나타남 / 나머지는 이전 점 위치에서 미끄러지듯 이동
-    const anim = dotIndex === 0 ? null : moveDotTo(target);
-    if (anim) {
-      anim.start(({ finished }) => {
-        if (finished) begin(); // 중간에 멈춘 경우(화면 나감 등)는 시작하지 않음
+    // 도착 신호: 점이 "톡" 커졌다 돌아옴 → 눈을 점으로 끌어당김
+    const arrive = () => {
+      dotScale.setValue(1);
+      pop = Animated.sequence([
+        Animated.timing(dotScale, { toValue: 1.7, duration: ARRIVE_POP_MS * 0.4, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(dotScale, { toValue: 1, duration: ARRIVE_POP_MS * 0.6, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ]);
+      pop.start();
+      hold = setTimeout(begin, ARRIVE_HOLD_MS);
+    };
+
+    const move = opts.move ? moveDotTo(target) : null;
+    if (move) {
+      move.start(({ finished }) => {
+        if (finished) arrive(); // 중간에 멈춘 경우(화면 나감 등)는 진행하지 않음
       });
     } else {
       dotPos.setValue(target);
-      begin();
+      arrive();
     }
+
     return () => {
-      anim?.stop();
-      if (timer) clearInterval(timer);
+      move?.stop();
+      pop?.stop();
+      if (hold) clearTimeout(hold);
+      if (poll) clearInterval(poll);
     };
+  };
+
+  // 점 단계: 첫 점은 그 자리에 바로, 나머지는 이전 점에서 이동 (도착 후 최소 1.5초, 최대 5초)
+  useEffect(() => {
+    if (phase !== 'dots' || !targets.length) return;
+    return runDotStep(targets[dotIndex], {
+      move: dotIndex > 0,
+      minMs: DOT_MIN_MS,
+      maxMs: DOT_MAX_MS,
+      targetSamples: DOT_TARGET_SAMPLES,
+      onDone: (point) => {
+        pointsRef.current.push(point);
+        if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
+        else setPhase('fixation');
+      },
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, dotIndex, size]);
 
   // 가운데 응시: 마지막 점에서 가운데로 이동 → 도착 후 최소 3초, 값이 5개 모이면 계산 (최대 6초)
   useEffect(() => {
     if (phase !== 'fixation' || !size) return;
-    const target = { x: size.width / 2, y: size.height / 2 };
-    currentRef.current = null;
-    let timer: ReturnType<typeof setInterval> | null = null;
-
-    const begin = () => {
-      const point: CalibPointData = { target, shownAt: Date.now(), obs: [] };
-      currentRef.current = point;
-      timer = setInterval(() => {
-        const elapsed = Date.now() - point.shownAt;
-        const enough = settled(point).length >= FIXATION_TARGET_SAMPLES;
-        if ((elapsed >= FIXATION_MIN_MS && enough) || elapsed >= FIXATION_MAX_MS) {
-          if (timer) clearInterval(timer);
-          currentRef.current = null;
+    return runDotStep(
+      { x: size.width / 2, y: size.height / 2 },
+      {
+        move: true,
+        minMs: FIXATION_MIN_MS,
+        maxMs: FIXATION_MAX_MS,
+        targetSamples: FIXATION_TARGET_SAMPLES,
+        onDone: (point) => {
           fixationRef.current = point;
           setResult(computeCalibration(pointsRef.current, point, size));
           setPhase('result');
-        }
-      }, POLL_MS);
-    };
-
-    const anim = moveDotTo(target);
-    anim.start(({ finished }) => {
-      if (finished) begin();
-    });
-    return () => {
-      anim.stop();
-      if (timer) clearInterval(timer);
-    };
+        },
+      },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, size]);
 
@@ -245,13 +280,13 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
         <>
           <Text style={styles.guide}>
             {phase === 'dots'
-              ? `머리는 그대로, 눈으로만 점을 봐 주세요 (${dotIndex + 1}/${targets.length})`
+              ? `고개는 움직이지 말고 눈으로만 점을 따라가 주세요 (${dotIndex + 1}/${targets.length})`
               : '가운데 점을 가만히 봐 주세요'}
           </Text>
           {/* 점 하나를 계속 두고 위치만 움직임 (left/top 은 반지름만큼 당겨서 점 중심 = dotPos) */}
           <Animated.View
             pointerEvents="none"
-            style={[styles.dot, { transform: dotPos.getTranslateTransform() }]}
+            style={[styles.dot, { transform: [...dotPos.getTranslateTransform(), { scale: dotScale }] }]}
           />
         </>
       )}

@@ -43,6 +43,7 @@ const MORE_ITEMS: { title: string; icon: IoniconsName; route: string }[] = [
   { title: "랭킹", icon: "trophy-outline", route: "/ranking" },
   { title: "그룹", icon: "people-outline", route: "/(tabs)/group" },
   { title: "추천", icon: "sparkles-outline", route: "/(tabs)/recommend" },
+  { title: "전자책", icon: "tablet-portrait-outline", route: "/ebook" },
 
 ];
 
