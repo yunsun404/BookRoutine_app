@@ -1,4 +1,3 @@
-// ⚠️ lib/api.ts 옆에 두는 기준. BASE_URL / authFetch가 다른 파일에 있으면 경로 수정
 import { authFetch, BASE_URL } from "../constants/api";
 
 export interface BookAiSummary {
