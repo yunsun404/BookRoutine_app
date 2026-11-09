@@ -1,4 +1,4 @@
-import { authApi } from "@/lib/api";
+import { authApi, userApi } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -52,9 +52,26 @@ export default function SignupScreen() {
             };
             // 1. 회원가입 API 호출 (백엔드에 맞게 body 조정)
             // 임시로 as any 처리를 하여 속성 오류를 우회합니다. 추후 lib/api.ts의 타입 정의도 업데이트가 필요합니다.
-            const { user_id, access_token, refresh_token } = await authApi.register(payload as any);
-            // 2. 로그인 상태 업데이트
-            await setAuth({ user_id, nickname }, access_token, refresh_token);
+            const res: any = await authApi.register(payload as any);
+            let access_token: string | undefined = res?.access_token;
+            let refresh_token: string | undefined = res?.refresh_token;
+
+            // 서버 회원가입 응답에 토큰이 없으면(응답 모양이 다름) → 방금 만든 계정으로 로그인해서 토큰을 받음
+            // (빈 토큰을 AsyncStorage에 저장하면 "Passing null/undefined" 에러가 남)
+            if (!access_token || !refresh_token) {
+                console.log('[회원가입] 응답에 토큰이 없어 로그인으로 받아요. 응답 키:', Object.keys(res ?? {}));
+                const tokens = await authApi.login({ username, password });
+                access_token = tokens.access_token;
+                refresh_token = tokens.refresh_token;
+            }
+            if (!access_token || !refresh_token) throw new Error('로그인 토큰을 받지 못했어요');
+
+            // 2. 로그인 상태 업데이트 (user_id가 응답에 없으면 내 정보 조회로 채움 — 로그인 화면과 같은 방식)
+            await setAuth({ user_id: res?.user_id ?? '', nickname }, access_token, refresh_token);
+            if (!res?.user_id) {
+                const me = await userApi.getMe();
+                await setAuth(me, access_token, refresh_token);
+            }
             // 3. 메인 화면으로 이동
             router.replace('/(tabs)/homescreen');
         } catch (error) {
@@ -79,6 +96,7 @@ export default function SignupScreen() {
 
             <TextInput
                 style={styles.input}
+                placeholderTextColor="#A0A3BD"
                 placeholder="아이디"
                 value={username}
                 onChangeText={setUsername}
@@ -86,6 +104,7 @@ export default function SignupScreen() {
             />
             <TextInput
                 style={styles.input}
+                placeholderTextColor="#A0A3BD"
                 placeholder="이메일"
                 value={email}
                 onChangeText={setEmail}
@@ -94,6 +113,7 @@ export default function SignupScreen() {
             />
             <TextInput
                 style={styles.input}
+                placeholderTextColor="#A0A3BD"
                 placeholder="닉네임"
                 value={nickname}
                 onChangeText={setNickname}
@@ -101,6 +121,7 @@ export default function SignupScreen() {
             />
             <TextInput
                 style={styles.input}
+                placeholderTextColor="#A0A3BD"
                 placeholder="비밀번호"
                 value={password}
                 onChangeText={setPassword}
@@ -108,6 +129,7 @@ export default function SignupScreen() {
             />
             <TextInput
                 style={styles.input}
+                placeholderTextColor="#A0A3BD"
                 placeholder="나이"
                 value={age ? String(age) : ''}
                 onChangeText={(text) => setAge(Number(text))}
@@ -203,6 +225,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         marginBottom: 16,
         fontSize: 16,
+        color: '#1F2233', // 지정 안 하면 다크 모드에서 흰 글자가 됨
     },
     sectionLabel: {
         fontSize: 15,

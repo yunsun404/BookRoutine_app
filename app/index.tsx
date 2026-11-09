@@ -4,12 +4,13 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import { authApi, userApi } from '../lib/api';
 import { syncPushToken } from '../lib/notifications';
@@ -71,7 +72,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    // 키보드가 올라오면 화면도 같이 올라가고, 스크롤로 아래 칸까지 볼 수 있게
+    <KeyboardAvoidingView style={styles.kav} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
       <Image
         source={require('../assets/images/logo.png')}
@@ -82,6 +85,7 @@ export default function LoginScreen() {
 
       <TextInput
         style={styles.input}
+        placeholderTextColor="#A0A3BD"
         placeholder="아이디"
         value={username}
         onChangeText={setUsername}
@@ -91,6 +95,7 @@ export default function LoginScreen() {
 
       <TextInput
         style={styles.input}
+        placeholderTextColor="#A0A3BD"
         placeholder="비밀번호"
         value={password}
         onChangeText={setPassword}
@@ -112,13 +117,18 @@ export default function LoginScreen() {
       <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
         <Text style={styles.link}>계정이 없으신가요? 회원가입</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  kav: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  container: {
+    flexGrow: 1, // ScrollView 안이라 flex 대신 flexGrow (내용이 적으면 가운데 정렬 유지)
     justifyContent: 'center',
     paddingHorizontal: 24,
     backgroundColor: '#fff',
@@ -155,6 +165,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 16,
     fontSize: 16,
+    color: '#1F2233', // 지정 안 하면 다크 모드에서 흰 글자가 됨
   },
   button: {
     backgroundColor: '#6B7BFF',
