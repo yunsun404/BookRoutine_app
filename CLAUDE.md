@@ -65,8 +65,7 @@ Key invariants:
 하고 싶은 것 방법
 Claude가 답하는 도중에 멈추기 Esc
 Claude Code 끄기 입력창에 /exit
-어제 하던 대화 이어서 하기 폴더에서 claude --continue , 또는 켜서 /resume 으
-로 목록에서 고르기
+어제 하던 대화 이어서 하기 폴더에서 claude --continue , 또는 켜서 /resume 으로 목록에서 고르기
 완료: 첫 질문에 대한 프로젝트 설명을 받았다
 Claude Code 시작 안내서
 Page 6 of 16
@@ -75,6 +74,7 @@ app/ebook/[bookId]/read.tsx
 ### 절대 하지 말 것
 - .env, API 키, 키스토어, .pem 파일을 커밋하거나 내용을 출력하지 않는다. 변수 이름만 말한
 다.
+- git 관련 명령을 직접 실행하지 않는다. 사용자에게 권장한다. 
 - `git add .` 금지. 항상 파일 경로를 지정한다.
 - main 브랜치에서 직접 작업하거나 push하지 않는다.
 - EXPO_PUBLIC_ 변수에 비밀값(OpenAI 키, service_role 키)을 넣지 않는다.

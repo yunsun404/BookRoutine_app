@@ -8,10 +8,10 @@
  *        ↓
  *   onFrame({ timestamp, state, detail, yaw, pitch })  → useFocusBucketRecorder 의 pushFrame
  */
-import { type RefObject, useCallback, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import type { CameraRef } from 'react-native-vision-camera';
 
-import { FocusJudge, type JudgeResult } from '../lib/gaze/focusJudge';
+import { FocusJudge, type JudgeResult, type ReaderMode } from '../lib/gaze/focusJudge';
 import type { GazeCalibration } from '../lib/gaze/gazeCalibration';
 import { GAZE_CONFIG } from '../lib/gaze/gazeConfig';
 import { type GazeSample, useGazeSampler } from '../lib/gaze/useGazeSampler';
@@ -27,10 +27,23 @@ interface Options {
   debug?: boolean;
   /** <Camera ref={cameraRef}> — 미리보기 캡처(셔터 소리 없음)에 필요 */
   cameraRef?: RefObject<CameraRef | null>;
+  /** 읽기 화면 방식 ('scroll' = 세로 스크롤, 'page' = 좌우 페이지). 기본 'scroll' */
+  readerMode?: ReaderMode;
 }
 
-export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, debug = false, cameraRef }: Options) {
+export function useGazeFocusTracker({
+  enabled,
+  onFrame,
+  calibrating = false,
+  debug = false,
+  cameraRef,
+  readerMode = 'scroll',
+}: Options) {
   const judgeRef = useRef(new FocusJudge());
+
+  useEffect(() => {
+    judgeRef.current.setReaderMode(readerMode);
+  }, [readerMode]);
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
   const calibratingRef = useRef(calibrating);
@@ -112,6 +125,19 @@ export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, deb
   /** 사용자가 스크롤했음 (멍때림·훑어보기 판단용). offsetY = 스크롤 위치(dp) */
   const notifyScroll = useCallback((offsetY?: number) => judgeRef.current.notifyScroll(Date.now(), offsetY), []);
 
+  /** [페이지 모드] 사용자가 페이지를 넘겼음. chars = 새 페이지 글자 수 (countReadingChars) */
+  const notifyPageTurn = useCallback(
+    (pageIndex: number, chars: number) => judgeRef.current.notifyPageTurn(Date.now(), pageIndex, chars),
+    [],
+  );
+  /** [페이지 모드] 화면이 페이지를 정했음 (처음 열기·이어 읽기·다시 나누기) — 넘김으로 세지 않음 */
+  const setCurrentPage = useCallback(
+    (pageIndex: number, chars: number) => judgeRef.current.setCurrentPage(pageIndex, chars),
+    [],
+  );
+  /** [페이지 모드] 읽기 속도 (개발 화면용) */
+  const getPageStats = useCallback(() => judgeRef.current.pageStats(Date.now()), []);
+
   return {
     /** <Camera outputs={[photoOutput]} /> 에 넣기 */
     photoOutput,
@@ -126,5 +152,8 @@ export function useGazeFocusTracker({ enabled, onFrame, calibrating = false, deb
     subscribe,
     setCalibration,
     notifyScroll,
+    notifyPageTurn,
+    setCurrentPage,
+    getPageStats,
   };
 }
