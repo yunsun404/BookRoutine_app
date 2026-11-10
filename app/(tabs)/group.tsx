@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/tokens";
+import { useInputColors } from "@/hooks/useInputColors";
 import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -54,6 +55,7 @@ const sortOptionsFeed = [
 // ── 컴포넌트 ───────────────────────────────────────────────────────
 export default function GroupScreen() {
   const router = useRouter();
+  const ic = useInputColors(); // 입력창 글자·placeholder 색 (다크 모드에서도 보이게)
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
@@ -255,15 +257,6 @@ export default function GroupScreen() {
   };
 
 
-  // 독서방 화면으로 이동하면서 데이터(방 이름) 전달
-  const handleEnterRoom = () => {
-    if (!selectedGroup) return;
-    router.push({
-      pathname: "/reading-room",
-      params: { roomId: selectedGroup.id, roomName: selectedGroup.name },
-    });
-  };
-
   return (
     <View style={styles.container}>
       <Header />
@@ -448,7 +441,8 @@ export default function GroupScreen() {
             </Text>
 
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, { color: ic.text }]}
+              placeholderTextColor={ic.placeholder}
               placeholder={
                 modalType === "create" ? "그룹 이름" : "초대 코드"
               }
@@ -460,7 +454,8 @@ export default function GroupScreen() {
             />
             {/* {modalType === "create" && (
               <TextInput
-                style={styles.modalInput}
+                style={[styles.modalInput, { color: ic.text }]}
+                placeholderTextColor={ic.placeholder}
                 placeholder="목표 도서 (선택)"
                 value={bookTitle}
                 onChangeText={setBookTitle}
@@ -469,7 +464,8 @@ export default function GroupScreen() {
             {modalType === "create" && (
               <View>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { color: ic.text }]}
+                placeholderTextColor={ic.placeholder}
                   placeholder="목표 도서 (필수)"
                   value={searchTitle}
                   onChangeText={handleSearch}
@@ -498,7 +494,8 @@ export default function GroupScreen() {
             )}
             {modalType === "create" && (
               <TextInput
-                style={styles.modalInput}
+                style={[styles.modalInput, { color: ic.text }]}
+                placeholderTextColor={ic.placeholder}
                 placeholder="최대 인원 (선택)"
                 keyboardType="number-pad"
                 value={maxPeople !== undefined ? String(maxPeople) : ""}

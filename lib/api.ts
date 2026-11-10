@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getAccessToken, isAuthEndpoint, sendWithAuth } from "./auth/session";
 
 // EXPO_PUBLIC_API_BASE_URL(.env)이 있으면 그걸 쓰고, 없으면 로컬호스트로 폴백
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
@@ -6,43 +6,46 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
   : "http://localhost:3000/api/v1";
 
 // 기본 요청 함수
+// 저장된 access 토큰을 Authorization 헤더로 붙임. 401(토큰 만료)이면 갱신 후 1번 다시 보내고,
+// 갱신도 안 되면 세션 만료 처리(로그인 화면으로) — lib/auth/session.ts
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = await AsyncStorage.getItem("access_token");
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   // 서버 IP가 바뀌었거나 서버가 꺼져 있으면 fetch는 수십 초~무한히 응답을 기다립니다.
   // 10초가 지나면 요청을 끊고 에러를 던져서 "무한 로딩" 대신 원인을 보여주게 합니다.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-
-  let response: Response;
-  try {
-    response = await fetch(`${BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-      signal: controller.signal,
-    });
-  } catch (e: any) {
-    if (e?.name === "AbortError") {
-      throw new Error(
-        `서버 응답이 없어요 (${BASE_URL}). 서버 실행 여부와 IP 주소를 확인해주세요.`,
-      );
+  const send = async (token: string | null) => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
-    throw new Error(`서버에 연결할 수 없어요 (${BASE_URL}).`);
-  } finally {
-    clearTimeout(timer);
-  }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      return await fetch(`${BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        throw new Error(
+          `서버 응답이 없어요 (${BASE_URL}). 서버 실행 여부와 IP 주소를 확인해주세요.`,
+        );
+      }
+      throw new Error(`서버에 연결할 수 없어요 (${BASE_URL}).`);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const response = isAuthEndpoint(endpoint)
+    ? await send(await getAccessToken())
+    : await sendWithAuth(send);
   console.log("요청 주소:", `${BASE_URL}${endpoint}`);
   console.log("요청 body:", options.body);
 
@@ -85,18 +88,18 @@ export const authApi = {
       body: JSON.stringify(body),
     }),
 
-  // 토큰 갱신
-  refresh: (refresh_token: string) =>
+  // 토큰 갱신 (백엔드는 { refreshToken } 이름으로 받음. 401 자동 갱신은 lib/auth/session.ts)
+  refresh: (refreshToken: string) =>
     request<{ access_token: string }>("/auth/refresh", {
       method: "POST",
-      body: JSON.stringify({ refresh_token }),
+      body: JSON.stringify({ refreshToken }),
     }),
 
-  // 로그아웃
-  logout: (body: { refresh_token: string }) =>
+  // 로그아웃 (백엔드는 { refreshToken } 이름으로 받음 → 서버에 저장된 refresh 토큰 삭제)
+  logout: (refreshToken: string) =>
     request<{ success: boolean }>("/auth/logout", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ refreshToken }),
     }),
 
   // 탈퇴
@@ -112,7 +115,7 @@ export const authApi = {
 // ────────────────────────────────────────
 
 export const userApi = {
-  // 내 프로필 조회 (최신 확장 데이터 타입 반영)
+  // 내 프로필 조회 (최신 확장 데이터 타입 반영) — 토큰은 request() 가 붙임
   getMe: () =>
     request<{
       user_id: string;
@@ -349,10 +352,6 @@ export const groupApi = {
       }[]
     >(`/groups/${group_id}/threads`),
 
-  // 독서방 활성 여부
-  getReadingRoomStatus: (group_id: string) =>
-    request<{ is_active: boolean }>(`/groups/${group_id}/realtime-status`),
-
   // 그룹 편집
   updateGroup: (
     group_id: string,
@@ -386,75 +385,6 @@ export const groupApi = {
   deleteGroup: (group_id: string) =>
     request<{}>(`/groups/${group_id}`, {
       method: "DELETE",
-    }),
-};
-
-// ────────────────────────────────────────
-// 실시간 독서방 (reading-room)
-// ────────────────────────────────────────
-
-export const readingroomApi = {
-  // 독서방 생성
-  start: (body: {
-    user_id: string;
-    group_id: string;
-    book_id: string;
-    started_by: string;
-    is_active: boolean;
-    started_at: Date;
-  }) =>
-    request<{
-      create: {
-        user_id: string;
-        group_id: string;
-        book_id: string;
-        started_by: string;
-        is_active: boolean;
-        started_at: Date;
-        room_id: string;
-      };
-      enter: { user_id: string; room_id: string; entered_at: Date };
-    }>("/reading-room/start", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
-  // 독서방 입장 알림
-  enter: (body: { group_id: string; user_id: string }) =>
-    request<{ success: boolean }>("/reading-room/enter", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
-  // 현재 독서방 참여자 조회
-  getUsers: (room_id: string, date: string) =>
-    request<{ users: object[] }>(
-      `/reading-room/users?room_id=${room_id}&date=${date}`,
-    ),
-
-  // 집중도 측정 결과 저장
-  saveFocus: (body: {
-    room_id: string;
-    user_id: string;
-    focus_score: number;
-  }) =>
-    request<{ success: boolean }>("/reading-room/focus", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
-  // 딴짓 알림
-  sendStatus: (body: { group_id: string; user_id: string; status: string }) =>
-    request<{ user_id: string }>("/reading-room/status", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
-  // 독서 활동 로그 조회
-  getLogs: (body: { room_id: string; date: string }) =>
-    request<{ logs: object[] }>("/reading-room/logs", {
-      method: "POST",
-      body: JSON.stringify(body),
     }),
 };
 

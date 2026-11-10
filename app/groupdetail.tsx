@@ -1,7 +1,5 @@
 import Header from "@/components/Header";
 import { groupApi } from "@/lib/api";
-import { startReadingRoom } from "@/lib/api/reading-room";
-import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -49,7 +47,6 @@ interface GroupDetail {
 
 export default function GroupDetailScreen() {
     const router = useRouter();
-    const { user } = useAuthStore();
     const { group_id } = useLocalSearchParams<{ group_id: string }>();
 
     const [group, setGroup] = useState<GroupDetail>();
@@ -113,23 +110,6 @@ export default function GroupDetailScreen() {
                 <Text style={styles.headerTitle} numberOfLines={1}>
                     {group?.group_name ?? ""}
                 </Text>
-                <TouchableOpacity
-                    style={styles.enterBtn}
-                    onPress={async () => {
-                        if (!group) return;
-                        try {
-                            const result = await startReadingRoom(group.group_id, group.group_name);
-                            const myNickname = user?.nickname ?? "익명";
-                            router.push(
-                                `/reading-room?room_id=${result.create.room_id}&room_name=${group.group_name}&username=${myNickname}`
-                            );
-                        } catch (error) {
-                            console.log("독서방 시작 에러:", error);
-                        }
-                    }}
-                >
-                    <Ionicons name="camera-outline" size={20} color="#6C63FF" />
-                </TouchableOpacity>
             </View>
 
             <ScrollView>
@@ -313,19 +293,6 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: "700",
         color: "#111",
-    },
-    enterBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: "#E8E6F8",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    enterBtnText: {
-        fontSize: 13,
-        color: "#fff",
-        fontWeight: "600",
     },
 
     // 그룹 정보 카드

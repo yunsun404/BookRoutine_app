@@ -1,5 +1,6 @@
 import { gaugeColor } from "@/components/home/BookCarousel";
 import { authFetch, BASE_URL } from "@/constants/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -63,7 +64,8 @@ export default function StatsScreen() {
   const [tabType, setTabType] = useState<"weekly" | "monthly">("weekly");
   const [picker, setPicker] = useState<null | "month" | "year">(null);
 
-  const myNickname = "hongildong";
+  // 로그인한 사용자 이름 (앱 시작 때 /users/me 로 채워짐)
+  const myNickname = useAuthStore((st) => st.user?.nickname) || "나";
 
   useEffect(() => {
     fetchStats();

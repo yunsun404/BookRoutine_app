@@ -1,4 +1,4 @@
-import { authFetch, BASE_URL } from "@/constants/api";
+import { authFetch, BASE_URL, getRefreshToken } from "@/constants/api";
 import { authApi } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,21 +42,19 @@ export default function Header() {
     // 로그아웃
     const { clearAuth } = useAuthStore();
 
-    const [refresh_token, setRefreshToken] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleLogout = async () => {
         try {
             setLoading(true);
-            // 1. 로그아웃 API 호출 (백엔드에 맞게 body 조정)
-            await authApi.logout({ refresh_token });
-            // 2. 로그인 상태 업데이트
-            clearAuth();
-            // 3. 로그인 화면으로 이동
-            router.replace('/');
+            // 1. 로그아웃 API 호출 — 저장된 refresh 토큰을 서버에서 지움 (실패해도 이 기기에서는 로그아웃)
+            await authApi.logout(await getRefreshToken());
         } catch (error) {
             console.error('로그아웃 오류:', error);
         } finally {
+            // 2. 로그인 상태·토큰 지우기  3. 로그인 화면으로 이동
+            await clearAuth();
+            router.replace('/');
             setLoading(false);
         }
     }

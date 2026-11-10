@@ -1,5 +1,6 @@
 // app/reading-goals/reading-plan.tsx
 import { authFetch, BASE_URL } from "@/constants/api";
+import { autoSelectReadingDays, DEFAULT_READING_DAYS } from "@/lib/goals/readingDays";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -65,7 +66,7 @@ export default function ReadingPlanScreen() {
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 3, 5]);
+  const [selectedDays, setSelectedDays] = useState<number[]>([...DEFAULT_READING_DAYS]); // 월·수·금
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingGoal, setLoadingGoal] = useState(isEdit);
@@ -129,7 +130,8 @@ export default function ReadingPlanScreen() {
     })();
   }, [goalId]);
 
-  // 시작일과 종료일이 모두 선택되면, 그 기간에 포함되는 요일 자동 선택
+  // 시작일과 종료일이 모두 선택되면 요일 자동 선택: 기본 월·수·금 중 그 기간에 있는 요일만
+  // (없으면 그 기간의 요일 전부) — lib/goals/readingDays.ts
   useEffect(() => {
     if (!startDate || !endDate) return;
     if (skipAutoDays.current) {
@@ -142,13 +144,7 @@ export default function ReadingPlanScreen() {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
     if (start > end) return;
 
-    const daySet = new Set<number>();
-    const current = new Date(start);
-    while (current <= end) {
-      daySet.add(current.getDay());
-      current.setDate(current.getDate() + 1);
-    }
-    setSelectedDays(Array.from(daySet));
+    setSelectedDays(autoSelectReadingDays(start, end));
   }, [startDate, endDate]);
 
   const readingDates = useMemo(() => {

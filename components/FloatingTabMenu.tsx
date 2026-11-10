@@ -32,7 +32,8 @@ const LEFT_TABS: Tab[] = [
   { key: "shelf", title: "책장", icon: "book-outline", iconActive: "book", route: "/bookshelf", match: ["bookshelf", "folder"] },
 ];
 const RIGHT_TABS: Tab[] = [
-  { key: "stats", title: "통계", icon: "stats-chart-outline", iconActive: "stats-chart", route: "/(tabs)/stats", match: ["stats"] },
+  // 통계는 '기타' 시트로 옮기고, 그 자리에 추천 (통계 ↔ 추천 위치 교환)
+  { key: "recommend", title: "추천", icon: "sparkles-outline", iconActive: "sparkles", route: "/(tabs)/recommend", match: ["recommend"] },
   // TODO: '내 서재' 전용 화면이 생기면 route를 그 경로로 바꾸면 됨
   { key: "my", title: "기타", icon: "person-outline", iconActive: "person", route: null, match: [] },
 ];
@@ -42,7 +43,7 @@ const MORE_ITEMS: { title: string; icon: IoniconsName; route: string }[] = [
   { title: "달력", icon: "calendar-outline", route: "/(tabs)/calendar" },
   { title: "랭킹", icon: "trophy-outline", route: "/ranking" },
   { title: "그룹", icon: "people-outline", route: "/(tabs)/group" },
-  { title: "추천", icon: "sparkles-outline", route: "/(tabs)/recommend" },
+  { title: "통계", icon: "stats-chart-outline", route: "/(tabs)/stats" },
   { title: "전자책", icon: "tablet-portrait-outline", route: "/ebook" },
 
 ];
