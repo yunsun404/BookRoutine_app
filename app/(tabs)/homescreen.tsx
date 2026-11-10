@@ -8,6 +8,7 @@ import {
   buildServerProgress,
   type ServerProgress,
 } from "@/lib/home/bookProgress";
+import { findBookshelfId } from "@/lib/bookshelf/findBookshelfId";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -261,11 +262,37 @@ export default function HomeScreen() {
 
   const isLastEmptyPage = bookGroups.length === 0 || currentIndex === booksForCarousel.length - 1;
 
-  const goThread = () =>
-    router.push({
-      pathname: "/thread",
-      params: { bookId: activeGroup.book_id, bookTitle: activeGroup.book_title },
+  // 타래 버튼 → 내 책장의 그 책 화면(/book/{bookshelf_id})에서 타래 쓰기·AI 요약
+  // 책장에서 못 찾거나 연결이 안 되면 기존 타래 화면(/thread)을 열 수 있게 물어봄 — lib/bookshelf/findBookshelfId.ts
+  const [openingBook, setOpeningBook] = useState(false);
+
+  const openOldThreadScreen = (bookId: string, bookTitle: string) =>
+    router.push({ pathname: "/thread", params: { bookId, bookTitle } });
+
+  const goThread = async () => {
+    const group = activeGroup;
+    if (!group || isLastEmptyPage || openingBook) return; // 읽는 책이 없거나 "책 등록하기" 칸이면 아무것도 안 함
+    setOpeningBook(true);
+    const result = await findBookshelfId(group.book_id, async (path) => {
+      const res = await authFetch(`${BASE_URL}${path}`);
+      if (!res.ok) throw new Error(`${path} ${res.status}`);
+      return res.json();
     });
+    setOpeningBook(false);
+
+    if (result.ok) {
+      router.push({ pathname: "/book/[bookshelf_id]", params: { bookshelf_id: result.bookshelfId } });
+      return;
+    }
+    Alert.alert(
+      result.reason === "network" ? "책장 정보를 불러오지 못했어요" : "내 책장에서 이 책을 찾지 못했어요",
+      "기존 타래 화면에서 타래를 쓸 수 있어요.",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "타래 화면 열기", onPress: () => openOldThreadScreen(group.book_id, group.book_title) },
+      ],
+    );
+  };
 
   if (loading) {
     return (

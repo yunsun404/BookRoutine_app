@@ -1,5 +1,5 @@
-import { authFetch, BASE_URL, getRefreshToken } from "@/constants/api";
-import { authApi } from "@/lib/api";
+import { authFetch, BASE_URL } from "@/constants/api";
+import { performLogout } from "@/lib/auth/logout";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,25 +39,8 @@ export default function Header() {
         }
     };
 
-    // 로그아웃
-    const { clearAuth } = useAuthStore();
-
-    const [loading, setLoading] = useState(false);
-
-    const handleLogout = async () => {
-        try {
-            setLoading(true);
-            // 1. 로그아웃 API 호출 — 저장된 refresh 토큰을 서버에서 지움 (실패해도 이 기기에서는 로그아웃)
-            await authApi.logout(await getRefreshToken());
-        } catch (error) {
-            console.error('로그아웃 오류:', error);
-        } finally {
-            // 2. 로그인 상태·토큰 지우기  3. 로그인 화면으로 이동
-            await clearAuth();
-            router.replace('/');
-            setLoading(false);
-        }
-    }
+    // 로그아웃 — lib/auth/logout.ts (설정 화면·로그아웃 화면과 같은 코드)
+    const handleLogout = () => performLogout();
 
     return (
         <>
@@ -122,6 +105,16 @@ export default function Header() {
                             }}
                         >
                             <Text style={styles.menuItemText}>랭킹 보기</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/settings");
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>설정</Text>
                         </TouchableOpacity>
 
                         <View style={styles.menuDivider} />

@@ -1,5 +1,8 @@
 import { authFetch, BASE_URL } from "@/constants/api";
 import { P } from "@/constants/palette";
+import { useInputColors } from "@/hooks/useInputColors";
+import { isAiSummary, stripAiMarker, validateThreadInput } from "@/lib/threads/aiSummary";
+import { createAiSummary, createThread } from "@/lib/threads/threadActions";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -7,10 +10,14 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -82,6 +89,15 @@ export default function BookDetailScreen() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [deleting, setDeleting] = useState(false);
 
+  // 타래 쓰기 · AI 요약 (홈의 타래 버튼으로 들어오면 여기서 함) — lib/threads/*
+  const ic = useInputColors();
+  const [composeVisible, setComposeVisible] = useState(false);
+  const [page, setPage] = useState("");
+  const [content, setContent] = useState("");
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+
   useEffect(() => {
     fetchDetail();
   }, []);
@@ -115,6 +131,49 @@ export default function BookDetailScreen() {
     } catch (error) {
       console.error("타래 에러:", error);
     }
+  };
+
+  const openCompose = () => {
+    setPage("");
+    setContent("");
+    setFormError("");
+    setComposeVisible(true);
+  };
+
+  const closeCompose = () => {
+    if (saving) return;
+    setComposeVisible(false);
+  };
+
+  const submitThread = async () => {
+    if (!detail || saving) return;
+    const problem = validateThreadInput(page, content);
+    if (problem) {
+      setFormError(problem);
+      return;
+    }
+    setSaving(true);
+    const ok = await createThread(detail.book.book_id, parseInt(page.trim(), 10), content.trim());
+    setSaving(false);
+    if (!ok) {
+      setFormError("저장하지 못했어요. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    setComposeVisible(false);
+    await fetchThreads();
+  };
+
+  const handleSummary = async () => {
+    if (!detail || summarizing) return;
+    setSummarizing(true);
+    const result = await createAiSummary(detail.book.book_id, threads);
+    setSummarizing(false);
+    if (!result.ok) {
+      showError(result.message);
+      return;
+    }
+    await fetchThreads();
+    if (result.aiUnavailable) showError("AI 서버가 꺼져 있어 이전 요약을 보여드려요");
   };
 
   const handleDelete = async () => {
@@ -216,23 +275,99 @@ export default function BookDetailScreen() {
         {/* 타래 목록 */}
         <View style={styles.threadSection}>
           <Text style={styles.threadTitle}>타래</Text>
+
+          {/* 타래 쓰기 · AI 요약 */}
+          <View style={styles.actionRow}>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, styles.actionPrimary, pressed && styles.pressed]}
+              onPress={openCompose}
+              accessibilityLabel="타래 쓰기"
+            >
+              <Ionicons name="create-outline" size={16} color={P.onPrimary} />
+              <Text style={styles.actionPrimaryText}>타래 쓰기</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, styles.actionSecondary, pressed && styles.pressed]}
+              onPress={handleSummary}
+              disabled={summarizing}
+              accessibilityLabel="AI 요약하기"
+            >
+              {summarizing ? (
+                <ActivityIndicator size="small" color={P.primary} />
+              ) : (
+                <Ionicons name="sparkles-outline" size={16} color={P.primary} />
+              )}
+              <Text style={styles.actionSecondaryText}>{summarizing ? "요약하는 중" : "AI 요약하기"}</Text>
+            </Pressable>
+          </View>
+
           {threads.length === 0 ? (
             <Text style={styles.threadEmpty}>아직 기록이 없습니다.</Text>
           ) : (
-            threads.map((item) => (
-              <View key={item.thread_id} style={styles.threadCard}>
-                <View style={styles.threadCardTop}>
-                  <Text style={styles.threadPage}>{item.current_page} pg</Text>
-                  <Text style={styles.threadDate}>
-                    {item.created_at?.slice(0, 10)}
-                  </Text>
+            threads.map((item) => {
+              const ai = isAiSummary(item.content);
+              return (
+                <View key={item.thread_id} style={[styles.threadCard, ai && styles.aiCard]}>
+                  <View style={styles.threadCardTop}>
+                    {ai ? (
+                      <Text style={styles.aiChip}>AI 요약</Text>
+                    ) : (
+                      <Text style={styles.threadPage}>{item.current_page} pg</Text>
+                    )}
+                    <Text style={styles.threadDate}>
+                      {item.created_at?.slice(0, 10)}
+                    </Text>
+                  </View>
+                  <Text style={styles.threadContent}>{ai ? stripAiMarker(item.content) : item.content}</Text>
                 </View>
-                <Text style={styles.threadContent}>{item.content}</Text>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>
+
+      {/* 타래 쓰기 창 — 키보드가 입력칸을 가리지 않게 KeyboardAvoidingView
+          (SDK 54 안드로이드는 화면 끝까지 그리는 방식이라 팝업 창이 저절로 밀려 올라가지 않음 → 양쪽 모두 padding) */}
+      <Modal transparent visible={composeVisible} animationType="fade" onRequestClose={closeCompose}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalBackdrop}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>타래 쓰기</Text>
+            <Text style={styles.modalLabel}>쪽수</Text>
+            <TextInput
+              style={[styles.modalInput, { color: ic.text }]}
+              placeholderTextColor={ic.placeholder}
+              placeholder="예: 42"
+              keyboardType="number-pad"
+              value={page}
+              onChangeText={setPage}
+              maxLength={6}
+            />
+            <Text style={styles.modalLabel}>내용</Text>
+            <TextInput
+              style={[styles.modalInput, styles.modalTextArea, { color: ic.text }]}
+              placeholderTextColor={ic.placeholder}
+              placeholder="인상 깊었던 문장이나 생각을 남겨보세요"
+              value={content}
+              onChangeText={setContent}
+              multiline
+              textAlignVertical="top"
+            />
+            {!!formError && <Text style={styles.formError}>{formError}</Text>}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancel} onPress={closeCompose} disabled={saving}>
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={submitThread} disabled={saving}>
+                {saving ? (
+                  <ActivityIndicator size="small" color={P.onPrimary} />
+                ) : (
+                  <Text style={styles.modalConfirmText}>남기기</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -369,4 +504,60 @@ const styles = StyleSheet.create({
     color: P.ink,
     lineHeight: 20,
   },
+  actionRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 42,
+    borderRadius: 12,
+  },
+  actionPrimary: { backgroundColor: P.primary },
+  actionPrimaryText: { color: P.onPrimary, fontSize: 14, fontWeight: "700" },
+  actionSecondary: { backgroundColor: P.primaryTint },
+  actionSecondaryText: { color: P.primary, fontSize: 14, fontWeight: "700" },
+  pressed: { opacity: 0.85 },
+  aiCard: { backgroundColor: P.lavenderTint },
+  aiChip: { fontSize: 12, fontWeight: "700", color: P.primaryLight },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(31,34,51,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalBox: { backgroundColor: P.surface, borderRadius: 20, padding: 20 },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: P.ink, marginBottom: 12 },
+  modalLabel: { fontSize: 13, fontWeight: "600", color: P.textSecondary, marginBottom: 6, marginTop: 8 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: P.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: P.surface,
+  },
+  modalTextArea: { minHeight: 110, maxHeight: 200 },
+  formError: { color: P.danger, fontSize: 12, marginTop: 8 },
+  modalButtons: { flexDirection: "row", gap: 8, marginTop: 16 },
+  modalCancel: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: P.bg,
+  },
+  modalCancelText: { color: P.textSecondary, fontSize: 15, fontWeight: "600" },
+  modalConfirm: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: P.primary,
+  },
+  modalConfirmText: { color: P.onPrimary, fontSize: 15, fontWeight: "700" },
 });

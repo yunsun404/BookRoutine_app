@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Text,
   TextInput,
@@ -303,8 +304,10 @@ export default function BookshelfScreen() {
       )}
 
       {/* 폴더 생성 모달 */}
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        {/* 키보드가 올라오면 창을 키보드 위로 밀어 올림 (예전엔 키보드가 폴더 이름 입력칸을 가렸음)
+            SDK 54 안드로이드는 팝업 창이 저절로 밀려 올라가지 않아서 양쪽 모두 padding */}
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>폴더 표지</Text>
             {/* 표지 미리보기를 누르면 CoverPickerModal이 열립니다. 표지 값 자체는
@@ -349,7 +352,7 @@ export default function BookshelfScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <CoverPickerModal
