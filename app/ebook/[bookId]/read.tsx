@@ -12,7 +12,7 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, type CameraRef, useCameraPermission } from 'react-native-vision-camera';
@@ -22,11 +22,18 @@ import {
   GazeCalibrationOverlay,
 } from '../../../components/gaze/GazeCalibrationOverlay';
 import { FocusTimeline } from '../../../components/reading/FocusTimeline';
+import { type PageInfo, PagedReader } from '../../../components/reading/PagedReader';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
 import { useGazeFocusTracker } from '../../../hooks/useGazeFocusTracker';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
 import { goldenStatus, type GoldenStatus } from '../../../lib/focus/goldenTime';
+import { FOCUS_JUDGE_POLICY, type PageStats, type ReaderMode } from '../../../lib/gaze/focusJudge';
 import { GAZE_CONFIG } from '../../../lib/gaze/gazeConfig';
+import { countReadingChars } from '../../../lib/reader/charCount';
+import { prepareContent } from '../../../lib/reader/normalizeContent';
+import type { Page } from '../../../lib/reader/paginate';
+import { READER_CONFIG } from '../../../lib/reader/readerConfig';
+import { loadReadingPosition, saveReadingPosition } from '../../../lib/reader/readingPositionStore';
 import { ReadingSession } from '../../../lib/types/ebook';
 
 const SEND_INTERVAL_MS = 30000;
@@ -63,6 +70,8 @@ const formatElapsed = (sec: number) => {
 };
 const hhmm = (ms: number) => new Date(ms).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 const mmss = (ms: number) => formatElapsed(Math.floor(ms / 1000));
+/** 개발 패널: 읽기 속도 표시 */
+const cpsText = (v: number | null) => (v == null ? '-' : Number.isFinite(v) ? v.toFixed(1) : '∞');
 
 /** 실시간 표시용 통계 */
 interface LiveStats {
@@ -84,7 +93,12 @@ export default function EbookReadingScreen() {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [stats, setStats] = useState<LiveStats | null>(null);
-  const [progress, setProgress] = useState(0); // 스크롤 진행률 0~1
+  const [progress, setProgress] = useState(0); // 진행률 0~1 (스크롤 비율 / 페이지 모드: 페이지 첫 글자 ÷ 전체 글자)
+
+  // [읽기 방식] 페이지 나누기가 실패하면 이 세션은 스크롤 모드로
+  const [mode, setMode] = useState<ReaderMode>(READER_CONFIG.MODE);
+  const [initialChar, setInitialChar] = useState(0); // 페이지 모드: 이어 읽을 글자 위치
+  const [pageDebug, setPageDebug] = useState<PageStats | null>(null); // 개발 패널
 
   const { pushFrame, flushCurrentBucket, drainCompletedBuckets, requeueBuckets, getStats } = useFocusBucketRecorder();
   const sendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -108,7 +122,16 @@ export default function EbookReadingScreen() {
     subscribe,
     setCalibration,
     notifyScroll,
-  } = useGazeFocusTracker({ enabled: tracking, onFrame: pushFrame, calibrating: showCalibration, cameraRef });
+    notifyPageTurn,
+    setCurrentPage,
+    getPageStats,
+  } = useGazeFocusTracker({
+    enabled: tracking,
+    onFrame: pushFrame,
+    calibrating: showCalibration,
+    cameraRef,
+    readerMode: mode,
+  });
 
   // 독서 중간에 다시 보정하면: 그때까지의 버킷을 마무리 (보정 시간이 "자리 비움"으로 쌓이지 않게)
   useEffect(() => {
@@ -148,9 +171,13 @@ export default function EbookReadingScreen() {
           startReadingSession(bookId),
           fetchBookDetail(bookId),
         ]);
+        // 본문 찌꺼기 정리 (&#8203;, 끝의 저작권 틀 등) — 스크롤·페이지 모드 공통
+        // 정리 후 공백만 남으면(빈 본문) 안내 문구
+        const text = prepareContent(bookDetail.content);
+        if (READER_CONFIG.MODE === 'page') setInitialChar(await loadReadingPosition(bookId, text.length));
         setSession(sessionRes);
-        setContent(bookDetail.content ?? '원문을 불러오지 못했습니다.');
-      } catch (e) {
+        setContent(text);
+      } catch {
         setError('읽기 세션을 시작하지 못했어요. 백엔드 서버가 켜져 있는지 확인해주세요.');
       } finally {
         setLoading(false);
@@ -203,9 +230,24 @@ export default function EbookReadingScreen() {
         setToast(`골든타임 달성! ${hhmm(golden.best.start)}부터 5분 넘게 집중했어요`);
         setTimeout(() => setToast(null), 5000);
       }
+      if (READER_CONFIG.SHOW_PAGE_DEBUG && mode === 'page') setPageDebug(getPageStats());
     }, 1000);
     return () => clearInterval(t);
-  }, [session, showCalibration, getStats]);
+  }, [session, showCalibration, getStats, mode, getPageStats]);
+
+  /* ─────────── 페이지 모드 ─────────── */
+  // 페이지가 바뀜: 판정기에 알림(넘김 / 화면이 정함) + 진행률 + 읽던 위치 저장
+  const handlePage = useCallback(
+    (index: number, page: Page, info: PageInfo) => {
+      const chars = countReadingChars(content.slice(page.startChar, page.endChar));
+      if (info.isTurn) notifyPageTurn(index, chars);
+      else setCurrentPage(index, chars);
+      setProgress(info.isLast ? 1 : content.length > 0 ? page.startChar / content.length : 0);
+      saveReadingPosition(bookId, page.startChar, content.length);
+    },
+    [content, bookId, notifyPageTurn, setCurrentPage],
+  );
+  const handlePageFallback = useCallback(() => setMode('scroll'), []);
 
   const goResult = (sessionId: string) => {
     setConfirmVisible(false);
@@ -300,7 +342,20 @@ export default function EbookReadingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 본문 (터치하면 위·아래 바 보이기/숨기기) */}
+      {/* 본문 — 페이지 모드: 좌우로 넘김 (끝 탭 = 넘김, 가운데 탭 = 바) / 스크롤 모드: 터치하면 위·아래 바 */}
+      {mode === 'page' ? (
+        <PagedReader
+          content={content}
+          title={title}
+          textStyle={styles.content}
+          titleStyle={styles.bookTitle}
+          backgroundColor={C.bg}
+          initialCharIndex={initialChar}
+          onPage={handlePage}
+          onTapCenter={() => showBars(!barsVisible)}
+          onFallback={handlePageFallback}
+        />
+      ) : (
       <ScrollView
         style={styles.textArea}
         contentContainerStyle={styles.textContent}
@@ -318,9 +373,29 @@ export default function EbookReadingScreen() {
           <Text style={styles.content}>{content}</Text>
         </Pressable>
       </ScrollView>
+      )}
 
       {!showCalibration && (
       <>
+      {/* [개발] 페이지 모드 읽기 속도·판정 — 직접 읽으면서 기준값 맞추기용 */}
+      {READER_CONFIG.SHOW_PAGE_DEBUG && mode === 'page' && pageDebug && (
+        <View style={styles.debugPanel} pointerEvents="none">
+          <Text style={styles.debugText}>
+            {pageDebug.pageIndex != null ? `${pageDebug.pageIndex + 1}쪽` : '-'} · 지금 쪽 {cpsText(pageDebug.currentCps)}자/초
+          </Text>
+          <Text style={styles.debugText}>
+            최근 {pageDebug.pages}쪽 평균 {cpsText(pageDebug.recentAvgCps)} · 판정용 {cpsText(pageDebug.judgeCps)}자/초
+          </Text>
+          <Text style={styles.debugText}>
+            기준 {FOCUS_JUDGE_POLICY.PAGE_SKIM_MAX_CHARS_PER_SEC}자/초 · {pageDebug.pages}/{FOCUS_JUDGE_POLICY.PAGE_SKIM_PAGES}쪽 ·{' '}
+            {pageDebug.recentChars}/{FOCUS_JUDGE_POLICY.PAGE_SKIM_MIN_CHARS}자
+          </Text>
+          <Text style={styles.debugText}>
+            판정: {focus ? `${focus.state}${focus.detail ? `/${focus.detail}` : ''} · ${focus.reason}` : '-'}
+          </Text>
+        </View>
+      )}
+
       {/* 상태 칩 — 바가 숨겨져 있어도 항상 보임 (누르면 다시 보정) */}
       <Pressable
         style={[styles.focusChip, { top: barsVisible ? 68 : 12 }]}
@@ -482,6 +557,19 @@ const styles = StyleSheet.create({
   tapArea: { flexGrow: 1 }, // 글이 짧아도 화면 어디를 눌러도 바가 토글되도록
   bookTitle: { fontSize: 24, fontWeight: '800', color: C.ink, letterSpacing: -0.6, marginBottom: 24 },
   content: { fontSize: 17, lineHeight: 31, color: C.ink },
+
+  /* [개발] 페이지 모드 패널 */
+  debugPanel: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 140,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(31,34,51,0.78)',
+    gap: 2,
+  },
+  debugText: { fontSize: 11, fontWeight: '600', color: '#fff', fontVariant: ['tabular-nums'] },
 
   /* 상태 칩 (항상 보임) */
   focusChip: {

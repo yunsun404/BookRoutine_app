@@ -17,6 +17,12 @@
  *                                                  → unfocused  (멍때림, detail='staring')
  *   7. 나머지                                       → focused
  *
+ * 페이지 모드 (setReaderMode('page'), 좌우로 넘기는 전자책 화면) 에서는 4·6번만 바뀜
+ *   4. 최근 3페이지의 읽기 속도(글자/초)가 기준보다 빠름 → 훑어보기
+ *        속도 = 3페이지 글자 합 ÷ (3페이지에 머문 시간 + 지금 페이지에 머문 시간)
+ *        → 빠르게 넘긴 뒤 한 페이지를 천천히 읽으면 저절로 풀림
+ *   6. "최근 스크롤 없음" 대신 "최근 페이지 넘김 없음" (창 15초, PAGE_STARE_ENABLED 로 끌 수 있음)
+ *
  * 한계: 시선이 화면 안에 있고 적당한 속도로 스크롤하면 "읽는 중"으로 봄 (내용 이해 여부는 측정하지 않음)
  * 멍때림·훑어보기는 백엔드로 보낼 때 unfocused 에 포함 (detail 은 앱 안에서만 사용 → 나중에 따로 보내도록 확장 가능)
  */
@@ -58,9 +64,45 @@ export const FOCUS_JUDGE_POLICY = {
   SMOOTH_WINDOW: 3,
   /** 기준값 적응 속도 (0이면 고정) */
   BASELINE_ADAPT: 0.02,
+
+  /* ── 페이지 모드 전용 (스크롤 모드는 위 값 그대로) ── */
+  /** 훑어보기: 최근 이 페이지 수로 읽기 속도 계산 */
+  PAGE_SKIM_PAGES: 3,
+  /**
+   * 이 속도(글자/초, 공백 제외)보다 빠르면 훑어보기.
+   * 한국어 묵독: 보통 초당 8~12자, 빠른 독자 15~17자 → 25자/초는 빠른 독자보다도 빠름
+   */
+  PAGE_SKIM_MAX_CHARS_PER_SEC: 25,
+  /** 최근 페이지 글자 합이 이보다 적으면 판단하지 않음 (짧은 페이지 몇 장으로 오판 방지) */
+  PAGE_SKIM_MIN_CHARS: 300,
+  /** 멍때림: 이 시간 동안 시선 정지 + 페이지 넘김 없음 */
+  PAGE_STARE_WINDOW_MS: 15_000,
+  /** false 면 페이지 모드에서 멍때림 판정을 하지 않음 */
+  PAGE_STARE_ENABLED: true,
 } as const;
 
-export type FocusJudgePolicy = { [K in keyof typeof FOCUS_JUDGE_POLICY]: number };
+export type FocusJudgePolicy = {
+  [K in keyof typeof FOCUS_JUDGE_POLICY]: (typeof FOCUS_JUDGE_POLICY)[K] extends boolean ? boolean : number;
+};
+
+/** 읽기 화면 방식: 'scroll' = 세로 스크롤, 'page' = 좌우로 넘기는 페이지 */
+export type ReaderMode = 'scroll' | 'page';
+
+/** 페이지 모드 읽기 속도 (개발 화면 표시용) */
+export interface PageStats {
+  /** 지금 페이지: 글자 수 ÷ 지금까지 머문 시간 (null = 아직 모름) */
+  currentCps: number | null;
+  /** 최근 넘긴 페이지들의 평균 (null = 넘긴 페이지 없음) */
+  recentAvgCps: number | null;
+  /** 판정에 쓰는 값: 최근 페이지 글자 합 ÷ (그 시간 + 지금 페이지 머문 시간) */
+  judgeCps: number | null;
+  /** 속도 계산에 들어간 페이지 수 (최대 PAGE_SKIM_PAGES) */
+  pages: number;
+  /** 그 페이지들의 글자 합 */
+  recentChars: number;
+  /** 지금 페이지 번호 (0부터, null = 모름) */
+  pageIndex: number | null;
+}
 
 /** 판정에 필요한 값 (useGazeSampler 의 GazeSample 이 그대로 들어감) */
 export interface JudgeInput {
@@ -119,6 +161,12 @@ export class FocusJudge {
   private screenTrail: { t: number; x: number; y: number }[] = [];
   private lastScrollAt = 0;
   private scrollTrail: { t: number; y: number }[] = [];
+  private mode: ReaderMode = 'scroll';
+  private lastPageTurnAt = 0;
+  /** 지금 보고 있는 페이지. enteredAt=null 이면 다음 판정부터 머문 시간을 셈 (보정 직후 등) */
+  private currentPage: { index: number; chars: number; enteredAt: number | null } | null = null;
+  /** 최근 앞으로 넘긴 페이지들 (최대 PAGE_SKIM_PAGES 개) */
+  private pageTrail: { chars: number; ms: number }[] = [];
 
   constructor(private readonly policy: FocusJudgePolicy = FOCUS_JUDGE_POLICY) {}
 
@@ -143,6 +191,69 @@ export class FocusJudge {
     this.lastState = null;
     this.screenTrail = [];
     this.scrollTrail = [];
+    // 보정 시간은 읽은 시간이 아님 → 페이지 기록을 비우고, 지금 페이지 머문 시간은 보정 뒤부터 다시 셈
+    this.pageTrail = [];
+    if (this.currentPage) this.currentPage.enteredAt = null;
+  }
+
+  /** 읽기 화면 방식 바꾸기. 바뀌면 페이지 기록을 비움 */
+  setReaderMode(mode: ReaderMode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.pageTrail = [];
+    this.currentPage = null;
+  }
+
+  get readerMode(): ReaderMode {
+    return this.mode;
+  }
+
+  /**
+   * [페이지 모드] 사용자가 페이지를 넘겼음 (멍때림·훑어보기 판단용)
+   * @param pageChars 새로 연 페이지의 글자 수 (공백 제외, countReadingChars)
+   * - 앞으로 넘김: 직전 페이지를 {글자 수, 머문 시간}으로 기록. 2쪽 이상 건너뛰면 사이 페이지는 직전 페이지 글자 수·0초
+   * - 뒤로 넘김: 속도 계산에서 뺌 (다시 읽기). "넘김 있음"만 기록
+   */
+  notifyPageTurn(t: number, pageIndex: number, pageChars: number) {
+    this.lastPageTurnAt = Math.max(this.lastPageTurnAt, t);
+    const cur = this.currentPage;
+    if (cur && cur.enteredAt != null && pageIndex > cur.index) {
+      this.pageTrail.push({ chars: cur.chars, ms: Math.max(0, t - cur.enteredAt) });
+      for (let k = cur.index + 1; k < pageIndex; k++) this.pageTrail.push({ chars: cur.chars, ms: 0 });
+      while (this.pageTrail.length > this.policy.PAGE_SKIM_PAGES) this.pageTrail.shift();
+    }
+    this.currentPage = { index: pageIndex, chars: pageChars, enteredAt: t };
+  }
+
+  /**
+   * [페이지 모드] 사용자가 넘긴 게 아니라 화면이 페이지를 정했음 (처음 열 때, 이어 읽기, 글자 크기 변경으로 다시 나눔)
+   * 넘김으로 세지 않고, 이미 머물던 시간은 유지
+   */
+  setCurrentPage(pageIndex: number, pageChars: number) {
+    this.currentPage = { index: pageIndex, chars: pageChars, enteredAt: this.currentPage?.enteredAt ?? null };
+  }
+
+  /** [페이지 모드] 읽기 속도 (판정·개발 화면용) */
+  pageStats(now: number): PageStats {
+    const trail = this.pageTrail;
+    const chars = trail.reduce((a, p) => a + p.chars, 0);
+    const ms = trail.reduce((a, p) => a + p.ms, 0);
+    const cur = this.currentPage;
+    const dwell = cur?.enteredAt != null ? Math.max(0, now - cur.enteredAt) : 0;
+    const cps = (c: number, m: number) => (m > 0 ? c / (m / 1000) : c > 0 ? Infinity : 0);
+    return {
+      currentCps: cur && dwell > 0 ? cps(cur.chars, dwell) : null,
+      recentAvgCps: trail.length ? cps(chars, ms) : null,
+      judgeCps: trail.length ? cps(chars, ms + dwell) : null,
+      pages: trail.length,
+      recentChars: chars,
+      pageIndex: cur?.index ?? null,
+    };
+  }
+
+  /** 멍때림 판단 창 길이 (모드별) */
+  private get stareWindowMs(): number {
+    return this.mode === 'page' ? this.policy.PAGE_STARE_WINDOW_MS : this.policy.STARE_WINDOW_MS;
   }
 
   /** 사용자가 스크롤했음 (멍때림·훑어보기 판단용). y = 스크롤 위치(dp) */
@@ -172,12 +283,14 @@ export class FocusJudge {
   }
 
   judge(s: JudgeInput): JudgeResult {
+    // 보정 직후: 지금 페이지 머문 시간을 이 판정부터 셈
+    if (this.currentPage && this.currentPage.enteredAt == null) this.currentPage.enteredAt = s.timestamp;
     if (this.phase === 'calibrating') return this.autoCalibrate(s);
 
     const screenGaze = this.cal?.map && s.gaze ? this.cal.map(s.gaze) : undefined;
     if (screenGaze) {
       this.screenTrail.push({ t: s.timestamp, ...screenGaze });
-      const from = s.timestamp - this.policy.STARE_WINDOW_MS;
+      const from = s.timestamp - this.stareWindowMs;
       while (this.screenTrail.length && this.screenTrail[0].t < from) this.screenTrail.shift();
     }
 
@@ -257,10 +370,23 @@ export class FocusJudge {
       return { raw: 'unfocused', detail: 'head', reason: `고개 상하 ${(s.pitch - b.pitch).toFixed(0)}°` };
     }
 
-    // 훑어보기: 읽을 수 없을 만큼 빠르게 스크롤
-    const speed = this.scrollSpeed(s.timestamp);
-    if (speed > p.SKIM_MAX_DP_PER_SEC) {
-      return { raw: 'unfocused', detail: 'skimming', reason: `훑어보기 (${speed.toFixed(0)}dp/초)` };
+    if (this.mode === 'page') {
+      // 훑어보기 (페이지 모드): 최근 페이지들을 읽을 수 없을 만큼 빠르게 넘김
+      const ps = this.pageStats(s.timestamp);
+      if (
+        ps.pages >= p.PAGE_SKIM_PAGES &&
+        ps.recentChars >= p.PAGE_SKIM_MIN_CHARS &&
+        ps.judgeCps != null &&
+        ps.judgeCps > p.PAGE_SKIM_MAX_CHARS_PER_SEC
+      ) {
+        return { raw: 'unfocused', detail: 'skimming', reason: `훑어보기 (${ps.judgeCps.toFixed(0)}자/초)` };
+      }
+    } else {
+      // 훑어보기: 읽을 수 없을 만큼 빠르게 스크롤
+      const speed = this.scrollSpeed(s.timestamp);
+      if (speed > p.SKIM_MAX_DP_PER_SEC) {
+        return { raw: 'unfocused', detail: 'skimming', reason: `훑어보기 (${speed.toFixed(0)}dp/초)` };
+      }
     }
 
     // ① 영역 — (가) 보정 시: 화면 안/밖
@@ -284,14 +410,18 @@ export class FocusJudge {
     return { raw: 'focused', reason: '집중 (고개 기준)' };
   }
 
-  /** 최근 10초 동안 시선이 거의 안 움직였고, 스크롤도 없었는지 */
+  /** 최근 10초(페이지 모드 15초) 동안 시선이 거의 안 움직였고, 스크롤(페이지 넘김)도 없었는지 */
   private isStaring(now: number): boolean {
     const p = this.policy;
     const cal = this.cal!;
     const trail = this.screenTrail;
+    const page = this.mode === 'page';
+    if (page && !p.PAGE_STARE_ENABLED) return false;
+    const win = this.stareWindowMs;
+    const lastActivity = page ? this.lastPageTurnAt : this.lastScrollAt;
     if (trail.length < p.STARE_MIN_SAMPLES) return false;
-    if (now - trail[0].t < p.STARE_WINDOW_MS * 0.8) return false; // 창이 아직 다 안 참
-    if (now - this.lastScrollAt < p.STARE_WINDOW_MS) return false; // 그동안 스크롤함 → 읽는 중
+    if (now - trail[0].t < win * 0.8) return false; // 창이 아직 다 안 참
+    if (now - lastActivity < win) return false; // 그동안 스크롤함(페이지 넘김) → 읽는 중
 
     const mx = median(trail.map((q) => q.x));
     const my = median(trail.map((q) => q.y));
