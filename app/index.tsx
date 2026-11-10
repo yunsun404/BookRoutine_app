@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,6 +33,9 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  // 앱 시작 때 이미 로그인돼 있으면(_layout 에서 토큰 복원 완료) 바로 홈으로.
+  // 처음 그릴 때 값만 봄 → 이 화면에서 로그인하는 도중에는 아래 handleLogin 이 직접 이동함
+  const [alreadyLoggedIn] = useState(() => useAuthStore.getState().isLoggedIn);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -70,6 +73,10 @@ export default function LoginScreen() {
       setLoading(false);
     }
   };
+
+  if (alreadyLoggedIn) {
+    return <Redirect href="/(tabs)/homescreen" />;
+  }
 
   return (
     // 키보드가 올라오면 화면도 같이 올라가고, 스크롤로 아래 칸까지 볼 수 있게

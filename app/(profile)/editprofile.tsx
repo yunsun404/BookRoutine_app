@@ -1,3 +1,4 @@
+import { useInputColors } from "@/hooks/useInputColors";
 import { userApi } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "expo-router";
@@ -23,6 +24,7 @@ const ageOptions = ['10대', '20대', '30대', '40대', '50대 이상'];
 
 export default function EditProfileScreen() {
     const router = useRouter();
+    const ic = useInputColors(); // 입력창 글자·placeholder 색 (다크 모드에서도 보이게)
     const [loading, setLoading] = useState(false);
     const { updateUser } = useAuthStore();
     const [username, setUsername] = useState('');
@@ -121,7 +123,8 @@ export default function EditProfileScreen() {
                         style={styles.avatar}
                     />
                     <TextInput
-                        style={styles.nicknameInput}
+                        style={[styles.nicknameInput, { color: ic.text }]}
+                        placeholderTextColor={ic.placeholder}
                         placeholder="닉네임"
                         value={nickname}
                         onChangeText={setNickname}
@@ -130,6 +133,7 @@ export default function EditProfileScreen() {
                 </View>
                 <TextInput
                     style={styles.imageUrlInput}
+                    placeholderTextColor={ic.placeholder}
                     placeholder="프로필 이미지 URL"
                     value={profile_image}
                     onChangeText={setProfileImage}
@@ -142,7 +146,8 @@ export default function EditProfileScreen() {
                 <View style={styles.fieldRow}>
                     <Text style={styles.fieldLabel}>아이디</Text>
                     <TextInput
-                        style={styles.fieldInput}
+                        style={[styles.fieldInput, { color: ic.text }]}
+                        placeholderTextColor={ic.placeholder}
                         placeholder="아이디"
                         value={username}
                         onChangeText={setUsername}
@@ -152,7 +157,8 @@ export default function EditProfileScreen() {
                 <View style={styles.fieldRow}>
                     <Text style={styles.fieldLabel}>이메일</Text>
                     <TextInput
-                        style={styles.fieldInput}
+                        style={[styles.fieldInput, { color: ic.text }]}
+                        placeholderTextColor={ic.placeholder}
                         placeholder="이메일"
                         value={email}
                         onChangeText={setEmail}
@@ -163,7 +169,8 @@ export default function EditProfileScreen() {
                 <View style={styles.fieldRow}>
                     <Text style={styles.fieldLabel}>비밀번호</Text>
                     <TextInput
-                        style={styles.fieldInput}
+                        style={[styles.fieldInput, { color: ic.text }]}
+                        placeholderTextColor={ic.placeholder}
                         placeholder="비밀번호"
                         value={password}
                         onChangeText={setPassword}

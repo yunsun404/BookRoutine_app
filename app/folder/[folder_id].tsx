@@ -1,4 +1,5 @@
 import { authFetch, BASE_URL } from "@/constants/api";
+import { isCompletedShelf } from "@/lib/home/bookProgress";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -266,7 +267,8 @@ export default function FolderDetailScreen() {
               onLongPress={() => setEditMode(true)}
             >
               <View style={styles.card}>
-                {item.book.bookshelves?.[0]?.status === 1 && (
+                {/* 완독: status 1 또는 진행률 100% (서버가 아직 status 를 1로 안 바꿔서 진행률로도 판단) */}
+                {isCompletedShelf(item.book.bookshelves?.[0]) && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>완독</Text>
                   </View>

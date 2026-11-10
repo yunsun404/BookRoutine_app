@@ -1,4 +1,6 @@
 import { authFetch, BASE_URL } from "@/constants/api";
+import { useInputColors } from "@/hooks/useInputColors";
+import { isCompletedShelf } from "@/lib/home/bookProgress";
 import { P } from "@/constants/palette";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -8,6 +10,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Text,
   TextInput,
@@ -52,6 +55,7 @@ interface FolderItem {
 }
 
 export default function BookshelfScreen() {
+  const ic = useInputColors(); // 입력창 글자·placeholder 색 (다크 모드에서도 보이게)
   const [books, setBooks] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"bookshelf" | "badge">(
@@ -158,7 +162,8 @@ export default function BookshelfScreen() {
       onPress={() => router.push(`/book/${item.bookshelf_id}` as any)}
     >
       <View style={styles.card}>
-        {item.status === 1 && (
+        {/* 완독: status 1 또는 진행률 100% (서버가 아직 status 를 1로 안 바꿔서 진행률로도 판단) */}
+        {isCompletedShelf(item) && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>완독</Text>
           </View>
@@ -299,8 +304,10 @@ export default function BookshelfScreen() {
       )}
 
       {/* 폴더 생성 모달 */}
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        {/* 키보드가 올라오면 창을 키보드 위로 밀어 올림 (예전엔 키보드가 폴더 이름 입력칸을 가렸음)
+            SDK 54 안드로이드는 팝업 창이 저절로 밀려 올라가지 않아서 양쪽 모두 padding */}
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>폴더 표지</Text>
             {/* 표지 미리보기를 누르면 CoverPickerModal이 열립니다. 표지 값 자체는
@@ -324,7 +331,8 @@ export default function BookshelfScreen() {
 
             <Text style={styles.modalTitle}>폴더 이름</Text>
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, { color: ic.text }]}
+              placeholderTextColor={ic.placeholder}
               value={folderName}
               onChangeText={setFolderName}
               placeholder="폴더 이름 입력"
@@ -344,7 +352,7 @@ export default function BookshelfScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <CoverPickerModal

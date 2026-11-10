@@ -1,4 +1,5 @@
-import { getToken } from "@/constants/api"; // 추가
+import { setSessionExpiredHandler } from "@/lib/auth/session";
+import { useAuthStore } from "@/store/useAuthStore";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
@@ -7,7 +8,7 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { StyleSheet, useColorScheme, View } from "react-native";
@@ -26,11 +27,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (error) throw error;
   }, [error]);
+  // 토큰이 만료돼 갱신도 안 되면 (lib/auth/session.ts): 로그인 상태를 지우고 로그인 화면으로
+  useEffect(
+    () =>
+      setSessionExpiredHandler(() => {
+        useAuthStore.setState({ user: null, access_token: null, isLoggedIn: false });
+        router.replace("/");
+      }),
+    [],
+  );
+  // 저장된 토큰 복원이 끝난 뒤에 화면을 그림 (그동안 스플래시 유지)
   useEffect(() => {
     if (loaded) {
       (async () => {
         try {
-          await getToken();
+          await useAuthStore.getState().restoreToken();
         } catch (e) {
           console.error("초기화 실패:", e);
         } finally {

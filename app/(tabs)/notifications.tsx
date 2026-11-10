@@ -1,15 +1,19 @@
+import { P } from "@/constants/palette";
 import { notificationApi } from "@/lib/api";
-import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type NotificationItem = {
   notification_id: string;
@@ -78,15 +82,35 @@ export default function NotificationsScreen() {
     }
   };
 
+  // 위쪽 바: 뒤로 가기 + 제목 (전자책·독서 목표·타래 화면의 뒤로 가기와 같은 모양)
+  const header = (
+    <View style={styles.header}>
+      <Pressable
+        style={styles.backBtn}
+        onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/homescreen"))}
+        hitSlop={8}
+        accessibilityLabel="뒤로 가기"
+      >
+        <Ionicons name="chevron-back" size={22} color={P.ink} />
+      </Pressable>
+      <Text style={styles.headerTitle}>알림</Text>
+    </View>
+  );
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-      </View>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        {header}
+        <View style={styles.center}>
+          <ActivityIndicator />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView style={styles.screen} edges={["top"]}>
+    {header}
     <FlatList
       style={styles.container}
       data={notifications}
@@ -123,10 +147,27 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       )}
     />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#fff" },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: P.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#4B55C8",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: P.ink, letterSpacing: -0.4 },
   container: { flex: 1, backgroundColor: "#fff" },
   center: {
     flex: 1,

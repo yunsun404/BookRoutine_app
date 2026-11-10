@@ -1,5 +1,5 @@
 import { authFetch, BASE_URL } from "@/constants/api";
-import { authApi } from "@/lib/api";
+import { performLogout } from "@/lib/auth/logout";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,27 +39,8 @@ export default function Header() {
         }
     };
 
-    // 로그아웃
-    const { clearAuth } = useAuthStore();
-
-    const [refresh_token, setRefreshToken] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const handleLogout = async () => {
-        try {
-            setLoading(true);
-            // 1. 로그아웃 API 호출 (백엔드에 맞게 body 조정)
-            await authApi.logout({ refresh_token });
-            // 2. 로그인 상태 업데이트
-            clearAuth();
-            // 3. 로그인 화면으로 이동
-            router.replace('/');
-        } catch (error) {
-            console.error('로그아웃 오류:', error);
-        } finally {
-            setLoading(false);
-        }
-    }
+    // 로그아웃 — lib/auth/logout.ts (설정 화면·로그아웃 화면과 같은 코드)
+    const handleLogout = () => performLogout();
 
     return (
         <>
@@ -124,6 +105,16 @@ export default function Header() {
                             }}
                         >
                             <Text style={styles.menuItemText}>랭킹 보기</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                router.push("/settings");
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>설정</Text>
                         </TouchableOpacity>
 
                         <View style={styles.menuDivider} />
