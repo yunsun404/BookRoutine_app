@@ -1,23 +1,49 @@
 /**
  * 개인 보정 화면 (= 독서 전 카메라 초기 설정)
  *
- *  ① 자세 맞추기  : 큰 카메라 미리보기 + 체크리스트(거리·각도·눈·밝기). 모두 ✅ 상태가 1초 유지되면 자동 진행
+ *  ⓪ 안내        : 넘겨 보는 카드 3장 (폰 위치·거리 / 눈으로만 보기 / 시작) → [시작하기]
+ *  ① 자세 맞추기  : 큰 카메라 미리보기 + 체크리스트(거리·각도·눈·밝기). 모두 ✅ 상태가 잠깐 유지되면 자동 진행
  *  ② 점 따라보기  : 점 5개가 차례로 나타남 → 그동안의 모델 출력을 모음
- *                   점마다: 부드럽게 이동 → 도착 신호(톡) → 0.3초 대기 → 값 모으기
- *                   이동·신호·대기 중의 값은 모으지 않음 (대기가 끝난 시각을 shownAt 으로 잡음
- *                   → settled() 의 0.7초까지 더해 도착 후 약 1초부터의 값만 계산에 쓰임)
- *                   실기기 테스트: 고개가 점을 따라 움직이면 오차가 크게 나빠짐 → 안내 문구로 강조
+ *                   시간 설정은 lib/gaze/calibrationTiming.ts (기본 'fast', 점 하나 약 1.5초)
+ *                   점이 움직이기 시작한 시각을 shownAt 으로 잡음 → 계산 쪽 settled() 가 0.7초를 버림
+ *                   (= 이동 0.3초 + 도착 후 0.4초). 그 뒤 "시선이 안정적인" 샘플만 모으고,
+ *                   필요한 개수가 차면 바로 다음 점. 최대 시간 안에 못 모으면 모은 만큼으로 넘어감
  *  ③ 가운데 응시  : 마지막 점에서 가운데로 이동 → 가운데 점 3초 → "가만히 볼 때 흔들림"(잡음) 측정
+ *                   (예전 값 그대로, 안정 필터 없음 — 흔들림이 작게 재지지 않게)
  *  ④ 결과        : 시선 오차(cm) 표시 → [시작하기] / [다시 하기]
  *  언제든 [건너뛰기] → 보정 없이 시작 (처음 5초 자동 기준, 고개 위주 판정)
  *
  * 카메라는 이 컴포넌트 밖(부모)에 있음: onPhaseChange 로 단계를 알려 주면 부모가 미리보기 크기를 바꿈
- * 좌표 기준: 이 오버레이 영역 (onLayout 으로 크기 측정) — 판정도 같은 크기를 "화면"으로 사용
+ * 좌표 기준: 점 영역 (오버레이에서 SafeArea 바깥 = 상태바·카메라 구멍·아래 바 부분을 뺀 곳)
+ *            판정도 같은 크기를 "화면"으로 사용
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  CALIBRATION_TIMING,
+  DEFAULT_CALIBRATION_TIMING,
+  FIXATION_TIMING,
+  isStableSample,
+  safeAreaGaps,
+  type CalibrationTiming,
+  type CalibrationTimingName,
+  type StableSample,
+} from '../../lib/gaze/calibrationTiming';
+import {
+  CALIBRATION_POLICY,
   calibrationTargets,
   computeCalibration,
   settled,
@@ -28,26 +54,10 @@ import {
 import { checkPosture, type PostureItem } from '../../lib/gaze/postureCheck';
 import type { GazeSample } from '../../lib/gaze/useGazeSampler';
 
-export type CalibrationPhase = 'posture' | 'dots' | 'fixation' | 'result';
+export type CalibrationPhase = 'intro' | 'posture' | 'dots' | 'fixation' | 'result';
 
-/**
- * 점마다 머무는 시간: 기기 속도에 맞춰 자동 조절
- *  - 최소 DOT_MIN_MS 는 보여 주고, 안정된 값이 DOT_TARGET_SAMPLES 개 모이면 다음 점으로
- *  - 느린 기기라도 DOT_MAX_MS 가 지나면 넘어감 (그 점은 값이 부족하면 계산에서 빠짐)
- */
-const DOT_MIN_MS = 1_500;
-const DOT_MAX_MS = 5_000;
-const DOT_TARGET_SAMPLES = 4; // 3 → 4: 튀는 값에 덜 흔들리게
-const FIXATION_MIN_MS = 3_000;
-const FIXATION_MAX_MS = 6_000;
-const FIXATION_TARGET_SAMPLES = 5;
-const POLL_MS = 200;
-/** 점이 다음 위치로 이동하는 시간 (이 동안의 값은 모으지 않음) */
-const DOT_MOVE_MS = 450;
 /** 도착 신호(점이 "톡" 커졌다 돌아옴) 길이 */
 const ARRIVE_POP_MS = 280;
-/** 도착한 뒤 값을 모으기 전에 더 기다리는 시간 (눈이 점에 도착할 시간을 줌) */
-const ARRIVE_HOLD_MS = 300;
 /** 점 반지름 (styles.dot 크기의 절반) */
 const DOT_RADIUS = 14;
 const POSTURE_OK_STREAK = 3; // 연속 3번(약 0.75초) 자세 OK → 자동 진행
@@ -55,25 +65,69 @@ const POSTURE_FORCE_MS = 10_000; // 10초 지나면 "그래도 진행" 버튼 �
 /** 부모가 큰 미리보기를 놓는 영역 높이 (자세 단계에서 이 아래에 안내를 그림) */
 export const CALIBRATION_PREVIEW_SPACE = 300;
 
+/** 보정 시작 전 안내 카드 */
+const INTRO_CARDS = [
+  { icon: '📱', title: '폰을 눈높이에 두세요', desc: '책을 읽을 때처럼 들고,\n얼굴에서 30~40cm 떨어뜨려 주세요.' },
+  { icon: '👀', title: '눈으로만 점을 봐 주세요', desc: '점이 나타나면 머리는 그대로 두고\n눈으로만 따라가 주세요.' },
+  { icon: '✨', title: '준비되면 시작해요', desc: '자세를 맞춘 뒤 점 5개와 가운데 점을\n차례로 보면 끝나요. 15초 정도 걸려요.' },
+] as const;
+
+/** 개발 화면 비교용 기록 */
+export interface CalibrationRunStats {
+  timing: CalibrationTimingName;
+  /** 첫 점이 나타난 때부터 결과가 나올 때까지 (ms) */
+  durationMs: number;
+  /** 점마다 계산에 쓰인 샘플 수 (settled 기준) */
+  perPointSamples: number[];
+  /** 샘플이 모자라 계산에서 빠진 점 수 */
+  droppedPoints: number;
+  /** 점 영역 위쪽에 더한 여백 (dp) — 카메라 구멍 피하기 확인용 */
+  areaTopGap: number;
+}
+
 interface Props {
   subscribe: (fn: (s: GazeSample) => void) => () => void;
   onDone: (cal: GazeCalibration | null) => void;
   onPhaseChange?: (phase: CalibrationPhase) => void;
+  /** 점 단계 시간 설정 (기본 'fast'). 개발 화면에서 예전 방식과 비교할 때만 바꿈 */
+  timing?: CalibrationTimingName;
+  /** 결과가 나올 때 한 번 (개발 화면 비교용) */
+  onStats?: (stats: CalibrationRunStats, cal: GazeCalibration) => void;
 }
 
-export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Props) {
+export function GazeCalibrationOverlay({
+  subscribe,
+  onDone,
+  onPhaseChange,
+  timing = DEFAULT_CALIBRATION_TIMING,
+  onStats,
+}: Props) {
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const dotTiming = CALIBRATION_TIMING[timing];
+
+  const [overlayWidth, setOverlayWidth] = useState(0);
+  const [gaps, setGaps] = useState<{ top: number; bottom: number } | null>(null);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
-  const [phase, setPhase] = useState<CalibrationPhase>('posture');
+  const [phase, setPhase] = useState<CalibrationPhase>('intro');
+  const [introPage, setIntroPage] = useState(0);
   const [posture, setPosture] = useState<{ ok: boolean; items: PostureItem[] }>({ ok: false, items: [] });
   const [canForce, setCanForce] = useState(false);
   const [dotIndex, setDotIndex] = useState(0);
   const [result, setResult] = useState<GazeCalibration | null>(null);
 
+  const overlayRef = useRef<View>(null);
+  const introScrollRef = useRef<ScrollView>(null);
+
   // 수집 데이터 (화면 갱신과 무관 → ref)
   const pointsRef = useRef<CalibPointData[]>([]);
-  const fixationRef = useRef<CalibPointData | null>(null);
   const currentRef = useRef<CalibPointData | null>(null);
+  /** 지금 모으는 점에 쓰는 시간 설정 (안정 필터 여부 포함) */
+  const currentTimingRef = useRef<CalibrationTiming>(dotTiming);
+  /** 바로 앞 샘플 (안정 판단용, 점이 바뀌어도 이어서 씀) */
+  const lastSampleRef = useRef<StableSample | null>(null);
   const okStreakRef = useRef(0);
+  const dotsStartedAtRef = useRef(0);
 
   // 점 위치 (점 단계·가운데 응시 단계가 같이 씀 → 이전 위치에서 이어서 움직임)
   const dotPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -81,10 +135,10 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
   const dotScale = useRef(new Animated.Value(1)).current;
 
   /** 점을 target 으로 부드럽게 옮기는 애니메이션 (start 는 부르는 쪽에서) */
-  const moveDotTo = (target: Pt) =>
+  const moveDotTo = (target: Pt, ms: number) =>
     Animated.timing(dotPos, {
       toValue: target,
-      duration: DOT_MOVE_MS,
+      duration: ms,
       easing: Easing.inOut(Easing.cubic),
       useNativeDriver: true,
     });
@@ -98,9 +152,16 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
+  /** 오버레이가 화면에서 놓인 위치를 재서, SafeArea 바깥에 걸친 만큼만 점 영역을 줄임 */
+  const measureOverlay = useCallback(() => {
+    overlayRef.current?.measureInWindow((_x, y, w, h) => {
+      setOverlayWidth(w);
+      setGaps(safeAreaGaps({ windowY: y, height: h }, windowHeight, insets));
+    });
+  }, [windowHeight, insets]);
+
   const startPosture = useCallback(() => {
     pointsRef.current = [];
-    fixationRef.current = null;
     currentRef.current = null;
     okStreakRef.current = 0;
     setResult(null);
@@ -113,14 +174,16 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
     phaseRef.current = 'dots'; // 다음 샘플이 또 부르지 않게 바로 바꿔 둠
     okStreakRef.current = 0;
     pointsRef.current = [];
+    dotsStartedAtRef.current = Date.now();
     setDotIndex(0);
     setPhase('dots');
   }, []);
 
-  // 샘플 받기: 자세 단계면 체크, 점 단계면 수집
+  // 샘플 받기: 자세 단계면 체크, 점 단계면 수집 (안정적인 샘플만)
   useEffect(
     () =>
       subscribe((s) => {
+        if (phaseRef.current === 'intro') return;
         if (phaseRef.current === 'posture') {
           const p = checkPosture(s);
           setPosture(p);
@@ -128,9 +191,13 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
           if (okStreakRef.current >= POSTURE_OK_STREAK) startDots();
           return;
         }
+        if (!s.faceDetected || !s.gaze) return;
+        const sample: StableSample = { gaze: s.gaze, yaw: s.yaw, pitch: s.pitch };
+        const prev = lastSampleRef.current;
+        lastSampleRef.current = sample;
         const cur = currentRef.current;
-        if (cur && s.faceDetected && s.gaze) {
-          cur.obs.push({ t: s.timestamp, gaze: s.gaze, yaw: s.yaw, pitch: s.pitch });
+        if (cur && isStableSample(prev, sample, currentTimingRef.current)) {
+          cur.obs.push({ t: s.timestamp, ...sample });
         }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,22 +212,19 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
   }, [phase]);
 
   /**
-   * 점 하나 진행: [이동(선택)] → 도착 신호(톡) → 잠깐 대기 → 값 모으기 → onDone(point)
-   *  - 이동·도착 신호·대기 동안 들어온 값은 버림 (눈이 아직 점에 도착하지 않았을 수 있어서)
-   *  - shownAt = 대기가 끝난 시각 → settled() 의 0.7초까지 더해 "도착 후 약 1초"부터의 값만 계산에 쓰임
+   * 점 하나 진행: [이동(선택)] → 도착 신호(톡) → (대기) → 값 모으기 → onDone(point)
+   *  - shownAtFrom 'move' : 이동을 시작할 때 shownAt → 계산 쪽 settled() 가 이동 중·도착 직후 값을 버림
+   *  - shownAtFrom 'hold' : 도착 후 대기가 끝난 때 shownAt (예전 방식, 가운데 응시)
+   *  - minMs 이상 지나고 settled 샘플이 targetSamples 개면 끝, maxMs 가 지나면 모은 만큼으로 끝
    *  - 반환값 = 정리 함수 (화면을 나가거나 단계가 바뀌면 애니메이션·타이머를 모두 멈춤)
    */
   const runDotStep = (
     target: Pt,
-    opts: {
-      move: boolean;
-      minMs: number;
-      maxMs: number;
-      targetSamples: number;
-      onDone: (point: CalibPointData) => void;
-    },
+    opts: { move: boolean; timing: CalibrationTiming; onDone: (point: CalibPointData) => void },
   ) => {
+    const t = opts.timing;
     currentRef.current = null;
+    currentTimingRef.current = t;
     let poll: ReturnType<typeof setInterval> | null = null;
     let hold: ReturnType<typeof setTimeout> | null = null;
     let pop: Animated.CompositeAnimation | null = null;
@@ -170,14 +234,14 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
       currentRef.current = point;
       poll = setInterval(() => {
         const elapsed = Date.now() - point.shownAt;
-        const enough = settled(point).length >= opts.targetSamples;
-        if ((elapsed >= opts.minMs && enough) || elapsed >= opts.maxMs) {
+        const enough = settled(point).length >= t.targetSamples;
+        if ((elapsed >= t.minMs && enough) || elapsed >= t.maxMs) {
           if (poll) clearInterval(poll);
           poll = null;
           currentRef.current = null; // 다 모았으면 바로 수집 멈춤
           opts.onDone(point);
         }
-      }, POLL_MS);
+      }, t.pollMs);
     };
 
     // 도착 신호: 점이 "톡" 커졌다 돌아옴 → 눈을 점으로 끌어당김
@@ -188,10 +252,12 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
         Animated.timing(dotScale, { toValue: 1, duration: ARRIVE_POP_MS * 0.6, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       ]);
       pop.start();
-      hold = setTimeout(begin, ARRIVE_HOLD_MS);
+      if (t.shownAtFrom === 'hold') hold = setTimeout(begin, t.arriveHoldMs);
     };
 
-    const move = opts.move ? moveDotTo(target) : null;
+    if (t.shownAtFrom === 'move') begin(); // 점이 움직이기 시작한 때부터 시간 셈
+
+    const move = opts.move ? moveDotTo(target, t.moveMs) : null;
     if (move) {
       move.start(({ finished }) => {
         if (finished) arrive(); // 중간에 멈춘 경우(화면 나감 등)는 진행하지 않음
@@ -206,17 +272,16 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
       pop?.stop();
       if (hold) clearTimeout(hold);
       if (poll) clearInterval(poll);
+      currentRef.current = null;
     };
   };
 
-  // 점 단계: 첫 점은 그 자리에 바로, 나머지는 이전 점에서 이동 (도착 후 최소 1.5초, 최대 5초)
+  // 점 단계: 첫 점은 그 자리에 바로, 나머지는 이전 점에서 이동
   useEffect(() => {
     if (phase !== 'dots' || !targets.length) return;
     return runDotStep(targets[dotIndex], {
       move: dotIndex > 0,
-      minMs: DOT_MIN_MS,
-      maxMs: DOT_MAX_MS,
-      targetSamples: DOT_TARGET_SAMPLES,
+      timing: dotTiming,
       onDone: (point) => {
         pointsRef.current.push(point);
         if (dotIndex + 1 < targets.length) setDotIndex(dotIndex + 1);
@@ -233,23 +298,110 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
       { x: size.width / 2, y: size.height / 2 },
       {
         move: true,
-        minMs: FIXATION_MIN_MS,
-        maxMs: FIXATION_MAX_MS,
-        targetSamples: FIXATION_TARGET_SAMPLES,
+        timing: FIXATION_TIMING,
         onDone: (point) => {
-          fixationRef.current = point;
-          setResult(computeCalibration(pointsRef.current, point, size));
+          const cal = computeCalibration(pointsRef.current, point, size);
+          setResult(cal);
           setPhase('result');
+          if (onStats) {
+            const perPointSamples = pointsRef.current.map((p) => settled(p).length);
+            onStats(
+              {
+                timing,
+                durationMs: Date.now() - dotsStartedAtRef.current,
+                perPointSamples,
+                droppedPoints: perPointSamples.filter((n) => n < CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT).length,
+                areaTopGap: gaps?.top ?? 0,
+              },
+              cal,
+            );
+          }
         },
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, size]);
 
+  // ── 안내 카드 넘기기
+  const introCardWidth = Math.max(overlayWidth - 48, 1);
+  const goIntroPage = (i: number) => {
+    const next = Math.min(Math.max(i, 0), INTRO_CARDS.length - 1);
+    introScrollRef.current?.scrollTo({ x: next * introCardWidth, animated: true });
+    setIntroPage(next);
+  };
+  const onIntroScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setIntroPage(Math.round(e.nativeEvent.contentOffset.x / introCardWidth));
+  };
+  const lastIntro = introPage >= INTRO_CARDS.length - 1;
+
   const showDot = phase === 'dots' || phase === 'fixation';
 
   return (
-    <View style={styles.overlay} onLayout={(e) => setSize(e.nativeEvent.layout)}>
+    <View ref={overlayRef} style={styles.overlay} onLayout={measureOverlay}>
+      {/* 점 영역: SafeArea 안쪽만 (카메라 구멍·상태바·아래 바 피하기). 측정 전에는 그리지 않음 */}
+      {gaps && (
+        <View
+          pointerEvents="none"
+          style={[styles.dotArea, { top: gaps.top, bottom: gaps.bottom }]}
+          onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        >
+          {showDot && (
+            // 점 하나를 계속 두고 위치만 움직임 (left/top 은 반지름만큼 당겨서 점 중심 = dotPos)
+            <Animated.View
+              style={[styles.dot, { transform: [...dotPos.getTranslateTransform(), { scale: dotScale }] }]}
+            />
+          )}
+        </View>
+      )}
+
+      {phase === 'intro' && (
+        <View style={[styles.introWrap, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+          <ScrollView
+            ref={introScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onIntroScrollEnd}
+            style={styles.introScroll}
+          >
+            {INTRO_CARDS.map((c, i) => (
+              <View key={i} style={[styles.introCard, { width: introCardWidth }]}>
+                <Text style={styles.introIcon}>{c.icon}</Text>
+                <Text style={styles.introStep}>
+                  {i + 1} / {INTRO_CARDS.length}
+                </Text>
+                <Text style={styles.introTitle}>{c.title}</Text>
+                <Text style={styles.introDesc}>{c.desc}</Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.introDots}>
+            {INTRO_CARDS.map((_, i) => (
+              <View key={i} style={[styles.introDot, i === introPage && styles.introDotActive]} />
+            ))}
+          </View>
+
+          <View style={styles.row}>
+            {introPage > 0 ? (
+              <Pressable style={styles.ghostBtn} onPress={() => goIntroPage(introPage - 1)}>
+                <Text style={styles.ghostText}>이전</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.ghostBtn} onPress={() => onDone(null)}>
+                <Text style={styles.ghostText}>건너뛰기</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={styles.primaryBtn}
+              onPress={() => (lastIntro ? startPosture() : goIntroPage(introPage + 1))}
+            >
+              <Text style={styles.primaryText}>{lastIntro ? '시작하기' : '다음'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {phase === 'posture' && (
         <View style={[styles.panel, { marginTop: CALIBRATION_PREVIEW_SPACE }]}>
           <Text style={styles.title}>집중도 측정 준비</Text>
@@ -274,21 +426,6 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
             )}
           </View>
         </View>
-      )}
-
-      {showDot && (
-        <>
-          <Text style={styles.guide}>
-            {phase === 'dots'
-              ? `고개는 움직이지 말고 눈으로만 점을 따라가 주세요 (${dotIndex + 1}/${targets.length})`
-              : '가운데 점을 가만히 봐 주세요'}
-          </Text>
-          {/* 점 하나를 계속 두고 위치만 움직임 (left/top 은 반지름만큼 당겨서 점 중심 = dotPos) */}
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.dot, { transform: [...dotPos.getTranslateTransform(), { scale: dotScale }] }]}
-          />
-        </>
       )}
 
       {phase === 'result' && result && (
@@ -319,6 +456,7 @@ export function GazeCalibrationOverlay({ subscribe, onDone, onPhaseChange }: Pro
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#FBFBFD', zIndex: 10 },
+  dotArea: { position: 'absolute', left: 0, right: 0 },
   panel: { paddingHorizontal: 24, gap: 10 },
   resultPanel: { flex: 1, justifyContent: 'center' },
   title: { fontSize: 20, fontWeight: '800', color: '#1F2233' },
@@ -334,7 +472,19 @@ const styles = StyleSheet.create({
   ghostText: { fontSize: 15, fontWeight: '600', color: '#6E7191' },
   primaryBtn: { flex: 1, height: 48, borderRadius: 14, backgroundColor: '#6B7BFF', alignItems: 'center', justifyContent: 'center' },
   primaryText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  guide: { position: 'absolute', top: 16, left: 24, right: 24, textAlign: 'center', fontSize: 14, fontWeight: '600', color: '#6E7191' },
+  introWrap: { ...StyleSheet.absoluteFillObject, paddingHorizontal: 24, justifyContent: 'center' },
+  introScroll: { flexGrow: 0 },
+  introCard: {
+    alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 32, paddingHorizontal: 20,
+    backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderColor: '#ECECF3',
+  },
+  introIcon: { fontSize: 48 },
+  introStep: { fontSize: 12, fontWeight: '700', color: '#A78BFA' },
+  introTitle: { fontSize: 20, fontWeight: '800', color: '#1F2233', textAlign: 'center' },
+  introDesc: { fontSize: 15, lineHeight: 23, color: '#6E7191', textAlign: 'center' },
+  introDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 16 },
+  introDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#ECECF3' },
+  introDotActive: { width: 20, backgroundColor: '#6B7BFF' },
   dot: {
     position: 'absolute', left: -DOT_RADIUS, top: -DOT_RADIUS,
     width: DOT_RADIUS * 2, height: DOT_RADIUS * 2, borderRadius: DOT_RADIUS, backgroundColor: '#6B7BFF', borderWidth: 6, borderColor: '#C9CFFF' },
