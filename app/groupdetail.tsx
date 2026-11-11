@@ -213,7 +213,12 @@ export default function GroupDetailScreen() {
                     </View>
 
                     {feedTab === "THREAD" ? (
-                        <TouchableOpacity style={styles.actionBtn} onPress={() =>
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => {
+                            // 목표 도서가 없으면 책 ID 없이 타래 화면이 열려 다른 책(기본값) 타래가 보이므로 막음
+                            if (!goalBook?.book_id) {
+                                ToastAndroid.show('목표 도서가 없습니다.', ToastAndroid.SHORT);
+                                return;
+                            }
                             router.push({
                                 pathname: "/thread",
                                 params: {
@@ -221,8 +226,8 @@ export default function GroupDetailScreen() {
                                     bookTitle: group?.group_books[0]?.book?.title,
                                     groupId: group_id,
                                 },
-                            })
-                        }>
+                            });
+                        }}>
                             <Text style={styles.threadBtnFilledText}>+ 타래 등록</Text>
                         </TouchableOpacity>
                     ) : (

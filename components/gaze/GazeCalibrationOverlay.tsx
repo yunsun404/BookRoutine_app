@@ -35,9 +35,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CALIBRATION_TIMING,
   DEFAULT_CALIBRATION_TIMING,
+  dotStepStatus,
   FIXATION_TIMING,
   isStableSample,
+  retryTimingAfter,
   safeAreaGaps,
+  withRejectedSamples,
   type CalibrationTiming,
   type CalibrationTimingName,
   type StableSample,
@@ -49,6 +52,7 @@ import {
   settled,
   type CalibPointData,
   type GazeCalibration,
+  type GazeObs,
   type Pt,
 } from '../../lib/gaze/gazeCalibration';
 import { checkPosture, type PostureItem } from '../../lib/gaze/postureCheck';
@@ -104,7 +108,14 @@ export function GazeCalibrationOverlay({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-  const dotTiming = CALIBRATION_TIMING[timing];
+  /** 지금 쓰는 방식: 빠른 방식이 실패하면 [다시 하기]부터 예전(천천히) 방식 */
+  const [activeTiming, setActiveTiming] = useState<CalibrationTimingName>(timing);
+  const [slowRetry, setSlowRetry] = useState(false);
+  useEffect(() => {
+    setActiveTiming(timing); // 개발 화면에서 방식을 바꾸면 따라감
+    setSlowRetry(false);
+  }, [timing]);
+  const dotTiming = CALIBRATION_TIMING[activeTiming];
 
   const [overlayWidth, setOverlayWidth] = useState(0);
   const [gaps, setGaps] = useState<{ top: number; bottom: number } | null>(null);
@@ -122,6 +133,8 @@ export function GazeCalibrationOverlay({
   // 수집 데이터 (화면 갱신과 무관 → ref)
   const pointsRef = useRef<CalibPointData[]>([]);
   const currentRef = useRef<CalibPointData | null>(null);
+  /** 지금 점에서 안정 필터로 걸러 낸 샘플 (모자랄 때 채워 넣기용) */
+  const rejectedRef = useRef<GazeObs[]>([]);
   /** 지금 모으는 점에 쓰는 시간 설정 (안정 필터 여부 포함) */
   const currentTimingRef = useRef<CalibrationTiming>(dotTiming);
   /** 바로 앞 샘플 (안정 판단용, 점이 바뀌어도 이어서 씀) */
@@ -196,9 +209,10 @@ export function GazeCalibrationOverlay({
         const prev = lastSampleRef.current;
         lastSampleRef.current = sample;
         const cur = currentRef.current;
-        if (cur && isStableSample(prev, sample, currentTimingRef.current)) {
-          cur.obs.push({ t: s.timestamp, ...sample });
-        }
+        if (!cur) return;
+        const obs: GazeObs = { t: s.timestamp, ...sample };
+        if (isStableSample(prev, sample, currentTimingRef.current)) cur.obs.push(obs);
+        else rejectedRef.current.push(obs);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [subscribe],
@@ -231,16 +245,23 @@ export function GazeCalibrationOverlay({
 
     const begin = () => {
       const point: CalibPointData = { target, shownAt: Date.now(), obs: [] };
+      rejectedRef.current = [];
       currentRef.current = point;
       poll = setInterval(() => {
-        const elapsed = Date.now() - point.shownAt;
-        const enough = settled(point).length >= t.targetSamples;
-        if ((elapsed >= t.minMs && enough) || elapsed >= t.maxMs) {
-          if (poll) clearInterval(poll);
-          poll = null;
-          currentRef.current = null; // 다 모았으면 바로 수집 멈춤
-          opts.onDone(point);
-        }
+        const status = dotStepStatus(
+          Date.now() - point.shownAt,
+          settled(point).length,
+          t,
+          CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT,
+        );
+        if (status === 'wait') return;
+        if (poll) clearInterval(poll);
+        poll = null;
+        currentRef.current = null; // 다 모았으면 바로 수집 멈춤
+        const rejected = rejectedRef.current;
+        rejectedRef.current = [];
+        // 모자라면 걸러 낸 샘플도 채움 (충분하면 그대로)
+        opts.onDone(withRejectedSamples(point, rejected, CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT));
       }, t.pollMs);
     };
 
@@ -307,7 +328,7 @@ export function GazeCalibrationOverlay({
             const perPointSamples = pointsRef.current.map((p) => settled(p).length);
             onStats(
               {
-                timing,
+                timing: activeTiming,
                 durationMs: Date.now() - dotsStartedAtRef.current,
                 perPointSamples,
                 droppedPoints: perPointSamples.filter((n) => n < CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT).length,
@@ -406,6 +427,7 @@ export function GazeCalibrationOverlay({
         <View style={[styles.panel, { marginTop: CALIBRATION_PREVIEW_SPACE }]}>
           <Text style={styles.title}>집중도 측정 준비</Text>
           <Text style={styles.desc}>책을 읽을 때처럼 폰을 들고, 얼굴이 원 안에 오게 해 주세요.</Text>
+          {slowRetry && <Text style={styles.desc}>이번에는 천천히 다시 해 볼게요.</Text>}
           <View style={styles.list}>
             {posture.items.map((i) => (
               <Text key={i.key} style={[styles.item, { color: i.ok ? '#2BA84A' : '#E5484D' }]}>
@@ -437,11 +459,21 @@ export function GazeCalibrationOverlay({
           <Text style={styles.desc}>{result.summary}</Text>
           {!Number.isFinite(result.errorCm) && (
             <Text style={styles.desc}>
-              얼굴과 두 눈이 화면에 잘 보이게 하고 [다시 하기]를 눌러 주세요. 그대로 시작하면 고개 방향 위주로 측정해요.
+              얼굴과 두 눈이 화면에 잘 보이게 하고 [다시 하기]를 눌러 주세요.
+              {activeTiming === 'fast' ? ' 다시 할 때는 점을 천천히 보여 드릴게요.' : ''} 그대로 시작하면 고개 방향
+              위주로 측정해요.
             </Text>
           )}
           <View style={styles.row}>
-            <Pressable style={styles.ghostBtn} onPress={startPosture}>
+            <Pressable
+              style={styles.ghostBtn}
+              onPress={() => {
+                const next = retryTimingAfter(activeTiming, result);
+                setSlowRetry(next !== activeTiming);
+                setActiveTiming(next);
+                startPosture();
+              }}
+            >
               <Text style={styles.ghostText}>다시 하기</Text>
             </Pressable>
             <Pressable style={styles.primaryBtn} onPress={() => onDone(result)}>
