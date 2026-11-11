@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import SentenceTab from "@/components/sentences/SentenceTab";
 import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
@@ -15,6 +16,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+
+import { LogBox } from "react-native";
+LogBox.ignoreLogs(["VirtualizedLists should never be nested"]); // 콘솔 경고 무시
 
 interface Thread {
     thread_id: string;
@@ -50,7 +54,13 @@ export default function GroupDetailScreen() {
     const { group_id } = useLocalSearchParams<{ group_id: string }>();
 
     const [group, setGroup] = useState<GroupDetail>();
+
+    const [feedTab, setFeedTab] = useState<"THREAD" | "SENTENCE">("THREAD");
+
     const [threads, setThreads] = useState<Thread[]>([]);
+    const [addSheetOpen, setAddSheetOpen] = useState(false);
+    const goalBook = group?.group_books?.[0];
+
     const [loading, setLoading] = useState(false);
 
     const [copiedText, setCopiedText] = useState<string>();
@@ -185,15 +195,25 @@ export default function GroupDetailScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
-            </ScrollView >
 
-            {/* 타래 섹션 */}
-            < View style={styles.sectionHeader} >
-                <Text style={styles.sectionTitle}>그룹원 타래</Text>
-                <View style={styles.threadBtnSection}>
-                    <TouchableOpacity
-                        style={styles.threadBtnFilled}
-                        onPress={() =>
+                {/* 탭 + 액션 버튼을 한 줄로 */}
+                <View style={styles.tabActionRow}>
+                    <View style={styles.tabGroup}>
+                        {(["THREAD", "SENTENCE"] as const).map((t) => (
+                            <TouchableOpacity
+                                key={t}
+                                style={[styles.tab, feedTab === t && styles.activeTab]}
+                                onPress={() => setFeedTab(t)}
+                            >
+                                <Text style={[styles.tabText, feedTab === t && styles.activeTabText]}>
+                                    {t === "THREAD" ? "그룹 타래" : "내 문장"}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {feedTab === "THREAD" ? (
+                        <TouchableOpacity style={styles.actionBtn} onPress={() =>
                             router.push({
                                 pathname: "/thread",
                                 params: {
@@ -202,24 +222,24 @@ export default function GroupDetailScreen() {
                                     groupId: group_id,
                                 },
                             })
-                        }
-                    >
-                        <Text style={styles.threadBtnFilledText}>타래 등록</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.threadBtnOutline}
-                        onPress={showToast}
-                    >
-                        <Text style={styles.threadBtnOutlineText}>문장 수집</Text>
-                    </TouchableOpacity>
+                        }>
+                            <Text style={styles.threadBtnFilledText}>+ 타래 등록</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={styles.threadBtnFilled} onPress={() => {
+                            if (!goalBook?.book_id) {
+                                ToastAndroid.show('목표 도서가 없습니다.', ToastAndroid.SHORT);
+                                return;
+                            }
+                            setFeedTab("SENTENCE");
+                            setAddSheetOpen(true);
+                        }}>
+                            <Text style={styles.threadBtnFilledText}>+ 문장 수집</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
-            </View >
-
-            {
-                loading ? (
-                    <ActivityIndicator style={{ marginTop: 40 }} />
-                ) : (
+                {feedTab === "THREAD" ? (
                     <FlatList
                         data={threads}
                         keyExtractor={(item) => item.thread_id}
@@ -250,10 +270,10 @@ export default function GroupDetailScreen() {
                                         <Text style={styles.threadDate}>
                                             {item.updated_at?.toString().split("T")[0]}
                                         </Text>
-                                        <View style={styles.likeRow}>
+                                        {/* <View style={styles.likeRow}>
                                             <Ionicons name="heart-outline" size={14} color="#aaa" />
                                             <Text style={styles.likeCount}>{item.likes ?? 0}</Text>
-                                        </View>
+                                        </View> */}
                                     </View>
                                 </View>
 
@@ -262,8 +282,15 @@ export default function GroupDetailScreen() {
                             </View>
                         )}
                     />
-                )
-            }
+                ) : goalBook?.book_id && (
+                    <SentenceTab
+                        bookId={goalBook.book_id}
+                        bookTitle={goalBook.book?.title}
+                        addSheetVisible={addSheetOpen}
+                        onCloseAddSheet={() => setAddSheetOpen(false)}
+                    />
+                )}
+            </ScrollView >
         </View >
     );
 }
@@ -412,6 +439,45 @@ const styles = StyleSheet.create({
     threadBtnOutlineText: {
         fontSize: 13,
         color: "#333",
+        fontWeight: "600",
+    },
+    tabActionRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,                 // 추가: 탭과 버튼이 붙지 않게
+        paddingHorizontal: 20,
+        paddingBottom: 8,
+    },
+    tabGroup: { flexDirection: "row", gap: 8, flexShrink: 1 },
+    actionBtn: {   // threadBtnFilled 대신 이걸 이 줄에서만 사용
+        flexShrink: 0,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 12,
+        backgroundColor: "#6C63FF",
+    },
+    tab: {
+        flex: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        alignItems: "center",
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#ddd",
+        backgroundColor: "#fff",
+    },
+    activeTab: {
+        backgroundColor: "#6C63FF",
+        borderColor: "#6C63FF",
+    },
+    tabText: {
+        fontSize: 14,
+        color: "#aaa",
+        fontWeight: "600",
+    },
+    activeTabText: {
+        color: "#fff",
         fontWeight: "600",
     },
 
