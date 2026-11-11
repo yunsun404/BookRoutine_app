@@ -1,6 +1,8 @@
 import { useInputColors } from "@/hooks/useInputColors";
 import { userApi } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -26,7 +28,7 @@ export default function EditProfileScreen() {
     const router = useRouter();
     const ic = useInputColors(); // 입력창 글자·placeholder 색 (다크 모드에서도 보이게)
     const [loading, setLoading] = useState(false);
-    const { updateUser } = useAuthStore();
+    const { user, updateUser } = useAuthStore();
     const [username, setUsername] = useState('');
     const [nickname, setNickname] = useState('');
     const [age, setAge] = useState<number | undefined | null>();
@@ -73,6 +75,11 @@ export default function EditProfileScreen() {
     const handleUpdateProfile = async () => {
         try {
             setLoading(true);
+            let imageUrl = profile_image;
+            if (profile_image && !profile_image.startsWith('http')) {
+                if (!user) return;
+                imageUrl = await uploadProfileImage(profile_image, user.user_id)
+            }
             const payload: UpdateProfilePayload = {
                 username: username || undefined,
                 nickname: nickname || undefined,
@@ -85,13 +92,51 @@ export default function EditProfileScreen() {
                 favorite_genre: favorite_genre.length > 0 ? { favorite_genre } : undefined,
             };
             await userApi.updateMe(payload as any);
-            updateUser({ nickname, profile_image, age });
+            updateUser({ nickname, profile_image: imageUrl, age });
             router.back();
         } catch (error) {
             console.error('프로필 수정 오류:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            alert('사진 접근 권한이 필요해요');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            // TODO: Supabase Storage 업로드 후 받은 공개 URL을 넣기
+            // 지금은 테스트용으로 로컬 uri를 바로 미리보기에 사용
+            setProfileImage(uri);
+        }
+    };
+
+    const uploadProfileImage = async (uri: string, userId: string): Promise<string> => {
+        const response = await fetch(uri);
+        const arrayBuffer = await response.arrayBuffer();
+
+        const ext = uri.split('.').pop()?.split('?')[0] || 'jpg';
+        const path = `${userId}/${Date.now()}.${ext}`;
+
+        const { error } = await supabase.storage
+            .from('profile-images')
+            .upload(path, arrayBuffer, { contentType: `image/${ext}`, upsert: true });
+        if (error) throw error;
+
+        const { data } = supabase.storage.from('profile-images').getPublicUrl(path);
+        return data.publicUrl;
     };
 
     const ageLabel = age ? `${Math.floor(age / 10) * 10}대` : '선택';
@@ -118,10 +163,15 @@ export default function EditProfileScreen() {
             {/* 프로필 이미지 + 닉네임 카드 */}
             <View style={styles.card}>
                 <View style={styles.profileRow}>
-                    <Image
-                        source={profile_image ? { uri: profile_image } : { uri: "https://via.placeholder.com/64" }}
-                        style={styles.avatar}
-                    />
+                    <TouchableOpacity onPress={pickImage}>
+                        <Image
+                            source={profile_image ? { uri: profile_image } : { uri: "https://via.placeholder.com/64" }}
+                            style={styles.avatar}
+                        />
+                        <View style={styles.cameraBadge}>
+                            <Text style={styles.cameraBadgeText}>📷</Text>
+                        </View>
+                    </TouchableOpacity>
                     <TextInput
                         style={[styles.nicknameInput, { color: ic.text }]}
                         placeholderTextColor={ic.placeholder}
@@ -346,6 +396,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
+    },
+    cameraBadge: {
+        position: 'absolute',
+        right: -2,
+        bottom: -2,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        width: 24,
+        height: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    cameraBadgeText: {
+        fontSize: 12,
     },
     avatar: {
         width: 64,
