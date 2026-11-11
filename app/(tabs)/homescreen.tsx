@@ -3,10 +3,16 @@ import FeedCard, { type FeedItem } from "@/components/home/FeedCard";
 import GoalSection, { type Task } from "@/components/home/GoalSection";
 import ReadPagesModal from "@/components/home/ReadPagesModal";
 import { authFetch, BASE_URL } from "@/constants/api";
+import {
+  bookProgress,
+  buildServerProgress,
+  type ServerProgress,
+} from "@/lib/home/bookProgress";
+import { findBookshelfId } from "@/lib/bookshelf/findBookshelfId";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
 import Header from "../../components/Header";
 import { colors, styles } from "../styles/home.styles";
 
@@ -56,11 +62,30 @@ export default function HomeScreen() {
   const [latestFeed, setLatestFeed] = useState<FeedItem | null>(null);
   const [feedLoading, setFeedLoading] = useState(false);
 
+  // 책별 전체 쪽(목표)·서버 읽은 쪽(남은 칸에 쪽수가 없을 때만 씀) — lib/home/bookProgress.ts
+  const [progressByBook, setProgressByBook] = useState<Record<string, ServerProgress>>({});
+
   useFocusEffect(
     useCallback(() => {
       fetchUpcoming();
+      fetchProgress();
     }, [])
   );
+
+  async function fetchProgress() {
+    try {
+      const [shelfRes, goalRes] = await Promise.all([
+        authFetch(`${BASE_URL}/bookshelf`),
+        authFetch(`${BASE_URL}/reading-goals`),
+      ]);
+      const shelves = shelfRes.ok ? await shelfRes.json() : null;
+      const goals = goalRes.ok ? await goalRes.json() : null;
+      setProgressByBook(buildServerProgress(shelves, goals));
+    } catch (e) {
+      // 실패하면 남은 체크리스트로 짐작한 값을 보여 줌
+      console.error("읽은 쪽수 불러오기 실패:", e);
+    }
+  }
 
   async function fetchUpcoming() {
     try {
@@ -151,6 +176,7 @@ export default function HomeScreen() {
       }
       setEditingTask(null);
       fetchUpcoming();
+      fetchProgress();
       return null;
     } catch (e) {
       console.error("읽은 쪽수 저장 실패:", e);
@@ -159,6 +185,7 @@ export default function HomeScreen() {
   };
 
   const handleToggle = async (bookId: string, taskId: string) => {
+    // 체크 표시를 먼저 보여 줌 → 읽은 쪽·온도도 그 칸 끝 쪽까지 바로 오름 (bookProgress)
     setBookGroups((prev) =>
       prev.map((group) => {
         if (group.book_id !== bookId) return group;
@@ -177,10 +204,16 @@ export default function HomeScreen() {
       });
 
       if (!res.ok) {
+        // 거절 이유를 알려 줌 (예: 서버가 UTC 기준이라 한국 오전 0~9시에는 오늘 칸도 "아직 다가오지 않은 날짜"로 거절)
+        const data = await res.json().catch(() => null);
+        const message = Array.isArray(data?.message) ? data.message.join("\n") : data?.message;
+        Alert.alert("체크하지 못했어요", message || "잠시 후 다시 시도해주세요.");
         fetchUpcoming();
+        fetchProgress();
         return;
       }
 
+      fetchProgress();
       setTimeout(() => {
         setBookGroups((prev) =>
           prev
@@ -196,52 +229,24 @@ export default function HomeScreen() {
       }, 300);
     } catch (e) {
       console.error("체크 상태 변경 실패:", e);
+      Alert.alert("체크하지 못했어요", "서버에 연결할 수 없어요.");
       fetchUpcoming();
+      fetchProgress();
     }
   };
 
   const booksForCarousel: Book[] = [
     ...bookGroups.map((group) => {
-      let totalMaxPage = 0; // 전체 쪽수 (마지막 태스크의 끝 페이지)
-      let currentMaxPage = 0; // 현재 읽은 쪽수 (체크된 항목 중 가장 큰 끝 페이지)
-      let firstUncheckedStartPage = -1; // 체크 안 된 첫 항목의 시작 페이지
-
-      if (group.tasks && group.tasks.length > 0) {
-        const lastTask = group.tasks[group.tasks.length - 1];
-        const lastMatch = lastTask.goal_content.match(/~(\s*[\d,]+)/);
-        if (lastMatch) {
-          const pageNum = parseInt(lastMatch[1].replace(/,/g, ""), 10);
-          if (!isNaN(pageNum)) totalMaxPage = pageNum;
-        }
-
-        group.tasks.forEach((task) => {
-          const rangeMatch = task.goal_content.match(/([\d,]+)\s*~\s*([\d,]+)/);
-          if (rangeMatch) {
-            const startNum = parseInt(rangeMatch[1].replace(/,/g, ""), 10);
-            const endNum = parseInt(rangeMatch[2].replace(/,/g, ""), 10);
-
-            if (!isNaN(endNum) && task.check_box && endNum > currentMaxPage) {
-              currentMaxPage = endNum;
-            }
-            if (!task.check_box && firstUncheckedStartPage === -1 && !isNaN(startNum)) {
-              firstUncheckedStartPage = startNum;
-            }
-          }
-        });
-
-        if (currentMaxPage === 0 && firstUncheckedStartPage !== -1) {
-          currentMaxPage = firstUncheckedStartPage;
-        }
-      }
-
+      // 읽은 쪽 = 다음에 읽을 칸의 시작 쪽 - 1, 전체 쪽 = 목표의 total_pages — lib/home/bookProgress.ts
+      const { currentPage, totalPages } = bookProgress(group.tasks ?? [], progressByBook[group.book_id]);
       return {
         id: group.book_id,
         title: group.book_title,
         author: "",
         subtitle: "",
         coverUrl: group.cover_url,
-        currentPage: currentMaxPage,
-        totalPages: totalMaxPage > 0 ? totalMaxPage : 100,
+        currentPage,
+        totalPages,
       };
     }),
     {
@@ -257,11 +262,37 @@ export default function HomeScreen() {
 
   const isLastEmptyPage = bookGroups.length === 0 || currentIndex === booksForCarousel.length - 1;
 
-  const goThread = () =>
-    router.push({
-      pathname: "/thread",
-      params: { bookId: activeGroup.book_id, bookTitle: activeGroup.book_title },
+  // 타래 버튼 → 내 책장의 그 책 화면(/book/{bookshelf_id})에서 타래 쓰기·AI 요약
+  // 책장에서 못 찾거나 연결이 안 되면 기존 타래 화면(/thread)을 열 수 있게 물어봄 — lib/bookshelf/findBookshelfId.ts
+  const [openingBook, setOpeningBook] = useState(false);
+
+  const openOldThreadScreen = (bookId: string, bookTitle: string) =>
+    router.push({ pathname: "/thread", params: { bookId, bookTitle } });
+
+  const goThread = async () => {
+    const group = activeGroup;
+    if (!group || isLastEmptyPage || openingBook) return; // 읽는 책이 없거나 "책 등록하기" 칸이면 아무것도 안 함
+    setOpeningBook(true);
+    const result = await findBookshelfId(group.book_id, async (path) => {
+      const res = await authFetch(`${BASE_URL}${path}`);
+      if (!res.ok) throw new Error(`${path} ${res.status}`);
+      return res.json();
     });
+    setOpeningBook(false);
+
+    if (result.ok) {
+      router.push({ pathname: "/book/[bookshelf_id]", params: { bookshelf_id: result.bookshelfId } });
+      return;
+    }
+    Alert.alert(
+      result.reason === "network" ? "책장 정보를 불러오지 못했어요" : "내 책장에서 이 책을 찾지 못했어요",
+      "기존 타래 화면에서 타래를 쓸 수 있어요.",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "타래 화면 열기", onPress: () => openOldThreadScreen(group.book_id, group.book_title) },
+      ],
+    );
+  };
 
   if (loading) {
     return (

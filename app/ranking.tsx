@@ -1,4 +1,6 @@
 import { authFetch, BASE_URL } from "@/constants/api";
+import { findMyRow, isMe } from "@/lib/ranking/myRank";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -58,8 +60,9 @@ export default function RankingScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const myNickname = "데미안";
-  const myPercentile = 3;
+  // 로그인한 사용자 (앱 시작 때 /users/me 로 채워짐)
+  const me = useAuthStore((st) => st.user);
+  const myName = me?.nickname || "나";
 
   useEffect(() => {
     fetchRanking();
@@ -81,6 +84,7 @@ export default function RankingScreen() {
     }
   }
 
+  const myRow = findMyRow(rankingData, me);
   const top1 = rankingData.find((u) => u.rank === 1);
   const top2 = rankingData.find((u) => u.rank === 2);
   const top3 = rankingData.find((u) => u.rank === 3);
@@ -155,14 +159,17 @@ export default function RankingScreen() {
             <View style={s.card}>
               <View style={s.banner}>
                 <Text style={s.bannerText}>
-                  {myNickname} 님은 같은 연령대 {ageGroup}대에서
+                  {myName} 님은 같은 연령대 {ageGroup}대에서
                 </Text>
-                <Text style={s.bannerStrong}>상위 {myPercentile}%</Text>
+                {/* 서버가 상위 20명만 줘서 "상위 N%"는 계산할 수 없음 → 목록에 있을 때만 순위 표시 */}
+                <Text style={s.bannerStrong}>
+                  {myRow ? `${myRow.rank}위 · ${myRow.completed_books_count}권 완독` : "아직 순위 밖이에요"}
+                </Text>
               </View>
 
               <View style={s.list}>
                 {rankingData.map((user) => {
-                  const mine = user.nickname === myNickname;
+                  const mine = isMe(user, me);
                   const top = user.rank <= 3;
                   return (
                     <View key={`${user.rank}-${user.username}`} style={[s.row, mine && s.rowMine]}>

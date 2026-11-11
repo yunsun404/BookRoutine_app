@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/tokens";
+import { useInputColors } from "@/hooks/useInputColors";
 import { groupApi } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -16,6 +17,7 @@ import {
 } from "react-native";
 
 export default function EditgroupScreen() {
+    const ic = useInputColors(); // placeholder 색 (다크 모드에서도 보이게)
     const [loading, setLoading] = useState(false);
     const { group_id } = useLocalSearchParams<{ group_id: string }>();
 
@@ -150,6 +152,7 @@ export default function EditgroupScreen() {
                     <Text style={styles.fieldLabel}>그룹 이름</Text>
                     <TextInput
                         style={styles.input}
+                        placeholderTextColor={ic.placeholder}
                         placeholder="그룹 이름"
                         value={groupName}
                         onChangeText={setGroupName}
@@ -159,6 +162,7 @@ export default function EditgroupScreen() {
                     <Text style={styles.fieldLabel}>최대 인원</Text>
                     <TextInput
                         style={styles.input}
+                        placeholderTextColor={ic.placeholder}
                         placeholder="최대 인원수"
                         value={people_count}
                         onChangeText={setPeopleCount}
@@ -172,6 +176,7 @@ export default function EditgroupScreen() {
                         </Text>
                         <TextInput
                             style={styles.input}
+                            placeholderTextColor={ic.placeholder}
                             placeholder="목표 도서 (선택)"
                             value={searchTitle}
                             onChangeText={handleSearch}

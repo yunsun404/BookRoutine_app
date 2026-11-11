@@ -14,6 +14,7 @@
 // 그래서 갤러리에서 고른 순간 Supabase Storage에 업로드하고,
 // 공개 URL을 받아서 그걸 넘깁니다.
 import { authFetch, BASE_URL, getUserId } from "@/constants/api";
+import { useInputColors } from "@/hooks/useInputColors";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -59,6 +60,7 @@ const SEARCH_DEBOUNCE_MS = 400;
 const COVER_BUCKET = "folder-covers";
 
 export default function CoverPickerModal({ visible, onClose, onSelect }: Props) {
+  const ic = useInputColors(); // 입력창 글자·placeholder 색 (다크 모드에서도 보이게)
   const [tab, setTab] = useState<Tab>("gallery");
   const [uploading, setUploading] = useState(false);
 
@@ -218,7 +220,8 @@ export default function CoverPickerModal({ visible, onClose, onSelect }: Props) 
         ) : (
           <View style={styles.bookTab}>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: ic.text }]}
+              placeholderTextColor={ic.placeholder}
               placeholder="책 제목으로 검색 (예: 이기적 유전자)"
               value={query}
               onChangeText={setQuery}

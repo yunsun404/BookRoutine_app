@@ -1,9 +1,12 @@
 import { userApi } from '@/lib/api';
+import { clearStoredTokens, getAccessToken, TOKEN_KEYS } from '@/lib/auth/session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 interface User {
   user_id: string;
+  /** 로그인 아이디 (랭킹에서 내 줄 찾기용. 닉네임은 겹칠 수 있음) */
+  username?: string;
   nickname: string;
   age?: number | null;
   profile_image?: string | null;
@@ -46,41 +49,43 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoggedIn: false,
 
   setAuth: async (user, access_token, refreshToken) => {
-    await AsyncStorage.setItem('access_token', access_token);
-    await AsyncStorage.setItem('refreshToken', refreshToken);
+    await AsyncStorage.setItem(TOKEN_KEYS.access, access_token);
+    await AsyncStorage.setItem(TOKEN_KEYS.refresh, refreshToken);
     set({ user, access_token, isLoggedIn: true });
   },
 
+  // 앱 시작 시 (app/_layout.tsx 가 화면을 그리기 전에 부름)
+  //  - 저장된 토큰이 있으면 /users/me 로 확인 (만료됐으면 request 가 refresh 토큰으로 갱신 후 다시 시도)
+  //  - 갱신도 안 되면 세션 만료 처리가 토큰을 지움 → 로그아웃 상태로 시작 (로그인 화면)
+  //  - 서버에 못 닿은 경우(네트워크)는 토큰이 남아 있으므로 로그인 상태 유지
   restoreToken: async () => {
-    const access_token = await AsyncStorage.getItem('access_token');
-    if (access_token) {
-      set({ access_token, isLoggedIn: true });
-      try {
-        const me = await userApi.getMe();
-        set({ user: me });
-      } catch (e) {
-        // 토큰 만료 등으로 getMe 실패하면 로그아웃 처리
-        await AsyncStorage.removeItem('access_token');
-        await AsyncStorage.removeItem('refresh_token');
+    const access_token = await getAccessToken();
+    if (!access_token) return;
+    set({ access_token, isLoggedIn: true });
+    try {
+      const me = await userApi.getMe();
+      set({ user: me, access_token: (await getAccessToken()) ?? access_token });
+    } catch (e) {
+      if (!(await getAccessToken())) {
         set({ user: null, access_token: null, isLoggedIn: false });
+      } else {
+        console.warn('프로필 확인 실패 (네트워크) — 로그인 상태는 유지:', e);
       }
     }
   },
 
   clearAuth: async () => {
-    await AsyncStorage.removeItem('access_token');
-    await AsyncStorage.removeItem('refreshToken');
+    await clearStoredTokens();
     set({ user: null, access_token: null, isLoggedIn: false });
   },
 
   updateaccess_token: async (access_token) => {
-    await AsyncStorage.setItem('access_token', access_token);
+    await AsyncStorage.setItem(TOKEN_KEYS.access, access_token);
     set({ access_token });
   },
 
   deleteAuth: async () => {
-    await AsyncStorage.removeItem('access_token');
-    await AsyncStorage.removeItem('refreshToken');
+    await clearStoredTokens();
     set({ user: null, access_token: null, isLoggedIn: false });
   },
 
