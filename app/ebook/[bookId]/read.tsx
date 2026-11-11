@@ -7,7 +7,9 @@
  *      위: 뒤로가기 · 제목 · 읽은 시간 · 측정 중 표시
  *      아래: 실시간 집중도 · 집중 시간 · 골든타임 · 30초 집중 그래프 · 진행률 · 종료
  *  - 바가 숨겨져 있어도 오른쪽 위 작은 칩에 지금 상태와 집중도가 항상 보임
- *  - 골든타임을 처음 달성하면 상단에 알림
+ *  - 골든타임을 처음 달성하면 상단에 축하 연출 (시연용: READER_CONFIG.DEMO_CELEBRATE_AT_SEC 초에 미리 보여 줌)
+ *  - 집중 중이면 상태 칩 테두리가 은은하게 빛남 (골든타임 중엔 금색)
+ *  - 딴짓이 10초 이어지면 소리+진동+짧은 문구 (위 바 🔔 로 소리만 끄기)
  *  - 카메라는 글 뒤에 숨어 0.5초마다 판정 (화면은 기기 밖으로 나가지 않음)
  */
 import { Ionicons } from '@expo/vector-icons';
@@ -16,13 +18,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, type CameraRef, useCameraPermission } from 'react-native-vision-camera';
-import {
-  CALIBRATION_PREVIEW_SPACE,
-  type CalibrationPhase,
-  GazeCalibrationOverlay,
-} from '../../../components/gaze/GazeCalibrationOverlay';
+import { GazeCalibrationOverlay } from '../../../components/gaze/GazeCalibrationOverlay';
 import { FocusTimeline } from '../../../components/reading/FocusTimeline';
+import { AlertFlash, CelebrationBanner, ChipGlow, type Flash } from '../../../components/reading/ReaderFlash';
 import { type PageInfo, PagedReader } from '../../../components/reading/PagedReader';
+import { useDistractionAlert } from '../../../hooks/useDistractionAlert';
 import { useFocusBucketRecorder } from '../../../hooks/useFocusBucketRecorder';
 import { useGazeFocusTracker } from '../../../hooks/useGazeFocusTracker';
 import { endReadingSession, fetchBookDetail, sendFocusBatch, startReadingSession } from '../../../lib/api/ebooks';
@@ -111,7 +111,6 @@ export default function EbookReadingScreen() {
 
   // [개인 보정] 세션 시작 직후 보정 화면 → 끝나면 독서 화면 (칩을 누르면 다시 보정)
   const [calibrating, setCalibrating] = useState(true);
-  const [calPhase, setCalPhase] = useState<CalibrationPhase>('intro');
   const showCalibration = !!session && hasPermission && calibrating;
 
   const cameraRef = useRef<CameraRef>(null);
@@ -138,6 +137,21 @@ export default function EbookReadingScreen() {
     if (showCalibration && session) flushCurrentBucket();
   }, [showCalibration, session, flushCurrentBucket]);
 
+  // [딴짓 알림] 딴짓이 10초 이어지면 소리+진동 (보정 중·종료 확인 창이 떠 있을 때는 안 셈)
+  const { soundOn, toggleSound } = useDistractionAlert({
+    focus,
+    active: tracking && !showCalibration && !confirmVisible,
+    onAlert: (message) => setAlertFlash({ id: ++flashIdRef.current, title: message }),
+  });
+
+  // [시연용] 독서 시간이 정한 초가 되면 골든타임 달성 연출을 미리 한 번 보여 줌 (화면 연출만, 실제 골든타임과 무관)
+  useEffect(() => {
+    const at = READER_CONFIG.DEMO_CELEBRATE_AT_SEC;
+    if (at == null || demoCelebratedRef.current || elapsed < at) return;
+    demoCelebratedRef.current = true;
+    setCelebrate({ id: ++flashIdRef.current, title: '골든타임 달성!', sub: `시연용 미리보기 · ${at}초 읽기 달성` });
+  }, [elapsed]);
+
   /* ─────────── 위·아래 바 (터치하면 보이고, 다시 터치하면 숨김) ─────────── */
   const [barsVisible, setBarsVisible] = useState(false);
   const barsAnim = useRef(new Animated.Value(0)).current;
@@ -161,8 +175,11 @@ export default function EbookReadingScreen() {
   }, [session, showCalibration]);
 
   /* ─────────── 골든타임 달성 알림 ─────────── */
-  const [toast, setToast] = useState<string | null>(null);
+  const [celebrate, setCelebrate] = useState<Flash | null>(null); // 골든타임 달성 연출
+  const [alertFlash, setAlertFlash] = useState<Flash | null>(null); // 딴짓 알림 문구
+  const flashIdRef = useRef(0);
   const goldenNotifiedRef = useRef(false);
+  const demoCelebratedRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -227,8 +244,7 @@ export default function EbookReadingScreen() {
       });
       if (golden.best && !goldenNotifiedRef.current) {
         goldenNotifiedRef.current = true;
-        setToast(`골든타임 달성! ${hhmm(golden.best.start)}부터 5분 넘게 집중했어요`);
-        setTimeout(() => setToast(null), 5000);
+        setCelebrate({ id: ++flashIdRef.current, title: '골든타임 달성!', sub: `${hhmm(golden.best.start)}부터 5분 넘게 집중했어요` });
       }
       if (READER_CONFIG.SHOW_PAGE_DEBUG && mode === 'page') setPageDebug(getPageStats());
     }, 1000);
@@ -321,6 +337,10 @@ export default function EbookReadingScreen() {
           ? { label: '멍때림', color: C.unfocused }
           : FOCUS_CHIP[focus.state];
 
+  // 상태 칩 테두리 빛: 기준을 잡은 뒤 "집중" 판정일 때만
+  const chipGlowOn = hasPermission && focus?.phase === 'tracking' && focus.state === 'focused';
+  const flashTop = (barsVisible ? 68 : 12) + 46; // 상태 칩 바로 아래
+
   // 골든타임 한 줄
   const g = stats?.golden;
   const goldenOngoing = !!(g?.best && g.current && g.current.start === g.best.start);
@@ -334,9 +354,9 @@ export default function EbookReadingScreen() {
           ? `골든타임까지 ${mmss(Math.max(0, g.minMs - g.current.ms))}`
           : '5분 이어서 집중하면 골든타임';
 
-  // 카메라 뷰 위치: 자세 맞추기 = 크게 보이게 / 그 외 = 글 뒤에 숨김
+  // 카메라 뷰: 항상 글·보정 화면 뒤에 숨김 (자세 맞추기에서도 영상 대신 얼굴 아이콘을 보여 줌)
   //  (셔터 소리 없는 "미리보기 캡처" 방식이라 뷰가 일정 크기 이상이어야 해서, 작게 줄이지 않고 뒤에 숨김)
-  const camStyle = showCalibration && calPhase === 'posture' ? styles.camLarge : styles.camBehind;
+  const camStyle = styles.camBehind;
   const barTranslateTop = barsAnim.interpolate({ inputRange: [0, 1], outputRange: [-80, 0] });
   const barTranslateBottom = barsAnim.interpolate({ inputRange: [0, 1], outputRange: [220, 0] });
 
@@ -402,6 +422,7 @@ export default function EbookReadingScreen() {
         onPress={hasPermission ? () => setCalibrating(true) : requestPermission}
         accessibilityLabel="집중 상태, 누르면 다시 보정"
       >
+        <ChipGlow active={chipGlowOn} color={goldenOngoing ? C.golden : C.focused} />
         <View style={[styles.statusDot, { backgroundColor: focusChip.color }]} />
         <Text style={[styles.focusText, { color: focusChip.color }]} numberOfLines={1}>
           {focusChip.label}
@@ -410,13 +431,9 @@ export default function EbookReadingScreen() {
         {goldenOngoing && <Ionicons name="sunny" size={13} color={C.golden} />}
       </Pressable>
 
-      {/* 골든타임 달성 알림 */}
-      {!!toast && (
-        <View style={styles.toast} pointerEvents="none">
-          <Ionicons name="sunny" size={18} color={C.golden} />
-          <Text style={styles.toastText}>{toast}</Text>
-        </View>
-      )}
+      {/* 딴짓 알림 문구 (약 2초) · 골든타임 달성 연출 — 상태 칩 바로 아래, 터치는 통과 */}
+      <AlertFlash flash={alertFlash} durationMs={READER_CONFIG.DISTRACTION_ALERT.TOAST_MS} top={flashTop} />
+      <CelebrationBanner flash={celebrate} top={flashTop} />
 
       {/* 위 바 */}
       <Animated.View
@@ -438,6 +455,14 @@ export default function EbookReadingScreen() {
           <View style={styles.statusDot} />
           <Text style={styles.statusTime}>{formatElapsed(elapsed)}</Text>
         </View>
+        <Pressable
+          style={styles.camBadge}
+          onPress={toggleSound}
+          hitSlop={8}
+          accessibilityLabel={soundOn ? '딴짓 알림 소리 끄기' : '딴짓 알림 소리 켜기'}
+        >
+          <Ionicons name={soundOn ? 'notifications' : 'notifications-off'} size={16} color={soundOn ? C.primary : C.inkMute} />
+        </Pressable>
         {hasPermission && (
           <View style={styles.camBadge}>
             <Ionicons name="videocam" size={16} color={tracking ? C.primary : C.inkMute} />
@@ -492,7 +517,6 @@ export default function EbookReadingScreen() {
       {showCalibration && (
         <GazeCalibrationOverlay
           subscribe={subscribe}
-          onPhaseChange={setCalPhase}
           onDone={(cal) => {
             setCalibration(cal);
             setCalibrating(false);
@@ -595,24 +619,6 @@ const styles = StyleSheet.create({
   focusText: { fontSize: 13, fontWeight: '800', flexShrink: 1 },
   focusScore: { fontSize: 13, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
 
-  /* 골든타임 알림 */
-  toast: {
-    position: 'absolute',
-    top: 110,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: C.goldenSoft,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    zIndex: 16,
-    elevation: 4,
-  },
-  toastText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#B4473A' },
-
   /* 위 바 */
   topBar: {
     position: 'absolute',
@@ -709,19 +715,6 @@ const styles = StyleSheet.create({
   retryText: { fontSize: 13, fontWeight: '700', color: C.primary },
 
   /* 카메라 */
-  camLarge: {
-    position: 'absolute',
-    top: (CALIBRATION_PREVIEW_SPACE - 240) / 2,
-    alignSelf: 'center',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    overflow: 'hidden',
-    borderWidth: 4,
-    borderColor: C.primary,
-    backgroundColor: C.line,
-    zIndex: 20,
-  },
   camBehind: {
     position: 'absolute',
     top: 0,

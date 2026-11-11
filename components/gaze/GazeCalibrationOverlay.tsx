@@ -2,7 +2,8 @@
  * 개인 보정 화면 (= 독서 전 카메라 초기 설정)
  *
  *  ⓪ 안내        : 넘겨 보는 카드 3장 (폰 위치·거리 / 눈으로만 보기 / 시작) → [시작하기]
- *  ① 자세 맞추기  : 큰 카메라 미리보기 + 체크리스트(거리·각도·눈·밝기). 모두 ✅ 상태가 잠깐 유지되면 자동 진행
+ *  ① 자세 맞추기  : 얼굴 아이콘(카메라 영상은 보여 주지 않음) + 체크리스트(거리·각도·눈·밝기). 모두 ✅ 상태가 잠깐 유지되면 자동 진행
+ *                   아이콘 색: 회색 = 얼굴 찾는 중 / 주황 = 자세 고치는 중 / 초록 = 좋음
  *  ② 점 따라보기  : 점 5개가 차례로 나타남 → 그동안의 모델 출력을 모음
  *                   시간 설정은 lib/gaze/calibrationTiming.ts (기본 'fast', 점 하나 약 1.5초)
  *                   점이 움직이기 시작한 시각을 shownAt 으로 잡음 → 계산 쪽 settled() 가 0.7초를 버림
@@ -31,13 +32,17 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   CALIBRATION_TIMING,
   DEFAULT_CALIBRATION_TIMING,
+  dotStepStatus,
   FIXATION_TIMING,
   isStableSample,
+  retryTimingAfter,
   safeAreaGaps,
+  withRejectedSamples,
   type CalibrationTiming,
   type CalibrationTimingName,
   type StableSample,
@@ -49,6 +54,7 @@ import {
   settled,
   type CalibPointData,
   type GazeCalibration,
+  type GazeObs,
   type Pt,
 } from '../../lib/gaze/gazeCalibration';
 import { checkPosture, type PostureItem } from '../../lib/gaze/postureCheck';
@@ -104,7 +110,14 @@ export function GazeCalibrationOverlay({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-  const dotTiming = CALIBRATION_TIMING[timing];
+  /** 지금 쓰는 방식: 빠른 방식이 실패하면 [다시 하기]부터 예전(천천히) 방식 */
+  const [activeTiming, setActiveTiming] = useState<CalibrationTimingName>(timing);
+  const [slowRetry, setSlowRetry] = useState(false);
+  useEffect(() => {
+    setActiveTiming(timing); // 개발 화면에서 방식을 바꾸면 따라감
+    setSlowRetry(false);
+  }, [timing]);
+  const dotTiming = CALIBRATION_TIMING[activeTiming];
 
   const [overlayWidth, setOverlayWidth] = useState(0);
   const [gaps, setGaps] = useState<{ top: number; bottom: number } | null>(null);
@@ -122,6 +135,8 @@ export function GazeCalibrationOverlay({
   // 수집 데이터 (화면 갱신과 무관 → ref)
   const pointsRef = useRef<CalibPointData[]>([]);
   const currentRef = useRef<CalibPointData | null>(null);
+  /** 지금 점에서 안정 필터로 걸러 낸 샘플 (모자랄 때 채워 넣기용) */
+  const rejectedRef = useRef<GazeObs[]>([]);
   /** 지금 모으는 점에 쓰는 시간 설정 (안정 필터 여부 포함) */
   const currentTimingRef = useRef<CalibrationTiming>(dotTiming);
   /** 바로 앞 샘플 (안정 판단용, 점이 바뀌어도 이어서 씀) */
@@ -196,9 +211,10 @@ export function GazeCalibrationOverlay({
         const prev = lastSampleRef.current;
         lastSampleRef.current = sample;
         const cur = currentRef.current;
-        if (cur && isStableSample(prev, sample, currentTimingRef.current)) {
-          cur.obs.push({ t: s.timestamp, ...sample });
-        }
+        if (!cur) return;
+        const obs: GazeObs = { t: s.timestamp, ...sample };
+        if (isStableSample(prev, sample, currentTimingRef.current)) cur.obs.push(obs);
+        else rejectedRef.current.push(obs);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [subscribe],
@@ -231,16 +247,23 @@ export function GazeCalibrationOverlay({
 
     const begin = () => {
       const point: CalibPointData = { target, shownAt: Date.now(), obs: [] };
+      rejectedRef.current = [];
       currentRef.current = point;
       poll = setInterval(() => {
-        const elapsed = Date.now() - point.shownAt;
-        const enough = settled(point).length >= t.targetSamples;
-        if ((elapsed >= t.minMs && enough) || elapsed >= t.maxMs) {
-          if (poll) clearInterval(poll);
-          poll = null;
-          currentRef.current = null; // 다 모았으면 바로 수집 멈춤
-          opts.onDone(point);
-        }
+        const status = dotStepStatus(
+          Date.now() - point.shownAt,
+          settled(point).length,
+          t,
+          CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT,
+        );
+        if (status === 'wait') return;
+        if (poll) clearInterval(poll);
+        poll = null;
+        currentRef.current = null; // 다 모았으면 바로 수집 멈춤
+        const rejected = rejectedRef.current;
+        rejectedRef.current = [];
+        // 모자라면 걸러 낸 샘플도 채움 (충분하면 그대로)
+        opts.onDone(withRejectedSamples(point, rejected, CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT));
       }, t.pollMs);
     };
 
@@ -307,7 +330,7 @@ export function GazeCalibrationOverlay({
             const perPointSamples = pointsRef.current.map((p) => settled(p).length);
             onStats(
               {
-                timing,
+                timing: activeTiming,
                 durationMs: Date.now() - dotsStartedAtRef.current,
                 perPointSamples,
                 droppedPoints: perPointSamples.filter((n) => n < CALIBRATION_POLICY.MIN_SAMPLES_PER_POINT).length,
@@ -403,18 +426,24 @@ export function GazeCalibrationOverlay({
       )}
 
       {phase === 'posture' && (
+        <PostureFace status={postureStatus(posture)} />
+      )}
+
+      {phase === 'posture' && (
         <View style={[styles.panel, { marginTop: CALIBRATION_PREVIEW_SPACE }]}>
           <Text style={styles.title}>집중도 측정 준비</Text>
-          <Text style={styles.desc}>책을 읽을 때처럼 폰을 들고, 얼굴이 원 안에 오게 해 주세요.</Text>
+          <Text style={styles.desc}>책을 읽을 때처럼 폰을 들고, 화면 위쪽 카메라를 바라봐 주세요.</Text>
+          {slowRetry && <Text style={styles.desc}>이번에는 천천히 다시 해 볼게요.</Text>}
           <View style={styles.list}>
             {posture.items.map((i) => (
               <Text key={i.key} style={[styles.item, { color: i.ok ? '#2BA84A' : '#E5484D' }]}>
                 {i.ok ? '✅' : '⚠️'} {i.label}
-                {i.ok ? '' : ` — ${i.hint}`}
+                {i.ok ? '' : ` — ${i.key === 'face' ? '얼굴이 카메라에 보이게 해 주세요' : i.hint}`}
               </Text>
             ))}
             {posture.items.length === 0 && <Text style={styles.item}>카메라 준비 중…</Text>}
           </View>
+          <Text style={styles.privacy}>카메라 영상은 화면에 나오지 않고, 기기 안에서만 처리돼요.</Text>
           <View style={styles.row}>
             <Pressable style={styles.ghostBtn} onPress={() => onDone(null)}>
               <Text style={styles.ghostText}>건너뛰기</Text>
@@ -437,11 +466,21 @@ export function GazeCalibrationOverlay({
           <Text style={styles.desc}>{result.summary}</Text>
           {!Number.isFinite(result.errorCm) && (
             <Text style={styles.desc}>
-              얼굴과 두 눈이 화면에 잘 보이게 하고 [다시 하기]를 눌러 주세요. 그대로 시작하면 고개 방향 위주로 측정해요.
+              얼굴과 두 눈이 화면에 잘 보이게 하고 [다시 하기]를 눌러 주세요.
+              {activeTiming === 'fast' ? ' 다시 할 때는 점을 천천히 보여 드릴게요.' : ''} 그대로 시작하면 고개 방향
+              위주로 측정해요.
             </Text>
           )}
           <View style={styles.row}>
-            <Pressable style={styles.ghostBtn} onPress={startPosture}>
+            <Pressable
+              style={styles.ghostBtn}
+              onPress={() => {
+                const next = retryTimingAfter(activeTiming, result);
+                setSlowRetry(next !== activeTiming);
+                setActiveTiming(next);
+                startPosture();
+              }}
+            >
               <Text style={styles.ghostText}>다시 하기</Text>
             </Pressable>
             <Pressable style={styles.primaryBtn} onPress={() => onDone(result)}>
@@ -450,6 +489,59 @@ export function GazeCalibrationOverlay({
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+/* ─────────── 자세 맞추기: 카메라 영상 대신 얼굴 아이콘 ─────────── */
+type PostureStatus = 'search' | 'adjust' | 'ok';
+
+function postureStatus(p: { ok: boolean; items: PostureItem[] }): PostureStatus {
+  if (p.ok) return 'ok';
+  const faceFound = p.items.length > 0 && !p.items.some((i) => i.key === 'face' && !i.ok);
+  return faceFound ? 'adjust' : 'search';
+}
+
+const POSTURE_FACE = {
+  search: { icon: 'scan-outline', color: '#A0A3BD', soft: '#ECECF3', text: '얼굴을 찾고 있어요' },
+  adjust: { icon: 'happy-outline', color: '#E5A100', soft: '#FFF3D6', text: '아래 안내대로 맞춰 주세요' },
+  ok: { icon: 'happy', color: '#2BA84A', soft: '#E3F6E8', text: '좋아요! 그대로 있어 주세요' },
+} as const;
+
+function PostureFace({ status }: { status: PostureStatus }) {
+  const ring = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    // 찾는 중에는 바깥 링이 천천히 퍼짐, 그 외에는 멈춤
+    if (status !== 'search') {
+      ring.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(ring, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [status, ring]);
+
+  const f = POSTURE_FACE[status];
+  return (
+    <View pointerEvents="none" style={styles.faceArea}>
+      <View style={styles.faceStage}>
+        <Animated.View
+          style={[
+            styles.faceRing,
+            {
+              borderColor: f.color,
+              opacity: ring.interpolate({ inputRange: [0, 1], outputRange: [status === 'search' ? 0.6 : 0, 0] }),
+              transform: [{ scale: ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+            },
+          ]}
+        />
+        <View style={[styles.faceCircle, { backgroundColor: f.soft, borderColor: f.color }]}>
+          <Ionicons name={f.icon} size={96} color={f.color} />
+        </View>
+      </View>
+      <Text style={[styles.faceText, { color: f.color }]}>{f.text}</Text>
     </View>
   );
 }
@@ -464,6 +556,28 @@ const styles = StyleSheet.create({
   big: { fontSize: 26, fontWeight: '800', color: '#6B7BFF' },
   list: { gap: 6, marginTop: 4 },
   item: { fontSize: 14, fontWeight: '600', color: '#1F2233' },
+  privacy: { fontSize: 12, color: '#A0A3BD', marginTop: 2 },
+  faceArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: CALIBRATION_PREVIEW_SPACE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  faceStage: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center' },
+  faceRing: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 3 },
+  faceCircle: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceText: { fontSize: 15, fontWeight: '800' },
   row: { flexDirection: 'row', gap: 12, marginTop: 12 },
   ghostBtn: {
     flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: '#ECECF3',
