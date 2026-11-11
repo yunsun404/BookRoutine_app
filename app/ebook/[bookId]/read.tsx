@@ -111,7 +111,7 @@ export default function EbookReadingScreen() {
 
   // [개인 보정] 세션 시작 직후 보정 화면 → 끝나면 독서 화면 (칩을 누르면 다시 보정)
   const [calibrating, setCalibrating] = useState(true);
-  const [calPhase, setCalPhase] = useState<CalibrationPhase>('posture');
+  const [calPhase, setCalPhase] = useState<CalibrationPhase>('intro');
   const showCalibration = !!session && hasPermission && calibrating;
 
   const cameraRef = useRef<CameraRef>(null);

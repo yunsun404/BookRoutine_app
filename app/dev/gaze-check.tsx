@@ -20,9 +20,19 @@ import { NitroImage } from 'react-native-nitro-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, type CameraRef, useCameraPermission } from 'react-native-vision-camera';
 
-import { CALIBRATION_PREVIEW_SPACE, type CalibrationPhase, GazeCalibrationOverlay } from '../../components/gaze/GazeCalibrationOverlay';
+import {
+  CALIBRATION_PREVIEW_SPACE,
+  type CalibrationPhase,
+  type CalibrationRunStats,
+  GazeCalibrationOverlay,
+} from '../../components/gaze/GazeCalibrationOverlay';
 import { useGazeFocusTracker } from '../../hooks/useGazeFocusTracker';
+import { type CalibrationTimingName, summarizeRuns } from '../../lib/gaze/calibrationTiming';
 import { GAZE_CONFIG } from '../../lib/gaze/gazeConfig';
+
+/** 보정 비교 기록 1줄 (앱이 켜져 있는 동안만 보관) */
+type RunRow = CalibrationRunStats & { errorCm: number; noiseDp: number; quality: string };
+const TIMING_LABEL: Record<CalibrationTimingName, string> = { fast: '새', legacy: '예전' };
 
 const STATE_LABEL = { focused: '집중', unfocused: '딴짓', away: '자리 비움' } as const;
 const STATE_COLOR = { focused: '#2BA84A', unfocused: '#E5A100', away: '#E5484D' } as const;
@@ -33,8 +43,12 @@ const f2 = (v: number | null | undefined) => (v == null ? '-' : v.toFixed(2));
 export default function GazeCheckScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const [calibrating, setCalibrating] = useState(false);
-  const [calPhase, setCalPhase] = useState<CalibrationPhase>('posture');
+  const [calPhase, setCalPhase] = useState<CalibrationPhase>('intro');
   const cameraRef = useRef<CameraRef>(null);
+  // 보정 방식 비교: [새 / 예전] 전환 + 보정할 때마다 기록
+  const [timing, setTiming] = useState<CalibrationTimingName>('fast');
+  const [runs, setRuns] = useState<RunRow[]>([]);
+  const summary = summarizeRuns(runs);
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
@@ -97,6 +111,39 @@ export default function GazeCheckScreen() {
         <Text style={styles.sub}>
           보정: {calibration ? `${calibration.quality} · 오차 ${f1(calibration.errorCm)}cm · 흔들림 ${f1(calibration.noiseDp)}dp` : '안 함 (자동 기준)'}
         </Text>
+
+        {/* 보정 방식 비교 (같은 자세·밝기에서 번갈아 각 5번 → 오차 중앙값 비교) */}
+        <View style={styles.titleRow}>
+          <Text style={styles.row}>보정 방식</Text>
+          <View style={styles.toggleRow}>
+            {(['fast', 'legacy'] as const).map((name) => (
+              <Pressable
+                key={name}
+                style={[styles.smallBtn, timing !== name && styles.smallBtnOff]}
+                onPress={() => setTiming(name)}
+              >
+                <Text style={styles.smallBtnText}>{TIMING_LABEL[name]}</Text>
+              </Pressable>
+            ))}
+            {runs.length > 0 && (
+              <Pressable style={[styles.smallBtn, styles.smallBtnOff]} onPress={() => setRuns([])}>
+                <Text style={styles.smallBtnText}>기록 지우기</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+        {(['fast', 'legacy'] as const).map((name) => (
+          <Text key={name} style={styles.sub}>
+            {TIMING_LABEL[name]}: {summary[name].count}회 · 오차 중앙값 {f1(summary[name].medianErrorCm)}cm · 실패{' '}
+            {summary[name].failed} · 시간 중앙값 {summary[name].medianDurationMs == null ? '-' : f1(summary[name].medianDurationMs / 1000)}초
+          </Text>
+        ))}
+        {runs.slice(-4).map((r, i) => (
+          <Text key={i} style={styles.sub}>
+            [{TIMING_LABEL[r.timing]}] {f1(r.durationMs / 1000)}초 · 오차 {f1(r.errorCm)}cm · 흔들림 {f1(r.noiseDp)}dp · {r.quality} ·
+            점별 샘플 {r.perPointSamples.join('/')} · 빠진 점 {r.droppedPoints} · 위 여백 {Math.round(r.areaTopGap)}dp
+          </Text>
+        ))}
         <View style={styles.eyes}>
           {s?.debugEyes ? (
             <>
@@ -129,6 +176,13 @@ export default function GazeCheckScreen() {
         <GazeCalibrationOverlay
           subscribe={subscribe}
           onPhaseChange={setCalPhase}
+          timing={timing}
+          onStats={(st, cal) =>
+            setRuns((prev) => [
+              ...prev,
+              { ...st, errorCm: cal.errorCm, noiseDp: cal.noiseDp, quality: cal.quality },
+            ])
+          }
           onDone={(cal) => {
             setCalibration(cal);
             setCalibrating(false);
@@ -160,6 +214,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: '800', color: '#1F2233' },
   smallBtn: { backgroundColor: '#EEF0FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   smallBtnText: { color: '#6B7BFF', fontWeight: '700', fontSize: 12 },
+  smallBtnOff: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#EEF0FF' },
+  toggleRow: { flexDirection: 'row', gap: 6 },
   state: { fontSize: 17, fontWeight: '800' },
   eyes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   eye: { width: 96, height: 96, borderRadius: 6, backgroundColor: '#ddd' },
