@@ -49,7 +49,8 @@ const sortOptionsList = [
 ];
 const sortOptionsFeed = [
   { label: '최신순', value: 'UPDATE_DESC' },
-  { label: '좋아요순', value: 'LIKES_DESC' }
+  // { label: '좋아요순', value: 'LIKES_DESC' }
+  { label: '오래된 순', value: 'UPDATE_ASC' },
 ];
 
 // ── 컴포넌트 ───────────────────────────────────────────────────────
@@ -103,6 +104,8 @@ export default function GroupScreen() {
         memberCount: g._count.group_members ?? 0,
         joined_at: g.group_members[0].joined_at,
       }));
+      // 최신 가입순으로 정렬
+      formatted.sort((a, b) => new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime());
       setGroups(formatted);
       await fetchFeeds(formatted); // groups state 말고 formatted 직접 넘기기
     } catch (e) {
@@ -126,8 +129,10 @@ export default function GroupScreen() {
         quote: t.content,
         likes: t.likes
       }));
-      // likes 많은 순으로 정렬
-      formatted.sort((a, b) => b.likes - a.likes);
+      // // likes 많은 순으로 정렬
+      // formatted.sort((a, b) => b.likes - a.likes);
+      // 최신순으로 정렬
+      formatted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPosts(formatted);
     } catch (e) {
       console.error("그룹 피드 조회 실패: ", e);
@@ -151,15 +156,23 @@ export default function GroupScreen() {
     return groups;
   }, [sortKey, groups]); // sortKey 상태가 변경될 때마다 다시 실행
   const sortPosts = useMemo(() => {
+    const copy = [...posts];
     if (sortKey === "UPDATE_DESC") {
-      return [...posts].sort((a, b) => {
+      return copy.sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
         return dateB - dateA;
       })
     }
-    if (sortKey === "LIKES_DESC") {
-      return [...posts].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+    // if (sortKey === "LIKES_DESC") {
+    //   return [...posts].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+    // }
+    if (sortKey === "UPDATE_ASC") {
+      return copy.sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateA - dateB;
+      })
     }
     return posts;
   }, [sortKey, posts]);
@@ -465,7 +478,7 @@ export default function GroupScreen() {
               <View>
                 <TextInput
                   style={[styles.modalInput, { color: ic.text }]}
-                placeholderTextColor={ic.placeholder}
+                  placeholderTextColor={ic.placeholder}
                   placeholder="목표 도서 (필수)"
                   value={searchTitle}
                   onChangeText={handleSearch}

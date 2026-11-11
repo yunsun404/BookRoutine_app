@@ -250,10 +250,10 @@ export default function GroupDetailScreen() {
                                         <Text style={styles.threadDate}>
                                             {item.updated_at?.toString().split("T")[0]}
                                         </Text>
-                                        <View style={styles.likeRow}>
+                                        {/* <View style={styles.likeRow}>
                                             <Ionicons name="heart-outline" size={14} color="#aaa" />
                                             <Text style={styles.likeCount}>{item.likes ?? 0}</Text>
-                                        </View>
+                                        </View> */}
                                     </View>
                                 </View>
 
